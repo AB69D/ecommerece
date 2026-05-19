@@ -1,0 +1,54 @@
+name: Deploy backend to VPS
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'backend/**'
+      - 'docker-compose.yml'
+      - 'Caddyfile'
+      - '.github/workflows/deploy-backend.yml'
+  workflow_dispatch: # allow manual trigger from the Actions tab
+
+concurrency:
+  group: deploy-backend
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Set up SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.VPS_SSH_PRIVATE_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -H "${{ secrets.VPS_HOST }}" >> ~/.ssh/known_hosts
+
+      - name: Pull + rebuild backend on VPS
+        run: |
+          ssh -o StrictHostKeyChecking=no root@${{ secrets.VPS_HOST }} bash -s <<'EOF'
+          set -euo pipefail
+          cd /opt/ab9d-ecommerce
+          echo "Current commit (before): $(git rev-parse --short HEAD)"
+          git fetch --quiet origin main
+          git reset --hard origin/main
+          echo "Current commit (after):  $(git rev-parse --short HEAD)"
+          docker compose up -d --build backend
+          # restart caddy too if Caddyfile changed
+          if git diff --name-only HEAD@{1} HEAD 2>/dev/null | grep -qE '^(Caddyfile|docker-compose\.yml)$'; then
+            docker compose up -d --force-recreate caddy
+          fi
+          # wait for health
+          for i in $(seq 1 30); do
+            if curl -fsS -m 3 http://127.0.0.1/healthz >/dev/null 2>&1; then
+              echo "Backend healthy after $i attempts"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "Backend did not become healthy"
+          docker compose logs --tail=50 backend
+          exit 1
+          EOF
