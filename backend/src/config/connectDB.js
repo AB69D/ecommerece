@@ -1,21 +1,19 @@
-import mongoose from "mongoose";
-import dotenv from 'dotenv'
-dotenv.config()
+import mongoose from 'mongoose';
+import { env } from './env.js';
+import { logger } from '../lib/logger.js';
 
-if(!process.env.MONGODB_URI){
-    throw new Error(
-        "Please provide MONGODB_URI in the .env file"
-    )
-}
+mongoose.set('strictQuery', true);
 
-async function connectDB(){
-    try {
-        await mongoose.connect(process.env.MONGODB_URI)
-        console.log("connect DB")
-    } catch (error) {
-        console.log("Mongodb connect error",error)
-        process.exit(1)
-    }
-}
+const connectDB = async () => {
+    mongoose.connection.on('connected', () => logger.info('MongoDB connected'));
+    mongoose.connection.on('disconnected', () => logger.warn('MongoDB disconnected'));
+    mongoose.connection.on('error', (err) => logger.error({ err }, 'MongoDB error'));
 
-export default connectDB
+    await mongoose.connect(env.MONGODB_URI, {
+        serverSelectionTimeoutMS: 10000,
+        socketTimeoutMS: 45000,
+        maxPoolSize: 20,
+    });
+};
+
+export default connectDB;

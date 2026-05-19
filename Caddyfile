@@ -1,0 +1,33 @@
+# Caddy reverse proxy config
+# Replace example.com with your real domain before deploying.
+# Caddy auto-provisions Let's Encrypt certs for any real domain.
+
+{
+    # Global options. Uncomment email line once you have a real domain.
+    # email you@example.com
+}
+
+# --- Production HTTPS site (uncomment + customize when domain is ready) ---
+# example.com {
+#     encode zstd gzip
+#     reverse_proxy /api/* backend:8080
+#     reverse_proxy /healthz backend:8080
+#     reverse_proxy frontend:3000
+# }
+#
+# api.example.com {
+#     encode zstd gzip
+#     reverse_proxy backend:8080
+# }
+
+# --- IP-only HTTP fallback (works without a domain, during initial setup) ---
+:80 {
+    encode zstd gzip
+    @api path /api/* /healthz
+    handle @api {
+        reverse_proxy backend:8080
+    }
+    handle {
+        reverse_proxy frontend:3000
+    }
+}

@@ -2,12 +2,10 @@
 const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8080";
 
 const nextConfig = {
+  output: 'standalone',
   images: {
     remotePatterns: [
-      {
-        protocol: 'https',
-        hostname: 'res.cloudinary.com',
-      },
+      { protocol: 'https', hostname: 'res.cloudinary.com' },
     ],
   },
   async rewrites() {

@@ -1,37 +1,37 @@
-import jwt from 'jsonwebtoken'
+import jwt from 'jsonwebtoken';
+import { env } from '../config/env.js';
+import { ApiError } from '../lib/ApiError.js';
+import { asyncHandler } from '../utils/asyncHandler.js';
 
-const authMiddleware = (request, response, next) => {
+const extractToken = (req) => {
+    const header = req.headers.authorization;
+    if (header?.startsWith('Bearer ')) return header.slice(7).trim();
+    return null;
+};
+
+const verify = (token) => {
     try {
-        const authHeader = request.headers.authorization
-
-        if (!authHeader || !authHeader.startsWith('Bearer ')) {
-            return response.status(401).json({
-                message: "Access denied. No token provided.",
-                error: true,
-                success: false
-            })
-        }
-
-        const token = authHeader.split(' ')[1]
-
-        if (!token) {
-            return response.status(401).json({
-                message: "Access denied. No token provided.",
-                error: true,
-                success: false
-            })
-        }
-
-        const decoded = jwt.verify(token, process.env.JWT_SECRET)
-        request.admin = decoded
-        next()
-    } catch (error) {
-        return response.status(401).json({
-            message: "Invalid or expired token.",
-            error: true,
-            success: false
-        })
+        return jwt.verify(token, env.JWT_SECRET);
+    } catch (err) {
+        if (err.name === 'TokenExpiredError') throw ApiError.unauthorized('Token expired');
+        throw ApiError.unauthorized('Invalid token');
     }
-}
+};
 
-export default authMiddleware
+export const requireAuth = asyncHandler(async (req, _res, next) => {
+    const token = extractToken(req);
+    if (!token) throw ApiError.unauthorized('Access denied. No token provided.');
+    req.admin = verify(token);
+    next();
+});
+
+export const requireRole = (...allowedRoles) =>
+    asyncHandler(async (req, _res, next) => {
+        if (!req.admin) throw ApiError.unauthorized();
+        if (allowedRoles.length && !allowedRoles.includes(req.admin.role)) {
+            throw ApiError.forbidden('Insufficient permissions');
+        }
+        next();
+    });
+
+export default requireAuth;

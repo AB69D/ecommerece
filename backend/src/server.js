@@ -1,8 +1,18 @@
-import express from 'express'
-import cors from 'cors'
-import dotenv from 'dotenv'
-dotenv.config()
-import connectDB from "./config/connectDB.js";
+import express from 'express';
+import cors from 'cors';
+import helmet from 'helmet';
+import hpp from 'hpp';
+import rateLimit from 'express-rate-limit';
+import mongoSanitize from 'express-mongo-sanitize';
+import pinoHttp from 'pino-http';
+
+import { env } from './config/env.js';
+import connectDB from './config/connectDB.js';
+import { logger } from './lib/logger.js';
+import { errorHandler } from './middlewares/error.middleware.js';
+import { notFound } from './middlewares/notFound.middleware.js';
+import requireAuth from './middlewares/auth.middleware.js';
+
 import categoryRouter from './routes/category.route.js';
 import productRouter from './routes/product.route.js';
 import headerRouter from './routes/header.route.js';
@@ -17,47 +27,124 @@ import clientReviewRouter from './routes/clientReview.route.js';
 import clientCategoryRouter from './routes/clientCategory.route.js';
 import authRouter from './routes/auth.route.js';
 import adminMgmtRouter from './routes/adminMgmt.route.js';
-import authMiddleware from './middlewares/auth.middleware.js';
+import siteSettingsRouter from './routes/siteSettings.route.js';
+import footerRouter from './routes/footer.route.js';
+import navMenuRouter from './routes/navMenu.route.js';
 
 const app = express();
 
-const corsOptions = {
-    origin: process.env.FRONTEND_URL ? [process.env.FRONTEND_URL, process.env.FRONTEND_URL.replace(/\/$/, '')] : true,
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'guest-id', 'Authorization'],
-    credentials: true
-}
-app.use(cors(corsOptions))
+app.set('trust proxy', 1);
 
-app.use(express.json())
-app.use(express.urlencoded({ extended: true }))
+app.use(helmet());
+app.use(
+    cors({
+        origin: env.FRONTEND_URL ? [env.FRONTEND_URL, env.FRONTEND_URL.replace(/\/$/, '')] : true,
+        methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+        allowedHeaders: ['Content-Type', 'guest-id', 'Authorization'],
+        credentials: true,
+    }),
+);
 
-const PORT = process.env.PORT || 8080
+app.use(express.json({ limit: '1mb' }));
+app.use(express.urlencoded({ extended: true, limit: '1mb' }));
+app.use(mongoSanitize());
+app.use(hpp());
 
-app.get("/", (request, response) => {
-    ///server to client
-    response.json({
-        message: "Ab9dEcommerce.com is under development " + PORT
-    })
-})
+app.use(
+    pinoHttp({
+        logger,
+        customLogLevel: (_req, res, err) => {
+            if (err || res.statusCode >= 500) return 'error';
+            if (res.statusCode >= 400) return 'warn';
+            return 'info';
+        },
+        autoLogging: { ignore: (req) => req.url === '/healthz' },
+    }),
+);
 
-app.use("/api/admin/category", authMiddleware, categoryRouter);
-app.use("/api/admin/product", authMiddleware, productRouter);
-app.use("/api/admin/header", authMiddleware, headerRouter);
-app.use("/api/client/header", clientHeaderRouter);
-app.use("/api/client/product", clientProductRouter);
-app.use("/api/client/cart", clientCartRouter);
-app.use("/api/client/order", clientOrderRouter);
-app.use("/api/admin/order", authMiddleware, orderRouter);
-app.use("/api/client/contact", contactMessageRouter);
-app.use("/api/admin/review", authMiddleware, reviewRouter);
-app.use("/api/client/review", clientReviewRouter);
-app.use("/api/client/category", clientCategoryRouter);
-app.use("/api/admin/auth", authRouter);
-app.use("/api/admin/admins", authMiddleware, adminMgmtRouter);
-
-connectDB().then(() => {
-    app.listen(PORT, () => {
-        console.log("Server is running", PORT)
-    })
+const apiLimiter = rateLimit({
+    windowMs: env.RATE_LIMIT_WINDOW_MS,
+    max: env.RATE_LIMIT_MAX,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { success: false, message: 'Too many requests, please try again later.' },
 });
+
+const authLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 20,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { success: false, message: 'Too many auth attempts, please try again later.' },
+});
+
+app.get('/healthz', (_req, res) => res.json({ status: 'ok', uptime: process.uptime() }));
+
+app.get('/', (_req, res) =>
+    res.json({ success: true, message: 'Ab9dEcommerce API', env: env.NODE_ENV }),
+);
+
+// Auth (stricter rate limit)
+app.use('/api/admin/auth', authLimiter, authRouter);
+
+// API rate limit for everything else
+app.use('/api', apiLimiter);
+
+// Admin routes (require auth)
+app.use('/api/admin/category', requireAuth, categoryRouter);
+app.use('/api/admin/product', requireAuth, productRouter);
+app.use('/api/admin/header', requireAuth, headerRouter);
+app.use('/api/admin/order', requireAuth, orderRouter);
+app.use('/api/admin/review', requireAuth, reviewRouter);
+app.use('/api/admin/admins', requireAuth, adminMgmtRouter);
+app.use('/api/admin/site-settings', requireAuth, siteSettingsRouter.admin);
+app.use('/api/admin/footer', requireAuth, footerRouter.admin);
+app.use('/api/admin/nav-menu', requireAuth, navMenuRouter.admin);
+
+// Public/client routes
+app.use('/api/client/header', clientHeaderRouter);
+app.use('/api/client/product', clientProductRouter);
+app.use('/api/client/cart', clientCartRouter);
+app.use('/api/client/order', clientOrderRouter);
+app.use('/api/client/contact', contactMessageRouter);
+app.use('/api/client/review', clientReviewRouter);
+app.use('/api/client/category', clientCategoryRouter);
+app.use('/api/client/site-settings', siteSettingsRouter.client);
+app.use('/api/client/footer', footerRouter.client);
+app.use('/api/client/nav-menu', navMenuRouter.client);
+
+app.use(notFound);
+app.use(errorHandler);
+
+const start = async () => {
+    try {
+        await connectDB();
+        const server = app.listen(env.PORT, () => {
+            logger.info(`Server listening on port ${env.PORT} [${env.NODE_ENV}]`);
+        });
+
+        const shutdown = (signal) => {
+            logger.info(`${signal} received, shutting down gracefully`);
+            server.close(() => {
+                logger.info('HTTP server closed');
+                process.exit(0);
+            });
+            setTimeout(() => process.exit(1), 10000).unref();
+        };
+        process.on('SIGTERM', () => shutdown('SIGTERM'));
+        process.on('SIGINT', () => shutdown('SIGINT'));
+    } catch (err) {
+        logger.fatal({ err }, 'Failed to start server');
+        process.exit(1);
+    }
+};
+
+process.on('unhandledRejection', (reason) => {
+    logger.fatal({ reason }, 'Unhandled promise rejection');
+});
+process.on('uncaughtException', (err) => {
+    logger.fatal({ err }, 'Uncaught exception');
+    process.exit(1);
+});
+
+start();
