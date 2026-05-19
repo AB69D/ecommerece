@@ -5,28 +5,28 @@ import TopSelling from "@/components/TopSelling.jsx";
 import CustomerReviews from "@/components/CustomerReviews.jsx";
 
 export const metadata = {
-    title: "Gram2Ghor - Pure Organic Products | Ghee, Honey, Oil & More",
-    description: "Shop pure organic products at Gram2Ghor. We offer premium quality ghee, honey, mustard oil, dates, and traditional Bengali food products.",
-    keywords: "Gram2Ghor, organic food, pure ghee, honey, mustard oil, Bengali food, traditional food, organic products Bangladesh",
+    title: "Ab9dEcommerce - Quality Products | Wide Selection",
+    description: "Shop quality products at Ab9dEcommerce. We offer a wide selection of quality products across multiple categories.",
+    keywords: "Ab9dEcommerce, products, pure various products, quality products, traditional food, products",
     openGraph: {
-        title: "Gram2Ghor - Pure Organic Products",
-        description: "Shop pure organic products at Gram2Ghor. Premium quality ghee, honey, mustard oil, and traditional Bengali food products.",
-        url: "https://gram2ghor.com",
-        siteName: "Gram2Ghor",
+        title: "Ab9dEcommerce - quality products",
+        description: "Shop quality products at Ab9dEcommerce. Premium quality various products, and quality products.",
+        url: "https://example.com",
+        siteName: "Ab9dEcommerce",
         images: [
             {
                 url: "/logo.png",
                 width: 800,
                 height: 600,
-                alt: "Gram2Ghor Logo"
+                alt: "Ab9dEcommerce Logo"
             }
         ],
         type: "website"
     },
     twitter: {
         card: "summary_large_image",
-        title: "Gram2Ghor - Pure Organic Products",
-        description: "Shop pure organic products at Gram2Ghor",
+        title: "Ab9dEcommerce - quality products",
+        description: "Shop quality products at Ab9dEcommerce",
         images: ["/logo.png"]
     }
 };

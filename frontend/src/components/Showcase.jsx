@@ -76,7 +76,7 @@ export default function Showcase() {
                             <a href={header.url} target="_blank" rel="noopener noreferrer" className="block w-full h-full">
                                 <img
                                     src={header.image}
-                                    alt="Gram2Ghor banner"
+                                    alt="Ab9dEcommerce banner"
                                     loading={idx === 0 ? "eager" : "lazy"}
                                     decoding={idx === 0 ? "sync" : "async"}
                                     fetchPriority={idx === 0 ? "high" : "auto"}
@@ -86,7 +86,7 @@ export default function Showcase() {
                         ) : (
                             <img
                                 src={header.image}
-                                alt="Gram2Ghor banner"
+                                alt="Ab9dEcommerce banner"
                                 loading={idx === 0 ? "eager" : "lazy"}
                                 decoding={idx === 0 ? "sync" : "async"}
                                 fetchPriority={idx === 0 ? "high" : "auto"}

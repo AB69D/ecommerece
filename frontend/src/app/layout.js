@@ -17,20 +17,20 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata = {
-  metadataBase: new URL("https://gram2ghor.com"),
-  title: "Gram2ghor - Collections of Organic Products",
-  description: "Gram2ghor is promising to deliver organic food products from direct gram to your home",
+  metadataBase: new URL("https://example.com"),
+  title: "Ab9dEcommerce - Quality Products Online",
+  description: "Ab9dEcommerce is promising to deliver products from our store to your door",
   openGraph: {
     type: "website",
     locale: "en_US",
-    url: "https://gram2ghor.com",
-    siteName: "Gram2Ghor",
+    url: "https://example.com",
+    siteName: "Ab9dEcommerce",
     images: [
       {
         url: "/logo.png",
         width: 800,
         height: 600,
-        alt: "Gram2Ghor Logo"
+        alt: "Ab9dEcommerce Logo"
       }
     ]
   },

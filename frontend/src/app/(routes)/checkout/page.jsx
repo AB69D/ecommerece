@@ -22,13 +22,13 @@ export default function CheckoutPage() {
     };
     
     const deliveryCharges = {
-        inside_dhaka: 70,
-        outside_dhaka: 100
+        local: 70,
+        regional: 100
     };
 
     const deliveryLabels = {
-        inside_dhaka: 'Inside Dhaka',
-        outside_dhaka: 'Outside Dhaka'
+        local: 'Local Delivery',
+        regional: 'Regional Delivery'
     };
     
     const [formData, setFormData] = useState({
@@ -36,7 +36,7 @@ export default function CheckoutPage() {
         customerPhone: '',
         customerEmail: '',
         shippingAddress: '',
-        deliveryArea: 'inside_dhaka',
+        deliveryArea: 'local',
         paymentMethod: 'cash_on_delivery',
         notes: ''
     });
@@ -229,8 +229,8 @@ export default function CheckoutPage() {
                                         onChange={handleChange}
                                         className="w-full px-4 py-2 border border-gray-300 rounded-lg"
                                     >
-                                        <option value="inside_dhaka">Inside Dhaka (70৳)</option>
-                                        <option value="outside_dhaka">Outside Dhaka (100৳)</option>
+                                        <option value="local">Local Delivery (70$)</option>
+                                        <option value="regional">Regional Delivery (100$)</option>
                                     </select>
                                 </div>
                                 <div className="md:col-span-2">
@@ -253,7 +253,7 @@ export default function CheckoutPage() {
                             disabled={placingOrder}
                             className="w-full bg-emerald-600 text-white font-bold py-3 rounded-lg hover:bg-emerald-700 disabled:opacity-50"
                         >
-                            {placingOrder ? 'Placing Order...' : `Place Order - ৳${totalAmount}`}
+                            {placingOrder ? 'Placing Order...' : `Place Order - $${totalAmount}`}
                         </button>
                     </form>
                 </div>
@@ -276,13 +276,13 @@ export default function CheckoutPage() {
                                         <p className="text-xs text-gray-500">Qty: {item.quantity}</p>
                                         {item.discountPercent > 0 ? (
                                             <div className="flex items-center gap-2">
-                                                <p className="text-xs text-gray-400 line-through">৳{item.price * item.quantity}</p>
+                                                <p className="text-xs text-gray-400 line-through">${item.price * item.quantity}</p>
                                                 <p className="text-sm font-bold text-emerald-600">
-                                                    ৳{(item.price - (item.price * item.discountPercent / 100)) * item.quantity}
+                                                    ${(item.price - (item.price * item.discountPercent / 100)) * item.quantity}
                                                 </p>
                                             </div>
                                         ) : (
-                                            <p className="text-sm font-bold">৳{item.price * item.quantity}</p>
+                                            <p className="text-sm font-bold">${item.price * item.quantity}</p>
                                         )}
                                     </div>
                                 </div>
@@ -291,21 +291,21 @@ export default function CheckoutPage() {
                         <div className="border-t mt-4 pt-4 space-y-2">
                             <div className="flex justify-between text-gray-600">
                                 <span>Subtotal</span>
-                                <span>৳{subtotal}</span>
+                                <span>${subtotal}</span>
                             </div>
                             {totalDiscount > 0 && (
                                 <div className="flex justify-between text-emerald-600">
                                     <span>Discount</span>
-                                    <span>-৳{totalDiscount.toFixed(0)}</span>
+                                    <span>-${totalDiscount.toFixed(0)}</span>
                                 </div>
                             )}
                             <div className="flex justify-between text-gray-600">
                                 <span>Shipping ({deliveryLabels[formData.deliveryArea]})</span>
-                                <span>৳{deliveryCharges[formData.deliveryArea]}</span>
+                                <span>${deliveryCharges[formData.deliveryArea]}</span>
                             </div>
                             <div className="flex justify-between font-bold text-gray-800 text-lg">
                                 <span>Total</span>
-                                <span>৳{totalAmount}</span>
+                                <span>${totalAmount}</span>
                             </div>
                         </div>
                     </div>

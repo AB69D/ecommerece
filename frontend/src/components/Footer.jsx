@@ -13,7 +13,7 @@ const socialLinks = [
         hoverBg: "hover:bg-[#1877F2]",
     },
     {
-        href: "https://www.instagram.com/gram2ghor?igsh=cTNsdmJ1dWd1azZu",
+        href: "https://www.instagram.com/ab9d-ecommerce?igsh=cTNsdmJ1dWd1azZu",
         label: "Instagram",
         Icon: FaInstagram,
         hoverBg: "hover:bg-gradient-to-tr hover:from-[#feda75] hover:via-[#fa7e1e] hover:to-[#d62976]",
@@ -25,14 +25,14 @@ const socialLinks = [
         hoverBg: "hover:bg-[#0A66C2]",
     },
     {
-        href: "mailto:gram2ghor@gmail.com",
+        href: "mailto:ab9d-ecommerce@gmail.com",
         label: "Email",
         Icon: HiOutlineMail,
         hoverBg: "hover:bg-[#EA4335]",
         external: false,
     },
     {
-        href: "https://youtube.com/@gram2ghor?si=iKdccWgOOUNrarJs",
+        href: "https://youtube.com/@ab9d-ecommerce?si=iKdccWgOOUNrarJs",
         label: "YouTube",
         Icon: FaYoutube,
         hoverBg: "hover:bg-[#FF0000]",
@@ -69,15 +69,15 @@ export default function Footer() {
                             <div className="mb-4 inline-flex items-center justify-center bg-white/95 rounded-full shadow-lg ring-4 ring-amber-400 w-36 h-36 sm:w-40 sm:h-40">
                                 <Image
                                     src="/logo.png"
-                                    alt="Gram2Ghor Logo"
+                                    alt="Ab9dEcommerce Logo"
                                     width={220}
                                     height={70}
                                     className="object-contain w-28 sm:w-32 h-auto"
                                 />
                             </div>
                             <p className="text-emerald-100/90 leading-relaxed mb-6 max-w-md">
-                                Gram2ghor is an e-commerce platform dedicated to delivering safe,
-                                organic and reliable food from the village to every home.
+                                Ab9dEcommerce is an e-commerce platform dedicated to delivering safe,
+                                quality and reliable products to every home.
                             </p>
 
                             <div className="space-y-3 mb-7 text-sm">
@@ -85,24 +85,24 @@ export default function Footer() {
                                     <span className="mt-0.5 flex-shrink-0 w-8 h-8 rounded-full bg-amber-400/15 text-amber-300 flex items-center justify-center ring-1 ring-amber-300/30">
                                         <FiMapPin className="w-4 h-4" />
                                     </span>
-                                    <span className="text-emerald-50">14/D, Kaderabad Housing, Mohammadpur, Dhaka</span>
+                                    <span className="text-emerald-50">[Your Business Address]</span>
                                 </div>
                                 <div className="flex items-start gap-3">
                                     <span className="mt-0.5 flex-shrink-0 w-8 h-8 rounded-full bg-amber-400/15 text-amber-300 flex items-center justify-center ring-1 ring-amber-300/30">
                                         <FiPhone className="w-4 h-4" />
                                     </span>
                                     <span className="text-emerald-50">
-                                        <a href="tel:+8801822858380" className="hover:text-amber-300 transition-colors">01822858380</a>
+                                        <a href="tel:+10000000000" className="hover:text-amber-300 transition-colors">+1 000 000 0000</a>
                                         <span className="mx-2 text-emerald-300/60">·</span>
-                                        <a href="tel:+8801822858283" className="hover:text-amber-300 transition-colors">01822858283</a>
+                                        <a href="tel:+10000000000" className="hover:text-amber-300 transition-colors">+1 000 000 0000</a>
                                     </span>
                                 </div>
                                 <div className="flex items-start gap-3">
                                     <span className="mt-0.5 flex-shrink-0 w-8 h-8 rounded-full bg-amber-400/15 text-amber-300 flex items-center justify-center ring-1 ring-amber-300/30">
                                         <FiMail className="w-4 h-4" />
                                     </span>
-                                    <a href="mailto:gram2ghor@gmail.com" className="text-emerald-50 hover:text-amber-300 transition-colors">
-                                        gram2ghor@gmail.com
+                                    <a href="mailto:ab9d-ecommerce@gmail.com" className="text-emerald-50 hover:text-amber-300 transition-colors">
+                                        ab9d-ecommerce@gmail.com
                                     </a>
                                 </div>
                             </div>
@@ -179,7 +179,7 @@ export default function Footer() {
                                     Need help with an order?
                                 </p>
                                 <a
-                                    href="tel:+8801822858380"
+                                    href="tel:+10000000000"
                                     className="inline-flex items-center gap-2 mt-2 px-4 py-2 rounded-lg bg-amber-400 hover:bg-amber-300 text-emerald-950 font-semibold text-sm shadow-md hover:shadow-lg transition-all hover:-translate-y-0.5"
                                 >
                                     <FiPhone className="w-4 h-4" />
@@ -190,7 +190,7 @@ export default function Footer() {
                     </div>
 
                     <div className="mt-12 pt-6 border-t border-white/10 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs sm:text-sm text-emerald-100/80">
-                        <p>&copy; {new Date().getFullYear()} Gram2ghor. All rights reserved.</p>
+                        <p>&copy; {new Date().getFullYear()} Ab9dEcommerce. All rights reserved.</p>
                         <p className="font-medium">
                             Crafted with care · <span className="text-amber-300">Developed by Abdullah AL Fuad</span>
                         </p>

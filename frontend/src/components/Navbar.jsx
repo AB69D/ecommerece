@@ -191,11 +191,11 @@ function Navbar() {
 
                         {/* CENTER ZONE — logo, sits in the visual centre on every breakpoint */}
                         <div className="flex-shrink-0 px-3 sm:px-4">
-                            <Link href="/" className="flex items-center" aria-label="Gram2Ghor home">
+                            <Link href="/" className="flex items-center" aria-label="Ab9dEcommerce home">
                                 <div className="w-28 sm:w-[150px] lg:w-48">
                                     <Image
                                         src="/logo.png"
-                                        alt="Gram2Ghor Logo"
+                                        alt="Ab9dEcommerce Logo"
                                         width={240}
                                         height={60}
                                         className="object-contain w-full h-auto"
@@ -272,7 +272,7 @@ function Navbar() {
                                     <div className="w-[110px]">
                                         <Image
                                             src="/logo.png"
-                                            alt="Gram2Ghor Logo"
+                                            alt="Ab9dEcommerce Logo"
                                             width={220}
                                             height={70}
                                             className="object-contain w-full h-auto"
@@ -289,7 +289,7 @@ function Navbar() {
                             </div>
 
                             <p className="relative mt-4 text-xs uppercase tracking-[0.2em] text-amber-300 font-semibold">
-                                Pure · Organic · Trusted
+                                Pure · quality · Trusted
                             </p>
                         </div>
                     </div>
@@ -407,7 +407,7 @@ function Navbar() {
                             Need help?
                         </p>
                         <a
-                            href="tel:+8801822858380"
+                            href="tel:+10000000000"
                             className="flex items-center justify-center gap-2 w-full px-4 py-3 rounded-xl bg-amber-400 hover:bg-amber-300 text-emerald-950 font-semibold text-sm shadow-md hover:shadow-lg transition-all hover:-translate-y-0.5"
                         >
                             <FiPhone className="w-4 h-4" />

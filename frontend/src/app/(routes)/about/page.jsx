@@ -1,26 +1,26 @@
 export const metadata = {
-    title: "About Gram2Ghor | Pure Organic Food Products Bangladesh",
-    description: "Learn about Gram2Ghor - Your trusted source for authentic Bangladeshi organic food products. We provide pure ghee, honey, mustard oil, pickles, and traditional food items directly from local farmers.",
-    keywords: "about Gram2Ghor, organic food Bangladesh, authentic Bangladeshi food, local farmers, sustainable agriculture, traditional food",
+    title: "About Ab9dEcommerce | Quality Products",
+    description: "Learn about Ab9dEcommerce - Your trusted source for our authentic products. We provide pure various products, pickles, and traditional food items directly from local farmers.",
+    keywords: "about Ab9dEcommerce, products, our authentic products, local farmers, sustainable agriculture, traditional food",
     openGraph: {
-        title: "About Gram2Ghor",
-        description: "Learn about Gram2Ghor - Your trusted source for authentic Bangladeshi organic food products.",
-        url: "https://gram2ghor.com/about",
-        siteName: "Gram2Ghor",
+        title: "About Ab9dEcommerce",
+        description: "Learn about Ab9dEcommerce - Your trusted source for our authentic products.",
+        url: "https://example.com/about",
+        siteName: "Ab9dEcommerce",
         images: [
             {
                 url: "/logo.png",
                 width: 800,
                 height: 600,
-                alt: "Gram2Ghor Logo"
+                alt: "Ab9dEcommerce Logo"
             }
         ],
         type: "website"
     },
     twitter: {
         card: "summary_large_image",
-        title: "About Gram2Ghor",
-        description: "Learn about Gram2Ghor - Your trusted source for authentic Bangladeshi organic food products.",
+        title: "About Ab9dEcommerce",
+        description: "Learn about Ab9dEcommerce - Your trusted source for our authentic products.",
         images: ["/logo.png"]
     }
 };
@@ -31,7 +31,7 @@ export default function AboutPage() {
             {/* Hero Section */}
             <div className="bg-emerald-600 text-white py-20 px-4">
                 <div className="max-w-4xl mx-auto text-center">
-                    <h1 className="text-4xl md:text-5xl font-bold mb-6">About Gram2Ghor</h1>
+                    <h1 className="text-4xl md:text-5xl font-bold mb-6">About Ab9dEcommerce</h1>
                     <p className="text-xl md:text-2xl font-light">
                         Bringing the Purity of the Village to Your Doorstep
                     </p>
@@ -43,10 +43,10 @@ export default function AboutPage() {
                 {/* Introduction */}
                 <div className="bg-white rounded-2xl shadow-sm p-8 md:p-12 mb-12">
                     <p className="text-lg text-gray-700 leading-relaxed">
-                        Welcome to <span className="font-semibold text-emerald-600">GRAM2GHOR</span>, your trusted gateway to authentic, organic, and farm-fresh products. In an era of mass production and chemical additives, we are on a mission to reconnect urban households with the wholesome, untainted flavors of rural Bangladesh.
+                        Welcome to <span className="font-semibold text-emerald-600">AB9DECOMMERCE</span>, your trusted gateway to authentic, quality, and farm-fresh products. In an era of mass production and chemical additives, we are on a mission to reconnect urban households with the wholesome, untainted flavors of local communities.
                     </p>
                     <p className="text-lg text-gray-700 leading-relaxed mt-6">
-                        The name <span className="font-semibold">GRAM2GHOR</span> (Gram to Ghor) reflects our core philosophy: sourcing the finest produce directly from the <span className="font-medium">Gram (Village)</span> and delivering it with love to your <span className="font-medium">Ghor (Home)</span>.
+                        The name <span className="font-semibold">AB9DECOMMERCE</span> (Gram to Ghor) reflects our core philosophy: sourcing the finest produce directly from the <span className="font-medium">Gram (Village)</span> and delivering it with love to your <span className="font-medium">Ghor (Home)</span>.
                     </p>
                 </div>
 
@@ -58,7 +58,7 @@ export default function AboutPage() {
                     </div>
                     <div className="bg-white rounded-2xl shadow-sm p-8 md:p-12">
                         <p className="text-lg text-gray-700 leading-relaxed">
-                            GRAM2GHOR was founded with a simple yet powerful vision—to make "pure" the new standard. We realized that while the city offers convenience, it often lacks the nutritional integrity found in the countryside. We decided to bridge that gap. By working closely with local farmers and artisans, we ensure that every product we offer is a celebration of nature's bounty, free from harmful preservatives and synthetic chemicals.
+                            AB9DECOMMERCE was founded with a simple yet powerful vision—to make "pure" the new standard. We realized that while the city offers convenience, it often lacks the nutritional integrity found in the countryside. We decided to bridge that gap. By working closely with local farmers and artisans, we ensure that every product we offer is a celebration of nature's bounty, free from harmful preservatives and synthetic chemicals.
                         </p>
                     </div>
                 </div>
@@ -67,7 +67,7 @@ export default function AboutPage() {
                 <div className="mb-12">
                     <div className="flex items-center gap-4 mb-8">
                         <div className="w-12 h-1 bg-emerald-600"></div>
-                        <h2 className="text-3xl font-bold text-gray-900">Why Choose GRAM2GHOR?</h2>
+                        <h2 className="text-3xl font-bold text-gray-900">Why Choose AB9DECOMMERCE?</h2>
                     </div>
                     <div className="grid md:grid-cols-2 gap-6">
                         <div className="bg-white rounded-xl shadow-sm p-8 hover:shadow-md transition-shadow">
@@ -90,7 +90,7 @@ export default function AboutPage() {
                             </div>
                             <h3 className="text-xl font-bold text-gray-800 mb-3">Purity Guaranteed</h3>
                             <p className="text-gray-600 leading-relaxed">
-                                From our organic oils and honey to our hand-picked grains, we maintain a strict "zero-adulteration" policy.
+                                From our our products to our hand-picked grains, we maintain a strict "zero-adulteration" policy.
                             </p>
                         </div>
 
@@ -147,7 +147,7 @@ export default function AboutPage() {
                                 <div>
                                     <h3 className="text-xl font-bold text-gray-800 mb-2">Community</h3>
                                     <p className="text-gray-600 leading-relaxed">
-                                        By choosing GRAM2GHOR, you are supporting local farmers and rural communities, helping to sustain traditional agriculture.
+                                        By choosing AB9DECOMMERCE, you are supporting local farmers and rural communities, helping to sustain traditional agriculture.
                                     </p>
                                 </div>
                             </div>

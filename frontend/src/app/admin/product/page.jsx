@@ -244,7 +244,7 @@ export default function CreateProductPage() {
                                     />
                                 </div>
                                 <div>
-                                    <label className="block text-[10px] sm:text-xs text-gray-500 mb-1">Price (৳)</label>
+                                    <label className="block text-[10px] sm:text-xs text-gray-500 mb-1">Price ($)</label>
                                     <input 
                                         type="number" 
                                         value={weight.price}
@@ -328,7 +328,7 @@ export default function CreateProductPage() {
                                                 value={qa.question}
                                                 onChange={(e) => updateQA(index, "question", e.target.value)}
                                                 className="w-full px-2 sm:px-3 py-1.5 sm:py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none text-gray-700 text-xs sm:text-sm" 
-                                                placeholder="e.g. Is this product organic?" 
+                                                placeholder="e.g. Is this product quality?" 
                                             />
                                         </div>
                                         <div>
@@ -338,7 +338,7 @@ export default function CreateProductPage() {
                                                 onChange={(e) => updateQA(index, "answer", e.target.value)}
                                                 rows={2}
                                                 className="w-full px-2 sm:px-3 py-1.5 sm:py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none text-gray-700 text-xs sm:text-sm resize-none" 
-                                                placeholder="e.g. Yes, this product is 100% organic certified." 
+                                                placeholder="e.g. Yes, this product is 100% quality certified." 
                                             />
                                         </div>
                                     </div>

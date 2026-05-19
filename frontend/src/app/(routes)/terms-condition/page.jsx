@@ -1,12 +1,12 @@
 export const metadata = {
-    title: "Terms & Conditions | Gram2Ghor",
-    description: "Read the Terms & Conditions for using Gram2Ghor's website and services. Learn about our policies, user responsibilities, and legal agreements.",
-    keywords: "terms and conditions, Gram2Ghor terms, user agreement, service terms, e-commerce policy Bangladesh",
+    title: "Terms & Conditions | Ab9dEcommerce",
+    description: "Read the Terms & Conditions for using Ab9dEcommerce's website and services. Learn about our policies, user responsibilities, and legal agreements.",
+    keywords: "terms and conditions, Ab9dEcommerce terms, user agreement, service terms, e-commerce policy",
     openGraph: {
-        title: "Terms & Conditions - Gram2Ghor",
-        description: "Read the Terms & Conditions for using Gram2Ghor's website and services.",
-        url: "https://gram2ghor.com/terms-condition",
-        siteName: "Gram2Ghor",
+        title: "Terms & Conditions - Ab9dEcommerce",
+        description: "Read the Terms & Conditions for using Ab9dEcommerce's website and services.",
+        url: "https://example.com/terms-condition",
+        siteName: "Ab9dEcommerce",
         type: "website"
     }
 };
@@ -33,7 +33,7 @@ export default function TermsConditionPage() {
                                 1. General Information
                             </h2>
                             <p className="text-gray-700 leading-relaxed ml-11">
-                                This website is owned and operated by <span className="font-semibold">GRAM2GHOR</span>, located at: 14/D, Kaderabad Housing, Mohammadpur, Dhaka, Bangladesh. By accessing this website and using our services, you agree to comply with and be bound by these Terms & Conditions.
+                                This website is owned and operated by <span className="font-semibold">AB9DECOMMERCE</span>, located at: [Your Business Address]. By accessing this website and using our services, you agree to comply with and be bound by these Terms & Conditions.
                             </p>
                         </div>
 
@@ -60,7 +60,7 @@ export default function TermsConditionPage() {
                                 3. Product Authenticity & Variations
                             </h2>
                             <p className="text-gray-700 leading-relaxed ml-11">
-                                GRAM2GHOR specializes in natural and organic products. Please note: Because our products are often sourced directly from villages and processed naturally, slight variations in color, texture, aroma, or packaging may occur. We strive for accuracy in product descriptions, but availability and specifications are subject to change without prior notice based on seasonal harvests.
+                                AB9DECOMMERCE specializes in natural and products. Please note: Because our products are often sourced directly from villages and processed naturally, slight variations in color, texture, aroma, or packaging may occur. We strive for accuracy in product descriptions, but availability and specifications are subject to change without prior notice based on seasonal harvests.
                             </p>
                         </div>
 
@@ -71,10 +71,10 @@ export default function TermsConditionPage() {
                                 4. Pricing & Payment
                             </h2>
                             <ul className="list-disc list-inside text-gray-700 leading-relaxed space-y-3 ml-11">
-                                <li>All prices are listed in Bangladeshi Taka (BDT).</li>
-                                <li>Prices are subject to change without notice due to market fluctuations in organic sourcing.</li>
+                                <li>All prices are listed in your local currency.</li>
+                                <li>Prices are subject to change without notice due to market fluctuations in sourcing.</li>
                                 <li>Payments must be made through our authorized channels: Cash on Delivery (COD), Mobile Banking (bKash, Nagad), or approved SSLCommerz gateways.</li>
-                                <li>GRAM2GHOR reserves the right to cancel orders and issue refunds in the event of technical pricing errors.</li>
+                                <li>AB9DECOMMERCE reserves the right to cancel orders and issue refunds in the event of technical pricing errors.</li>
                             </ul>
                         </div>
 
@@ -101,8 +101,8 @@ export default function TermsConditionPage() {
                                 6. Shipping & Delivery
                             </h2>
                             <ul className="list-disc list-inside text-gray-700 leading-relaxed space-y-3 ml-11">
-                                <li>Delivery timelines are estimates and vary based on the delivery location within or outside Dhaka.</li>
-                                <li>Once a shipment is handed over to our third-party courier partners, GRAM2GHOR is not held liable for delays caused by the courier or external factors (e.g., weather or strikes).</li>
+                                <li>Delivery timelines are estimates and vary based on the delivery location within your service area.</li>
+                                <li>Once a shipment is handed over to our third-party courier partners, AB9DECOMMERCE is not held liable for delays caused by the courier or external factors (e.g., weather or strikes).</li>
                             </ul>
                         </div>
 
@@ -117,7 +117,7 @@ export default function TermsConditionPage() {
                             </p>
                             <ul className="list-disc list-inside text-gray-700 leading-relaxed space-y-3 ml-16">
                                 <li>Returns are only accepted for Damaged, Defective, or Incorrect items.</li>
-                                <li><span className="font-semibold">Mandatory Requirement:</span> You must provide a clear unboxing video recorded at the time of delivery/opening to validate a claim. Without video proof, GRAM2GHOR reserves the right to reject refund or replacement requests.</li>
+                                <li><span className="font-semibold">Mandatory Requirement:</span> You must provide a clear unboxing video recorded at the time of delivery/opening to validate a claim. Without video proof, AB9DECOMMERCE reserves the right to reject refund or replacement requests.</li>
                                 <li>Issues must be reported to our customer service within 24 hours of receipt.</li>
                             </ul>
                         </div>
@@ -129,7 +129,7 @@ export default function TermsConditionPage() {
                                 8. Account Security
                             </h2>
                             <p className="text-gray-700 leading-relaxed ml-11">
-                                You are responsible for maintaining the confidentiality of your account password and activity. GRAM2GHOR reserves the right to suspend or terminate accounts that show suspicious or unauthorized behavior.
+                                You are responsible for maintaining the confidentiality of your account password and activity. AB9DECOMMERCE reserves the right to suspend or terminate accounts that show suspicious or unauthorized behavior.
                             </p>
                         </div>
 
@@ -156,7 +156,7 @@ export default function TermsConditionPage() {
                                 10. Intellectual Property
                             </h2>
                             <p className="text-gray-700 leading-relaxed ml-11">
-                                All website content—including the GRAM2GHOR logo, product photography, graphics, and text—is the exclusive property of GRAM2GHOR. Unauthorized reproduction or distribution is strictly prohibited.
+                                All website content—including the AB9DECOMMERCE logo, product photography, graphics, and text—is the exclusive property of AB9DECOMMERCE. Unauthorized reproduction or distribution is strictly prohibited.
                             </p>
                         </div>
 
@@ -167,12 +167,12 @@ export default function TermsConditionPage() {
                                 11. Limitation of Liability
                             </h2>
                             <p className="text-gray-700 leading-relaxed mb-4 ml-11">
-                                GRAM2GHOR shall not be held liable for:
+                                AB9DECOMMERCE shall not be held liable for:
                             </p>
                             <ul className="list-disc list-inside text-gray-700 leading-relaxed space-y-2 ml-16">
                                 <li>Indirect, incidental, or consequential damages arising from the use of our website.</li>
                                 <li>Delays caused by third-party delivery services.</li>
-                                <li>Misuse of products or failure to follow storage instructions provided on organic goods.</li>
+                                <li>Misuse of products or failure to follow storage instructions provided on products.</li>
                             </ul>
                         </div>
 
@@ -183,7 +183,7 @@ export default function TermsConditionPage() {
                                 12. Governing Law
                             </h2>
                             <p className="text-gray-700 leading-relaxed ml-11">
-                                These Terms & Conditions are governed by and construed in accordance with the laws of the People's Republic of Bangladesh.
+                                These Terms & Conditions are governed by and construed in accordance with applicable local laws.
                             </p>
                         </div>
 
@@ -197,10 +197,10 @@ export default function TermsConditionPage() {
                                 For any questions regarding these Terms, please contact us at:
                             </p>
                             <div className="ml-16 bg-gray-50 rounded-lg p-6">
-                                <p className="text-gray-700 leading-relaxed"><span className="font-semibold">Brand:</span> GRAM2GHOR</p>
-                                <p className="text-gray-700 leading-relaxed"><span className="font-semibold">Address:</span> 14/D, Kaderabad Housing, Mohammadpur, Dhaka</p>
-                                <p className="text-gray-700 leading-relaxed"><span className="font-semibold">Phone:</span> 01822858380</p>
-                                <p className="text-gray-700 leading-relaxed"><span className="font-semibold">Email:</span> gram2ghor@gmail.com</p>
+                                <p className="text-gray-700 leading-relaxed"><span className="font-semibold">Brand:</span> AB9DECOMMERCE</p>
+                                <p className="text-gray-700 leading-relaxed"><span className="font-semibold">Address:</span> [Your Business Address]</p>
+                                <p className="text-gray-700 leading-relaxed"><span className="font-semibold">Phone:</span> +1 000 000 0000</p>
+                                <p className="text-gray-700 leading-relaxed"><span className="font-semibold">Email:</span> ab9d-ecommerce@gmail.com</p>
                             </div>
                         </div>
                     </div>

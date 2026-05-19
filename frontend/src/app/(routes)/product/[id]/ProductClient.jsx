@@ -292,7 +292,7 @@ export default function ProductClient({ productId }) {
                                                     : 'border-gray-300 text-gray-700 hover:border-emerald-400'
                                             }`}
                                         >
-                                            {weight.weight} - ৳{weight.price}
+                                            {weight.weight} - ${weight.price}
                                         </button>
                                     ))}
                                 </div>
@@ -346,10 +346,10 @@ export default function ProductClient({ productId }) {
                         {currentWeight?.discountPercent > 0 ? (
                             <div className="flex items-center gap-3">
                                 <p className="text-lg sm:text-xl text-gray-400 line-through">
-                                    ৳{currentWeight?.price * quantity || 0}
+                                    ${currentWeight?.price * quantity || 0}
                                 </p>
                                 <p className="text-2xl sm:text-3xl font-bold text-emerald-600">
-                                    ৳{(currentWeight.price - (currentWeight.price * currentWeight.discountPercent / 100)) * quantity}
+                                    ${(currentWeight.price - (currentWeight.price * currentWeight.discountPercent / 100)) * quantity}
                                 </p>
                                 <span className="bg-emerald-100 text-emerald-700 text-xs font-bold px-2 py-1 rounded">
                                     -{currentWeight.discountPercent}%
@@ -357,7 +357,7 @@ export default function ProductClient({ productId }) {
                             </div>
                         ) : (
                             <p className="text-2xl sm:text-3xl font-bold text-gray-900">
-                                ৳{currentWeight?.price * quantity || 0}
+                                ${currentWeight?.price * quantity || 0}
                             </p>
                         )}
                     </div>
@@ -372,7 +372,7 @@ export default function ProductClient({ productId }) {
                                  {adding ? 'Adding...' : added ? <><FiCheck className="w-5 h-5" /> Added</> : currentWeight?.stock > 0 ? 'Add to Cart' : 'Out of Stock'}
                              </button>
                              <a
-                                 href={`https://wa.me/8801618566586?text=${encodeURIComponent(`হ্যালো, আমি ${product?.firstName} পণ্যটি সম্পর্কে জানতে চাই।`)}`}
+                                 href={`https://wa.me/10000000000?text=${encodeURIComponent(`Hi, I'd like to know more about ${product?.firstName}.`)}`}
                                  target="_blank"
                                  rel="noopener noreferrer"
                                  className="flex-1 bg-green-500 hover:bg-green-600 text-white text-sm sm:text-base font-medium py-3 sm:py-3.5 rounded-lg flex items-center justify-center gap-1.5 transition-colors whitespace-nowrap"
@@ -383,7 +383,7 @@ export default function ProductClient({ productId }) {
                          </div>
                          <div className="flex gap-3">
                              <a
-                                 href="tel:+8801822858380"
+                                 href="tel:+10000000000"
                                  className="flex-1 bg-emerald-700 hover:bg-emerald-800 text-white text-sm sm:text-base font-medium py-3 sm:py-3.5 rounded-lg flex items-center justify-center gap-1.5 transition-colors whitespace-nowrap shadow-sm hover:shadow-md"
                                  aria-label="Call to order"
                              >
@@ -391,7 +391,7 @@ export default function ProductClient({ productId }) {
                                  <span>Call to Order</span>
                              </a>
                              <a
-                                 href={`https://m.me/gram2ghor?text=${encodeURIComponent(`হ্যালো, আমি ${product?.firstName} পণ্যটি সম্পর্কে জানতে চাই।`)}`}
+                                 href={`https://m.me/ab9d-ecommerce?text=${encodeURIComponent(`Hi, I'd like to know more about ${product?.firstName}.`)}`}
                                  target="_blank"
                                  rel="noopener noreferrer"
                                  className="flex-1 bg-blue-500 hover:bg-blue-600 text-white text-sm sm:text-base font-medium py-3 sm:py-3.5 rounded-lg flex items-center justify-center gap-1.5 transition-colors whitespace-nowrap shadow-sm hover:shadow-md"
@@ -480,7 +480,7 @@ export default function ProductClient({ productId }) {
                                                      <p className="text-xs text-gray-600 truncate">{item.lastName}</p>
                                                  )}
                                                  <p className="text-sm font-bold text-emerald-600 mt-1">
-                                                     ৳{item.weights?.[0]?.price || 0}
+                                                     ${item.weights?.[0]?.price || 0}
                                                  </p>
                                              </div>
                                          </Link>

@@ -152,13 +152,13 @@ export default function AllProducts() {
                                     {minWeight && (
                                         hasDiscount ? (
                                             <div className="flex items-center justify-center gap-1 sm:gap-2">
-                                                <p className="text-[10px] sm:text-sm text-gray-400 line-through">৳{minWeight.price}</p>
+                                                <p className="text-[10px] sm:text-sm text-gray-400 line-through">${minWeight.price}</p>
                                                 <p className="text-sm sm:text-base font-bold text-emerald-600">
-                                                    ৳{(minWeight.price - (minWeight.price * minWeight.discountPercent / 100)).toFixed(0)}
+                                                    ${(minWeight.price - (minWeight.price * minWeight.discountPercent / 100)).toFixed(0)}
                                                 </p>
                                             </div>
                                         ) : (
-                                            <p className="text-sm sm:text-base font-bold text-gray-900">৳{minWeight.price}</p>
+                                            <p className="text-sm sm:text-base font-bold text-gray-900">${minWeight.price}</p>
                                         )
                                     )}
                                 </div>

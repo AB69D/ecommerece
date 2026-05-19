@@ -40,10 +40,8 @@ export default function GheeOilPage() {
                     const catData = await catRes.json();
                     
                     if (catData.success) {
-                        const cat = catData.data.find(c => 
-                            c.category_name.includes("ঘি") || 
+                        const cat = catData.data.find(c =>
                             c.category_name.toLowerCase().includes("ghee") ||
-                            c.category_name.includes("তেল") ||
                             c.category_name.toLowerCase().includes("oil")
                         );
                         
@@ -202,7 +200,7 @@ export default function GheeOilPage() {
                                     <div className="mt-2">
                                         {product.weights && product.weights.length > 0 && (
                                             <p className="text-base font-bold text-gray-900 text-center">
-                                                ৳{Math.min(...product.weights.map(w => w.price))}
+                                                ${Math.min(...product.weights.map(w => w.price))}
                                             </p>
                                         )}
                                     </div>

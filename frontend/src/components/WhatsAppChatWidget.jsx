@@ -11,8 +11,8 @@ export default function WhatsAppChatWidget() {
     const [isVisible, setIsVisible] = useState(false);
     const messagesEndRef = useRef(null);
 
-    const whatsappNumber = "8801618566586";
-    const defaultMessage = "হ্যালো, আমি একটি পণ্য সম্পর্কে জানতে চাই।";
+    const whatsappNumber = "10000000000";
+    const defaultMessage = "Hi, I'd like to know more about a product.";
 
     useEffect(() => {
         setIsVisible(true);
@@ -83,7 +83,7 @@ export default function WhatsAppChatWidget() {
                                 <PiWhatsappLogoBold className="w-6 h-6" />
                             </div>
                             <div>
-                                <h3 className="font-semibold text-sm">Gram2Ghor Support</h3>
+                                <h3 className="font-semibold text-sm">Ab9dEcommerce Support</h3>
                                 <p className="text-xs text-emerald-100">Online</p>
                             </div>
                         </div>
@@ -118,7 +118,7 @@ export default function WhatsAppChatWidget() {
                                 <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4">
                                     <PiWhatsappLogoBold className="w-8 h-8 text-emerald-600" />
                                 </div>
-                                <h4 className="font-medium text-gray-800 mb-2">Welcome to Gram2Ghor!</h4>
+                                <h4 className="font-medium text-gray-800 mb-2">Welcome to Ab9dEcommerce!</h4>
                                 <p className="text-sm text-gray-500 mb-4">
                                     Hi! Send us a message and we&apos;ll get back to you on WhatsApp.
                                 </p>
@@ -183,7 +183,7 @@ export default function WhatsAppChatWidget() {
                             <div className="w-8 h-8 bg-emerald-100 rounded-full flex items-center justify-center">
                                 <PiWhatsappLogoBold className="w-5 h-5 text-emerald-600" />
                             </div>
-                            <span className="text-sm font-medium text-gray-700">Gram2Ghor Support</span>
+                            <span className="text-sm font-medium text-gray-700">Ab9dEcommerce Support</span>
                         </div>
                         <button
                             onClick={() => setIsMinimized(false)}

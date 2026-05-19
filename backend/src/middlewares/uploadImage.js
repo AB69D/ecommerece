@@ -11,7 +11,7 @@ export const processAndUploadImages = async (req, res, next) => {
         const uploadStream = (buffer) => {
             return new Promise((resolve, reject) => {
                 const stream = cloudinary.uploader.upload_stream(
-                    { folder: "Gram2ghor", format: "webp" },
+                    { folder: "Ab9dEcommerce", format: "webp" },
                     (error, result) => {
                         if (result) resolve(result);
                         else reject(error);

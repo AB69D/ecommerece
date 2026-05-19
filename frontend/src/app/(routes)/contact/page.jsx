@@ -2,28 +2,28 @@ import { FiMapPin, FiPhone, FiMail, FiClock } from "react-icons/fi";
 import { ContactForm } from "./ContactForm";
 
 export const metadata = {
-    title: "Contact Gram2Ghor | Get in Touch with Us",
-    description: "Contact Gram2Ghor for any queries about our organic food products. Reach us at Rampura, Dhaka, Bangladesh.",
-    keywords: "contact Gram2Ghor, Gram2Ghor phone number, Gram2Ghor email, organic food contact Bangladesh",
+    title: "Contact Ab9dEcommerce | Get in Touch with Us",
+    description: "Contact Ab9dEcommerce for any queries about our products. Reach us at [Your Location].",
+    keywords: "contact Ab9dEcommerce, Ab9dEcommerce phone number, Ab9dEcommerce email, products contact",
     openGraph: {
-        title: "Contact Gram2Ghor",
-        description: "Contact Gram2Ghor for any queries about our organic food products.",
-        url: "https://gram2ghor.com/contact",
-        siteName: "Gram2Ghor",
+        title: "Contact Ab9dEcommerce",
+        description: "Contact Ab9dEcommerce for any queries about our products.",
+        url: "https://example.com/contact",
+        siteName: "Ab9dEcommerce",
         images: [
             {
                 url: "/logo.png",
                 width: 800,
                 height: 600,
-                alt: "Gram2Ghor Logo"
+                alt: "Ab9dEcommerce Logo"
             }
         ],
         type: "website"
     },
     twitter: {
         card: "summary_large_image",
-        title: "Contact Gram2Ghor",
-        description: "Contact Gram2Ghor for any queries about our organic food products.",
+        title: "Contact Ab9dEcommerce",
+        description: "Contact Ab9dEcommerce for any queries about our products.",
         images: ["/logo.png"]
     }
 };
@@ -56,7 +56,7 @@ export default function ContactPage() {
                                 </div>
                                 <div>
                                     <h3 className="font-semibold text-gray-800 mb-1">Address</h3>
-                                    <p className="text-gray-600">14/D, Kaderabad Housing, Mohammadpur, Dhaka</p>
+                                    <p className="text-gray-600">[Your Business Address]</p>
                                 </div>
                             </div>
 
@@ -66,7 +66,7 @@ export default function ContactPage() {
                                 </div>
                                 <div>
                                     <h3 className="font-semibold text-gray-800 mb-1">Phone</h3>
-                                    <p className="text-gray-600">01822858380, 01822-858283</p>
+                                    <p className="text-gray-600">+1 000 000 0000, 01822-858283</p>
                                 </div>
                             </div>
 
@@ -76,7 +76,7 @@ export default function ContactPage() {
                                 </div>
                                 <div>
                                     <h3 className="font-semibold text-gray-800 mb-1">Email</h3>
-                                    <p className="text-gray-600">gram2ghor@gmail.com</p>
+                                    <p className="text-gray-600">ab9d-ecommerce@gmail.com</p>
                                 </div>
                             </div>
 

@@ -354,7 +354,7 @@ export default function AdminOrdersPage() {
                                             <span className="text-sm text-gray-600">{order.items?.length || 0} items</span>
                                         </td>
                                         <td className="px-4 py-4">
-                                            <span className="font-bold text-gray-900">৳{order.totalAmount}</span>
+                                            <span className="font-bold text-gray-900">${order.totalAmount}</span>
                                         </td>
                                         <td className="px-4 py-4">
                                             {getStatusBadge(order.orderStatus)}
@@ -476,24 +476,24 @@ export default function AdminOrdersPage() {
                                             </div>
                                             <div className="flex-1">
                                                 <p className="font-medium text-gray-800">{item.productName}</p>
-                                                <p className="text-sm text-gray-500">Qty: {item.quantity} x ৳{item.price}</p>
+                                                <p className="text-sm text-gray-500">Qty: {item.quantity} x ${item.price}</p>
                                             </div>
-                                            <p className="font-bold text-gray-800">৳{item.totalPrice}</p>
+                                            <p className="font-bold text-gray-800">${item.totalPrice}</p>
                                         </div>
                                     ))}
                                 </div>
                                 <div className="border-t mt-4 pt-4 space-y-2">
                                     <div className="flex justify-between text-sm">
                                         <span className="text-gray-500">Subtotal</span>
-                                        <span className="font-medium">৳{selectedOrder.subtotal}</span>
+                                        <span className="font-medium">${selectedOrder.subtotal}</span>
                                     </div>
                                     <div className="flex justify-between text-sm">
                                         <span className="text-gray-500">Delivery Charge</span>
-                                        <span className="font-medium">৳{selectedOrder.deliveryCharge}</span>
+                                        <span className="font-medium">${selectedOrder.deliveryCharge}</span>
                                     </div>
                                     <div className="flex justify-between font-bold text-lg pt-2 border-t">
                                         <span>Total Amount</span>
-                                        <span className="text-emerald-700">৳{selectedOrder.totalAmount}</span>
+                                        <span className="text-emerald-700">${selectedOrder.totalAmount}</span>
                                     </div>
                                 </div>
                             </div>

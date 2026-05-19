@@ -21,8 +21,9 @@ export default function GheeOilAdminPage() {
             const res = await authFetch(`/api/admin/category/get-all-category`);
             const data = await res.json();
             if (data.success) {
-                const gheeCategory = data.data.find(cat => 
-                    cat.category_name.includes("ঘি") || cat.category_name.toLowerCase().includes("ghee")
+                const gheeCategory = data.data.find(cat =>
+                    cat.category_name.toLowerCase().includes("ghee") ||
+                    cat.category_name.toLowerCase().includes("oil")
                 );
                 if (gheeCategory) {
                     setCategoryId(gheeCategory._id);
@@ -169,7 +170,7 @@ export default function GheeOilAdminPage() {
                                             {product.lastName && <p className="text-sm text-gray-500">{product.lastName}</p>}
                                         </td>
                                         <td className="px-4 py-3 text-sm text-gray-600">
-                                            ৳{minPrice} - ৳{maxPrice}
+                                            ${minPrice} - ${maxPrice}
                                         </td>
                                         <td className="px-4 py-3">
                                             <span className={`px-2 py-1 rounded-full text-xs font-medium ${

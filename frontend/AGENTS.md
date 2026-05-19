@@ -1,10 +1,10 @@
-# 🧠 Agent Configuration — Admin Panel (Gram2Ghor)
+# 🧠 Agent Configuration — Admin Panel (Ab9dEcommerce)
 
 ## 📁 Repository Structure
 
 Root contains:
 - `/client` → ❌ DO NOT USE
-- `/gram2ghor` → ✅ Frontend (PRIMARY WORKSPACE)
+- `/ab9d-ecommerce` → ✅ Frontend (PRIMARY WORKSPACE)
 - `/server` → ✅ Backend (REFERENCE + LIMITED MODIFICATION)
 
 ---
@@ -41,7 +41,7 @@ Build a fully functional **Admin Panel frontend** for an e-commerce system using
 
 ---
 
-## 🏗️ Frontend Architecture Rules (`/gram2ghor`)
+## 🏗️ Frontend Architecture Rules (`/ab9d-ecommerce`)
 
 - Use modular folder structure
 - Must include reusable components:

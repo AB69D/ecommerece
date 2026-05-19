@@ -122,7 +122,7 @@ export default function StockManagementPage() {
                     <div className="flex items-center justify-between">
                         <div>
                             <p className="text-purple-100 text-sm">Inventory Value</p>
-                            <p className="text-3xl font-bold mt-1">৳{summary.totalInventoryValue.toLocaleString()}</p>
+                            <p className="text-3xl font-bold mt-1">${summary.totalInventoryValue.toLocaleString()}</p>
                         </div>
                         <FiAlertCircle className="w-10 h-10 text-purple-200 opacity-50" />
                     </div>
@@ -168,7 +168,7 @@ export default function StockManagementPage() {
                                 </div>
                                 <div className="text-right">
                                     <p className="text-lg font-bold text-gray-800">Total: {product.totalStock} items</p>
-                                    <p className="text-sm text-emerald-600">Value: ৳{product.totalValue.toLocaleString()}</p>
+                                    <p className="text-sm text-emerald-600">Value: ${product.totalValue.toLocaleString()}</p>
                                 </div>
                             </div>
 
@@ -178,7 +178,7 @@ export default function StockManagementPage() {
                                         <div key={index} className="bg-white border border-gray-100 rounded-lg p-3">
                                             <div className="flex items-center justify-between mb-2">
                                                 <span className="font-medium text-gray-700">{weight.weight}</span>
-                                                <span className="text-emerald-600 font-semibold">৳{weight.price}</span>
+                                                <span className="text-emerald-600 font-semibold">${weight.price}</span>
                                             </div>
                                             <div className="flex items-center justify-between">
                                                 <span className={`px-2 py-1 rounded-full text-xs font-medium ${

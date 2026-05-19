@@ -21,10 +21,9 @@ export default function HoneySweetsAdminPage() {
             const res = await authFetch(`/api/admin/category/get-all-category`);
             const data = await res.json();
             if (data.success) {
-                const honeyCategory = data.data.find(cat => 
-                    cat.category_name.includes("মধু") || 
+                const honeyCategory = data.data.find(cat =>
                     cat.category_name.toLowerCase().includes("honey") ||
-                    cat.category_name.includes("মিষ্টি")
+                    cat.category_name.toLowerCase().includes("sweet")
                 );
                 if (honeyCategory) {
                     setCategoryId(honeyCategory._id);
@@ -171,7 +170,7 @@ export default function HoneySweetsAdminPage() {
                                             {product.lastName && <p className="text-sm text-gray-500">{product.lastName}</p>}
                                         </td>
                                         <td className="px-4 py-3 text-sm text-gray-600">
-                                            ৳{minPrice} - ৳{maxPrice}
+                                            ${minPrice} - ${maxPrice}
                                         </td>
                                         <td className="px-4 py-3">
                                             <span className={`px-2 py-1 rounded-full text-xs font-medium ${

@@ -11,11 +11,11 @@ export default function ChatFloatingButton() {
         setIsVisible(true);
     }, []);
 
-    const whatsappNumber = "8801618566586";
-    const defaultMessage = "হ্যালো, আমি একটি পণ্য সম্পর্কে জানতে চাই।";
+    const whatsappNumber = "10000000000";
+    const defaultMessage = "Hi, I'd like to know more about a product.";
     const encodedMessage = encodeURIComponent(defaultMessage);
     const whatsappLink = `https://wa.me/${whatsappNumber}?text=${encodedMessage}`;
-    const messengerLink = "https://m.me/gram2ghor";
+    const messengerLink = "https://m.me/ab9d-ecommerce";
 
     const toggleOpen = () => setIsOpen((prev) => !prev);
 

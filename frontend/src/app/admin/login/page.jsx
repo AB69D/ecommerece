@@ -69,7 +69,7 @@ export default function AdminLoginPage() {
                         <div className="flex justify-center mb-4">
                             <Image
                                 src="/logo.png"
-                                alt="Gram2Ghor"
+                                alt="Ab9dEcommerce"
                                 width={80}
                                 height={80}
                                 className="object-contain"

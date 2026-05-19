@@ -1,9 +1,9 @@
 export default function BlogPage() {
     const blogs = [
         {
-            title: "The Benefits of Organic Honey",
+            title: "The Benefits of Our Products",
             date: "April 20, 2026",
-            excerpt: "Discover why organic honey is considered liquid gold and how it can transform your health.",
+            excerpt: "Discover why quality honey is considered liquid gold and how it can transform your health.",
             category: "Health"
         },
         {
@@ -19,9 +19,9 @@ export default function BlogPage() {
             category: "Tips"
         },
         {
-            title: "The Story Behind Gram2ghor",
+            title: "The Story Behind Ab9dEcommerce",
             date: "April 10, 2026",
-            excerpt: "How we started our journey to bring authentic Bangladeshi food to every home.",
+            excerpt: "How we started our journey to bring our authentic products to every home.",
             category: "Company"
         },
         {
@@ -31,7 +31,7 @@ export default function BlogPage() {
             category: "Health"
         },
         {
-            title: "Cooking Tips with Organic Oils",
+            title: "Cooking Tips",
             date: "April 1, 2026",
             excerpt: "Maximize the health benefits of cooking oils in your daily meals.",
             category: "Tips"

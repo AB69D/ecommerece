@@ -16,15 +16,15 @@ clientOrderRouter.post('/create', async (req, res) => {
             customerPhone, 
             customerEmail, 
             shippingAddress, 
-            deliveryArea = 'inside_dhaka',
+            deliveryArea = 'local',
             paymentMethod = 'cash_on_delivery',
             notes = ''
         } = req.body;
         
         const deliveryCharges = {
-            inside_dhaka: 70,
-            outside_dhaka: 100,
-            outside_bangladesh: 130
+            local: 70,
+            regional: 100,
+            international: 130
         };
 
         const deliveryCharge = deliveryCharges[deliveryArea] || 70;

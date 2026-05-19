@@ -7,7 +7,7 @@ export default function RefundReturnsPage() {
                 {/* Introduction */}
                 <div>
                     <p className="text-gray-600 leading-relaxed">
-                        Thank you for shopping with Gram2Ghor. We truly value your trust and strive to provide 
+                        Thank you for shopping with Ab9dEcommerce. We truly value your trust and strive to provide 
                         high-quality products along with reliable customer service. Our goal is to ensure you have a 
                         satisfying experience with every purchase.
                     </p>
@@ -24,7 +24,7 @@ export default function RefundReturnsPage() {
                         <p className="text-gray-700">
                             We kindly request you to check your order carefully in front of the delivery personnel at the 
                             time of receiving it. If you notice any problem or mismatch, please contact us immediately at{' '}
-                            <a href="tel:01822858380" className="text-emerald-600 font-semibold hover:underline">01822-858380</a>.
+                            <a href="tel:+1 000 000 0000" className="text-emerald-600 font-semibold hover:underline">01822-858380</a>.
                         </p>
                     </div>
                     
@@ -52,7 +52,7 @@ export default function RefundReturnsPage() {
                 <div className="border-t border-gray-200 pt-8">
                     <h2 className="text-xl sm:text-2xl font-bold text-gray-800 mb-4">Refund Policy</h2>
                     <p className="text-gray-600 leading-relaxed mb-4">
-                        Gram2Ghor offers a customer-friendly policy where you can try our product and request a 
+                        Ab9dEcommerce offers a customer-friendly policy where you can try our product and request a 
                         refund within <strong>10 days</strong> from the delivery date if you are not satisfied.
                     </p>
                     <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-4">
@@ -63,7 +63,7 @@ export default function RefundReturnsPage() {
                     </div>
                     <p className="text-gray-600">
                         For assistance, feel free to call us at{' '}
-                        <a href="tel:01822858380" className="text-emerald-600 font-semibold hover:underline">01822-858380</a>.
+                        <a href="tel:+1 000 000 0000" className="text-emerald-600 font-semibold hover:underline">01822-858380</a>.
                     </p>
                 </div>
 
@@ -90,7 +90,7 @@ export default function RefundReturnsPage() {
                 <div className="border-t border-gray-200 pt-8">
                     <p className="text-gray-600 leading-relaxed italic">
                         We believe that a clear and fair return policy helps build strong relationships with 
-                        customers. At Gram2Ghor, we are committed to handling all return and refund requests 
+                        customers. At Ab9dEcommerce, we are committed to handling all return and refund requests 
                         professionally and efficiently to ensure your satisfaction.
                     </p>
                 </div>

@@ -20,9 +20,9 @@ export default function CorporateDealPage() {
                     <div className="p-6">
                         <h2 className="text-xl font-bold text-gray-800 mb-2">Md. Moshreful Islam Sojib</h2>
                         <p className="text-sm text-gray-500 mb-1">MSc & BSc in Zoology</p>
-                        <p className="text-sm text-gray-500 mb-1">Dhaka College, Dhaka (Affiliated DU)</p>
-                        <p className="text-sm font-semibold text-emerald-600 mt-3">Founder & CEO - Gram2Ghor</p>
-                        <p className="text-sm text-gray-600 mt-2">Contact: 01743289610</p>
+                        <p className="text-sm text-gray-500 mb-1">[Your Institution]</p>
+                        <p className="text-sm font-semibold text-emerald-600 mt-3">Founder & CEO - Ab9dEcommerce</p>
+                        <p className="text-sm text-gray-600 mt-2">Contact: +1 000 000 0000</p>
                     </div>
                 </div>
 
@@ -41,7 +41,7 @@ export default function CorporateDealPage() {
                         <h2 className="text-xl font-bold text-gray-800 mb-2">Md. Raju Hossain</h2>
                         <p className="text-sm text-gray-500 mb-1">BSc in Textile Engineering</p>
                         <p className="text-sm text-gray-500 mb-1">Pabna Textile Engineering College, Pabna (Affiliated BUTEX)</p>
-                        <p className="text-sm font-semibold text-emerald-600 mt-3">Founder & MD - Gram2Ghor</p>
+                        <p className="text-sm font-semibold text-emerald-600 mt-3">Founder & MD - Ab9dEcommerce</p>
                         <p className="text-sm text-gray-600 mt-2">Contact: 01726-317392</p>
                     </div>
                 </div>
@@ -51,10 +51,10 @@ export default function CorporateDealPage() {
             <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-6 sm:p-8 mb-12">
                 <h2 className="text-xl font-bold text-gray-800 mb-4">Contact Us</h2>
                 <div className="space-y-2 text-gray-700">
-                    <p><strong>Email:</strong> gram2ghor@gmail.com</p>
-                    <p><strong>Phone:</strong> 01822858380, 01822-858283</p>
-                    <p><strong>Products Exhibition Address:</strong> Meherba Plaza, Level-8, Room#J, 33-Topkhana Road, Segunbagicha, Dhaka-1000</p>
-                    <p><strong>Office Address:</strong> 14/D, Kaderabad housing, Mohammadpur, Dhaka</p>
+                    <p><strong>Email:</strong> ab9d-ecommerce@gmail.com</p>
+                    <p><strong>Phone:</strong> +1 000 000 0000, 01822-858283</p>
+                    <p><strong>Products Exhibition Address:</strong> [Your Exhibition Address]</p>
+                    <p><strong>Office Address:</strong> [Your Business Address]</p>
                     <p><strong>Order Time:</strong> Everyday 24/7</p>
                 </div>
             </div>

@@ -1,12 +1,12 @@
 export const metadata = {
-    title: "Privacy Policy | Gram2Ghor",
-    description: "Read Gram2Ghor's Privacy Policy to understand how we collect, use, and protect your personal information when you use our organic food delivery service.",
-    keywords: "privacy policy, Gram2Ghor privacy, data protection, personal information, GDPR compliance Bangladesh",
+    title: "Privacy Policy | Ab9dEcommerce",
+    description: "Read Ab9dEcommerce's Privacy Policy to understand how we collect, use, and protect your personal information when you use our products delivery service.",
+    keywords: "privacy policy, Ab9dEcommerce privacy, data protection, personal information, GDPR compliance ",
     openGraph: {
-        title: "Privacy Policy - Gram2Ghor",
-        description: "Read Gram2Ghor's Privacy Policy to understand how we collect, use, and protect your personal information.",
-        url: "https://gram2ghor.com/privacy-policy",
-        siteName: "Gram2Ghor",
+        title: "Privacy Policy - Ab9dEcommerce",
+        description: "Read Ab9dEcommerce's Privacy Policy to understand how we collect, use, and protect your personal information.",
+        url: "https://example.com/privacy-policy",
+        siteName: "Ab9dEcommerce",
         type: "website"
     }
 };
@@ -33,7 +33,7 @@ export default function PrivacyPolicyPage() {
                                 1. Introduction
                             </h2>
                             <p className="text-gray-700 leading-relaxed ml-11">
-                                At <span className="font-semibold">GRAM2GHOR</span>, we are dedicated to bringing the purity of the village to your doorstep. We are committed to protecting your privacy and safeguarding your personal information. This Privacy Policy outlines our practices regarding the collection, use, and disclosure of your information when you use our e-commerce platform for organic food and natural products. By using our services, you consent to the practices described in this policy.
+                                At <span className="font-semibold">AB9DECOMMERCE</span>, we are dedicated to bringing the purity of the village to your doorstep. We are committed to protecting your privacy and safeguarding your personal information. This Privacy Policy outlines our practices regarding the collection, use, and disclosure of your information when you use our e-commerce platform for products and natural products. By using our services, you consent to the practices described in this policy.
                             </p>
                         </div>
 
@@ -53,11 +53,11 @@ export default function PrivacyPolicyPage() {
                                 </div>
                                 <div className="bg-gray-50 rounded-lg p-4">
                                     <h3 className="text-lg font-semibold text-gray-800 mb-2">2.2. Payment Data</h3>
-                                    <p className="text-gray-700 leading-relaxed">Details required to process transactions. Payments are handled via secure third-party gateways (e.g., bKash, Nagad, SSLCommerz). GRAM2GHOR does not store your full card or mobile wallet credentials.</p>
+                                    <p className="text-gray-700 leading-relaxed">Details required to process transactions. Payments are handled via secure third-party gateways (e.g., bKash, Nagad, SSLCommerz). AB9DECOMMERCE does not store your full card or mobile wallet credentials.</p>
                                 </div>
                                 <div className="bg-gray-50 rounded-lg p-4">
                                     <h3 className="text-lg font-semibold text-gray-800 mb-2">2.3. Quality Assurance Media</h3>
-                                    <p className="text-gray-700 leading-relaxed">To maintain our high organic standards, we may collect photos or unboxing videos provided by you to verify product quality or process return requests.</p>
+                                    <p className="text-gray-700 leading-relaxed">To maintain our high quality standards, we may collect photos or unboxing videos provided by you to verify product quality or process return requests.</p>
                                 </div>
                                 <div className="bg-gray-50 rounded-lg p-4">
                                     <h3 className="text-lg font-semibold text-gray-800 mb-2">2.4. Usage & Location Information</h3>
@@ -80,11 +80,11 @@ export default function PrivacyPolicyPage() {
                                 We use your personal information for the following purposes:
                             </p>
                             <div className="ml-16 space-y-3">
-                                <p className="text-gray-700 leading-relaxed"><span className="font-semibold">3.1. Order Fulfillment:</span> To process and deliver your organic products safely to your home.</p>
+                                <p className="text-gray-700 leading-relaxed"><span className="font-semibold">3.1. Order Fulfillment:</span> To process and deliver your products safely to your home.</p>
                                 <p className="text-gray-700 leading-relaxed"><span className="font-semibold">3.2. Customer Support:</span> To address inquiries regarding product freshness, sourcing, or delivery status.</p>
                                 <p className="text-gray-700 leading-relaxed"><span className="font-semibold">3.3. Marketing & Transparency:</span> To send updates on seasonal harvests, promotional offers, and order status notifications via SMS or email.</p>
                                 <p className="text-gray-700 leading-relaxed"><span className="font-semibold">3.4. Service Optimization:</span> To analyze customer preferences and ensure we are sourcing the products you need most.</p>
-                                <p className="text-gray-700 leading-relaxed"><span className="font-semibold">3.5. Legal Compliance:</span> To comply with the Digital Security Act and other regulatory obligations in Bangladesh.</p>
+                                <p className="text-gray-700 leading-relaxed"><span className="font-semibold">3.5. Legal Compliance:</span> To comply with applicable regulations in .</p>
                             </div>
                         </div>
 
@@ -111,7 +111,7 @@ export default function PrivacyPolicyPage() {
                                 5. Data Security
                             </h2>
                             <p className="text-gray-700 leading-relaxed ml-11">
-                                GRAM2GHOR employs industry-standard security measures, including SSL encryption, to protect your personal information from unauthorized access, disclosure, or alteration.
+                                AB9DECOMMERCE employs industry-standard security measures, including SSL encryption, to protect your personal information from unauthorized access, disclosure, or alteration.
                             </p>
                         </div>
 
@@ -122,7 +122,7 @@ export default function PrivacyPolicyPage() {
                                 6. Your Choices
                             </h2>
                             <div className="ml-16 space-y-3">
-                                <p className="text-gray-700 leading-relaxed"><span className="font-semibold">6.1. Account Management:</span> You can update your address and contact details at any time by logging into your GRAM2GHOR account.</p>
+                                <p className="text-gray-700 leading-relaxed"><span className="font-semibold">6.1. Account Management:</span> You can update your address and contact details at any time by logging into your AB9DECOMMERCE account.</p>
                                 <p className="text-gray-700 leading-relaxed"><span className="font-semibold">6.2. Communication Preferences:</span> You may opt-out of marketing materials by using the "unsubscribe" link in our emails or contacting our support team.</p>
                                 <p className="text-gray-700 leading-relaxed"><span className="font-semibold">6.3. Cookie Control:</span> You can manage or disable cookies through your browser settings.</p>
                             </div>
@@ -160,10 +160,10 @@ export default function PrivacyPolicyPage() {
                                 If you have any questions or concerns regarding this Privacy Policy, please contact us at:
                             </p>
                             <div className="ml-16 bg-gray-50 rounded-lg p-6">
-                                <p className="text-gray-700 leading-relaxed"><span className="font-semibold">GRAM2GHOR</span></p>
-                                <p className="text-gray-700 leading-relaxed"><span className="font-semibold">Email:</span> gram2ghor@gmail.com</p>
-                                <p className="text-gray-700 leading-relaxed"><span className="font-semibold">Phone:</span> 01822858380, 01822858283</p>
-                                <p className="text-gray-700 leading-relaxed"><span className="font-semibold">Address:</span> 14/D, Kaderabad Housing, Mohammadpur, Dhaka</p>
+                                <p className="text-gray-700 leading-relaxed"><span className="font-semibold">AB9DECOMMERCE</span></p>
+                                <p className="text-gray-700 leading-relaxed"><span className="font-semibold">Email:</span> ab9d-ecommerce@gmail.com</p>
+                                <p className="text-gray-700 leading-relaxed"><span className="font-semibold">Phone:</span> +1 000 000 0000, +1 000 000 0000</p>
+                                <p className="text-gray-700 leading-relaxed"><span className="font-semibold">Address:</span> [Your Business Address]</p>
                             </div>
                         </div>
                     </div>

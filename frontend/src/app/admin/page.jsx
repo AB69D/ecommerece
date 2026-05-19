@@ -8,7 +8,7 @@ export default function AdminDashboard() {
                 <div className="flex justify-center">
                     <Image
                         src="/logo.png"
-                        alt="Gram2Ghor Logo"
+                        alt="Ab9dEcommerce Logo"
                         width={200}
                         height={200}
                         className="object-contain w-40 sm:w-48 md:w-56"
@@ -20,7 +20,7 @@ export default function AdminDashboard() {
                         Welcome to Admin Dashboard
                     </h1>
                     <p className="text-gray-500 text-sm sm:text-base md:text-lg">
-                        Manage your Gram2Ghor store efficiently
+                        Manage your Ab9dEcommerce store efficiently
                     </p>
                 </div>
             </div>

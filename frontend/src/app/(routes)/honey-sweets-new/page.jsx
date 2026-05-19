@@ -40,10 +40,9 @@ export default function HoneySweetsPage() {
                     const catData = await catRes.json();
                     
                     if (catData.success) {
-                        const cat = catData.data.find(c => 
-                            c.category_name.includes("মধু") || 
+                        const cat = catData.data.find(c =>
                             c.category_name.toLowerCase().includes("honey") ||
-                            c.category_name.includes("মিষ্টি")
+                            c.category_name.toLowerCase().includes("sweet")
                         );
                         
                         if (cat) {
@@ -201,7 +200,7 @@ export default function HoneySweetsPage() {
                                     <div className="mt-2">
                                         {product.weights && product.weights.length > 0 && (
                                             <p className="text-base font-bold text-gray-900 text-center">
-                                                ৳{Math.min(...product.weights.map(w => w.price))}
+                                                ${Math.min(...product.weights.map(w => w.price))}
                                             </p>
                                         )}
                                     </div>

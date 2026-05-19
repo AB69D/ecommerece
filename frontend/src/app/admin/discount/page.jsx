@@ -136,16 +136,16 @@ export default function DiscountPage() {
                                         <div className="flex items-center gap-2">
                                             {weight.discountPercent > 0 ? (
                                                 <>
-                                                    <p className="text-sm text-gray-400 line-through">৳{weight.price}</p>
+                                                    <p className="text-sm text-gray-400 line-through">${weight.price}</p>
                                                     <p className="text-sm font-bold text-emerald-600">
-                                                        ৳{getDiscountedPrice(weight.price, weight.discountPercent).toFixed(0)}
+                                                        ${getDiscountedPrice(weight.price, weight.discountPercent).toFixed(0)}
                                                     </p>
                                                     <span className="text-xs bg-emerald-600 text-white px-1.5 py-0.5 rounded">
                                                         -{weight.discountPercent}%
                                                     </span>
                                                 </>
                                             ) : (
-                                                <p className="text-sm font-bold text-gray-800">৳{weight.price}</p>
+                                                <p className="text-sm font-bold text-gray-800">${weight.price}</p>
                                             )}
                                         </div>
                                     </div>
@@ -211,11 +211,11 @@ export default function DiscountPage() {
                             </div>
                             {discountPercent > 0 && (
                                 <p className="mt-2 text-sm text-emerald-600">
-                                    Discounted price: ৳{getDiscountedPrice(
+                                    Discounted price: ${getDiscountedPrice(
                                         editingProduct.weights[editingWeightIndex]?.price,
                                         discountPercent
                                     ).toFixed(0)}
-                                    {" "}(was ৳{editingProduct.weights[editingWeightIndex]?.price})
+                                    {" "}(was ${editingProduct.weights[editingWeightIndex]?.price})
                                 </p>
                             )}
                         </div>

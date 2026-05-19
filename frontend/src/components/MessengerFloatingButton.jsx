@@ -9,7 +9,7 @@ export default function MessengerFloatingButton() {
         setIsVisible(true);
     }, []);
 
-    const messengerLink = "https://m.me/gram2ghor";
+    const messengerLink = "https://m.me/ab9d-ecommerce";
 
     return (
         <div

@@ -178,7 +178,7 @@ export default function CustomerReviews() {
                     flex-shrink: 0;
                 }
  
-                /* Comment — word-wrap so Bengali/long text never overflows */
+                /* Comment — word-wrap so long text never overflows */
                 .rv-comment {
                     font-size: 14px;
                     line-height: 1.8;

@@ -92,7 +92,7 @@ export default function CategoryProducts({ categorySlug }) {
                                 )}
                                 {product.weights && product.weights.length > 0 && (
                                     <p className="text-emerald-600 font-bold mt-2">
-                                        ৳{product.weights[0].price}
+                                        ${product.weights[0].price}
                                     </p>
                                 )}
                             </div>

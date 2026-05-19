@@ -11,14 +11,14 @@ export async function generateMetadata({ params }) {
         if (data.success && data.data) {
             const product = data.data;
             const productName = `${product.firstName} ${product.lastName || ''}`.trim();
-            const description = product.description || `${productName} - Available at Gram2Ghor`;
+            const description = product.description || `${productName} - Available at Ab9dEcommerce`;
             const image = product.cover_image || (product.weights?.[0]?.images?.[0]) || `${backendUrl}/logo.png`;
             const price = product.weights?.[0]?.price || 0;
             
             return {
-                title: `${productName} - ৳${price} | Gram2Ghor`,
+                title: `${productName} - $${price} | Ab9dEcommerce`,
                 description: description,
-                keywords: [product.firstName, product.lastName, product.category?.category_name, 'Gram2Ghor', 'organic products'].filter(Boolean).join(', '),
+                keywords: [product.firstName, product.lastName, product.category?.category_name, 'Ab9dEcommerce', 'products'].filter(Boolean).join(', '),
                 openGraph: {
                     title: productName,
                     description: description,
@@ -31,7 +31,7 @@ export async function generateMetadata({ params }) {
                         }
                     ],
                     type: 'website',
-                    siteName: 'Gram2Ghor'
+                    siteName: 'Ab9dEcommerce'
                 },
                 twitter: {
                     card: 'summary_large_image',
@@ -46,8 +46,8 @@ export async function generateMetadata({ params }) {
     }
     
     return {
-        title: 'Product Details | Gram2Ghor',
-        description: 'View product details at Gram2Ghor'
+        title: 'Product Details | Ab9dEcommerce',
+        description: 'View product details at Ab9dEcommerce'
     };
 }
 
