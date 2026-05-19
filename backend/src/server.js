@@ -35,7 +35,14 @@ const app = express();
 
 app.set('trust proxy', 1);
 
-app.use(helmet());
+// CSP/CORP defaults are for HTML pages. This is a JSON API consumed by
+// a frontend on a different origin (Vercel), so we relax those two.
+app.use(
+    helmet({
+        crossOriginResourcePolicy: { policy: 'cross-origin' },
+        contentSecurityPolicy: false,
+    }),
+);
 app.use(
     cors({
         origin: env.FRONTEND_URL ? [env.FRONTEND_URL, env.FRONTEND_URL.replace(/\/$/, '')] : true,
