@@ -1,0 +1,104 @@
+@import "tailwindcss";
+
+html {
+    scroll-behavior: smooth;
+}
+
+body {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    -webkit-tap-highlight-color: transparent;
+    text-rendering: optimizeLegibility;
+}
+
+/* Modern, slim scrollbar that fits a premium look (desktop only) */
+@media (min-width: 768px) {
+    ::-webkit-scrollbar {
+        width: 10px;
+        height: 10px;
+    }
+    ::-webkit-scrollbar-track {
+        background: #f8fafc;
+    }
+    ::-webkit-scrollbar-thumb {
+        background: linear-gradient(180deg, #047857, #059669);
+        border-radius: 8px;
+        border: 2px solid #f8fafc;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+        background: linear-gradient(180deg, #065f46, #047857);
+    }
+}
+
+/* Mobile horizontal-scroll containers stay clean */
+@media (max-width: 768px) {
+    .hide-scrollbar::-webkit-scrollbar {
+        display: none;
+    }
+    .hide-scrollbar {
+        -ms-overflow-style: none;
+        scrollbar-width: none;
+    }
+}
+
+/* Smooth fade-in when grids/cards transition from skeleton to real content */
+@keyframes fade-in {
+    from {
+        opacity: 0;
+        transform: translateY(8px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.fade-in {
+    animation: fade-in 0.45s ease-out both;
+}
+
+/* Subtle staggered reveal for grid children */
+.fade-in-stagger > * {
+    animation: fade-in 0.5s ease-out both;
+}
+.fade-in-stagger > *:nth-child(1)  { animation-delay: 0.02s; }
+.fade-in-stagger > *:nth-child(2)  { animation-delay: 0.06s; }
+.fade-in-stagger > *:nth-child(3)  { animation-delay: 0.10s; }
+.fade-in-stagger > *:nth-child(4)  { animation-delay: 0.14s; }
+.fade-in-stagger > *:nth-child(5)  { animation-delay: 0.18s; }
+.fade-in-stagger > *:nth-child(6)  { animation-delay: 0.22s; }
+.fade-in-stagger > *:nth-child(7)  { animation-delay: 0.26s; }
+.fade-in-stagger > *:nth-child(8)  { animation-delay: 0.30s; }
+.fade-in-stagger > *:nth-child(n+9){ animation-delay: 0.34s; }
+
+/* Premium card hover — smooth lift with soft brand glow */
+.card-hover {
+    transition: transform 0.35s cubic-bezier(0.2, 0.8, 0.2, 1),
+                box-shadow 0.35s cubic-bezier(0.2, 0.8, 0.2, 1),
+                border-color 0.35s ease;
+    will-change: transform;
+}
+.card-hover:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 14px 30px -12px rgba(5, 150, 105, 0.25),
+                0 6px 12px -4px rgba(0, 0, 0, 0.06);
+}
+
+/* Reduced motion preference — respect users */
+@media (prefers-reduced-motion: reduce) {
+    html {
+        scroll-behavior: auto;
+    }
+    .fade-in,
+    .fade-in-stagger > *,
+    .card-hover {
+        animation: none !important;
+        transition: none !important;
+    }
+}
+
+/* Visual selection that matches the brand */
+::selection {
+    background: #d1fae5;
+    color: #065f46;
+}

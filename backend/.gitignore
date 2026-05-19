@@ -1,0 +1,26 @@
+# Env (NEVER commit secrets)
+.env
+.env.local
+.env.*.local
+
+# Dependencies
+node_modules/
+package-lock.json
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# OS / editor
+.DS_Store
+*.swp
+.idea/
+.vscode/
+
+# Build / runtime
+dist/
+build/
+*.log
+
+# cPanel / Passenger artifacts
+.passenger/
+tmp/restart.txt
