@@ -37,9 +37,12 @@ const action = z.object({
     text: z.string().max(500).optional(),
 }).passthrough();
 
+// `.nullish()` (optional + nullable): the widget sends literal `null` for
+// `context`/`guestId` on a visitor's first turn, which `.optional()` alone
+// rejects. The engine re-derives every value server-side, so null == absent.
 export const chatMessageSchema = z.object({
-    message: z.string().max(1000).optional(),
-    action: action.optional(),
-    guestId: z.string().max(120).optional(),
-    context: context.optional(),
+    message: z.string().max(1000).nullish(),
+    action: action.nullish(),
+    guestId: z.string().max(120).nullish(),
+    context: context.nullish(),
 });
