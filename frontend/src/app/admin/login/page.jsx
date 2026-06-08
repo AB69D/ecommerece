@@ -2,63 +2,38 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
-import { FiMail, FiLock, FiArrowRight, FiCheckCircle, FiAlertCircle, FiSend } from "react-icons/fi";
-import { sendLoginCode, verifyLoginCode, login } from "@/services/adminAuth";
+import { FiUser, FiLock, FiArrowRight, FiAlertCircle, FiEye, FiEyeOff } from "react-icons/fi";
+import { loginWithPassword, login } from "@/services/adminAuth";
 
 export default function AdminLoginPage() {
     const router = useRouter();
-    const [step, setStep] = useState('email');
-    const [email, setEmail] = useState('');
-    const [code, setCode] = useState('');
+    const [username, setUsername] = useState("");
+    const [password, setPassword] = useState("");
+    const [showPassword, setShowPassword] = useState(false);
     const [loading, setLoading] = useState(false);
-    const [message, setMessage] = useState({ type: '', text: '' });
+    const [message, setMessage] = useState({ type: "", text: "" });
 
-    const handleSendCode = async (e) => {
+    const handleSubmit = async (e) => {
         e.preventDefault();
-        setMessage({ type: '', text: '' });
-        setLoading(true);
-
-        try {
-            const result = await sendLoginCode(email);
-            setLoading(false);
-
-            if (result.success) {
-                setStep('code');
-                setMessage({ type: 'success', text: 'Login code sent to your email' });
-            } else {
-                setMessage({ type: 'error', text: result.message || 'Failed to send code' });
-            }
-        } catch (err) {
-            setLoading(false);
-            setMessage({ type: 'error', text: 'Network error. Could not connect to server.' });
+        if (!username || !password) {
+            setMessage({ type: "error", text: "Username and password are required" });
+            return;
         }
-    };
-
-    const handleVerifyCode = async (e) => {
-        e.preventDefault();
-        setMessage({ type: '', text: '' });
+        setMessage({ type: "", text: "" });
         setLoading(true);
-
         try {
-            const result = await verifyLoginCode(email, code);
+            const result = await loginWithPassword(username.trim(), password);
             setLoading(false);
-
-            if (result.success) {
+            if (result.success && result.data?.token) {
                 login(result.data.token);
-                router.push('/admin');
+                router.push("/admin");
             } else {
-                setMessage({ type: 'error', text: result.message || 'Invalid code' });
+                setMessage({ type: "error", text: result.message || "Invalid credentials" });
             }
         } catch (err) {
             setLoading(false);
-            setMessage({ type: 'error', text: 'Network error. Could not connect to server.' });
+            setMessage({ type: "error", text: "Network error. Could not connect to server." });
         }
-    };
-
-    const handleResend = async () => {
-        setCode('');
-        setStep('email');
-        setMessage({ type: '', text: '' });
     };
 
     return (
@@ -77,102 +52,83 @@ export default function AdminLoginPage() {
                         </div>
                         <h1 className="text-2xl font-bold text-gray-800">Admin Login</h1>
                         <p className="text-gray-500 mt-1 text-sm">
-                            {step === 'email'
-                                ? 'Enter your email to receive a login code'
-                                : `Enter the 6-digit code sent to ${email}`
-                            }
+                            Sign in with your administrator credentials
                         </p>
                     </div>
 
                     {message.text && (
-                        <div className={`mb-6 p-4 rounded-xl flex items-start gap-3 text-sm ${
-                            message.type === 'success'
-                                ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                                : 'bg-red-50 text-red-700 border border-red-200'
-                        }`}>
-                            {message.type === 'success'
-                                ? <FiCheckCircle className="w-5 h-5 mt-0.5 shrink-0" />
-                                : <FiAlertCircle className="w-5 h-5 mt-0.5 shrink-0" />
-                            }
+                        <div className="mb-6 p-4 rounded-xl flex items-start gap-3 text-sm bg-red-50 text-red-700 border border-red-200">
+                            <FiAlertCircle className="w-5 h-5 mt-0.5 shrink-0" />
                             <span>{message.text}</span>
                         </div>
                     )}
 
-                    {step === 'email' ? (
-                        <form onSubmit={handleSendCode} className="space-y-5">
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                                    Email Address
-                                </label>
-                                <div className="relative">
-                                    <FiMail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                                    <input
-                                        type="email"
-                                        value={email}
-                                        onChange={(e) => setEmail(e.target.value)}
-                                        placeholder="admin@example.com"
-                                        required
-                                        className="w-full pl-11 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all placeholder:text-gray-400"
-                                    />
-                                </div>
+                    <form onSubmit={handleSubmit} className="space-y-5">
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                                Username
+                            </label>
+                            <div className="relative">
+                                <FiUser className="absolute left-3.5 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                                <input
+                                    type="text"
+                                    autoComplete="username"
+                                    value={username}
+                                    onChange={(e) => setUsername(e.target.value)}
+                                    placeholder="ab9d"
+                                    required
+                                    autoFocus
+                                    className="w-full pl-11 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all placeholder:text-gray-400"
+                                />
                             </div>
-                            <button
-                                type="submit"
-                                disabled={loading}
-                                className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-400 text-white font-medium rounded-xl transition-all flex items-center justify-center gap-2"
-                            >
-                                {loading ? (
-                                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                                ) : (
-                                    <>
-                                        Send Code
-                                        <FiSend className="w-4 h-4" />
-                                    </>
-                                )}
-                            </button>
-                        </form>
-                    ) : (
-                        <form onSubmit={handleVerifyCode} className="space-y-5">
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                                    Login Code
-                                </label>
-                                <div className="relative">
-                                    <FiLock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                                    <input
-                                        type="text"
-                                        value={code}
-                                        onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                                        placeholder="000000"
-                                        maxLength={6}
-                                        required
-                                        className="w-full pl-11 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm tracking-[8px] text-center font-mono text-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all placeholder:text-gray-400"
-                                    />
-                                </div>
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                                Password
+                            </label>
+                            <div className="relative">
+                                <FiLock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                                <input
+                                    type={showPassword ? "text" : "password"}
+                                    autoComplete="current-password"
+                                    value={password}
+                                    onChange={(e) => setPassword(e.target.value)}
+                                    placeholder="••••••••"
+                                    required
+                                    className="w-full pl-11 pr-11 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all placeholder:text-gray-400"
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => setShowPassword((s) => !s)}
+                                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                                    aria-label={showPassword ? "Hide password" : "Show password"}
+                                    tabIndex={-1}
+                                >
+                                    {showPassword ? <FiEyeOff className="w-5 h-5" /> : <FiEye className="w-5 h-5" />}
+                                </button>
                             </div>
-                            <button
-                                type="submit"
-                                disabled={loading || code.length !== 6}
-                                className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-400 text-white font-medium rounded-xl transition-all flex items-center justify-center gap-2"
-                            >
-                                {loading ? (
-                                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                                ) : (
-                                    <>
-                                        Verify & Login
-                                        <FiArrowRight className="w-4 h-4" />
-                                    </>
-                                )}
-                            </button>
-                            <button
-                                type="button"
-                                onClick={handleResend}
-                                className="w-full text-sm text-gray-500 hover:text-emerald-600 transition-colors text-center"
-                            >
-                                Use a different email
-                            </button>
-                        </form>
-                    )}
+                        </div>
+
+                        <button
+                            type="submit"
+                            disabled={loading}
+                            className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-400 text-white font-medium rounded-xl transition-all flex items-center justify-center gap-2"
+                        >
+                            {loading ? (
+                                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                            ) : (
+                                <>
+                                    Sign in
+                                    <FiArrowRight className="w-4 h-4" />
+                                </>
+                            )}
+                        </button>
+                    </form>
+
+                    <p className="text-xs text-gray-400 text-center mt-6">
+                        Forgot your password? Contact your system administrator.
+                    </p>
                 </div>
             </div>
         </div>

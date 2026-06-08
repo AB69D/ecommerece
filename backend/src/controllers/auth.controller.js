@@ -1,6 +1,7 @@
 import OtpModel from "../models/otp.model.js";
 import AdminModel from "../models/admin.model.js";
 import jwt from 'jsonwebtoken';
+import bcrypt from 'bcryptjs';
 
 const BREVO_API = 'https://api.brevo.com/v3/smtp/email';
 const BREVO_KEY = process.env.API_KEY || process.env.SMTP_KEY;
@@ -195,5 +196,110 @@ export const verifyToken = async (request, response) => {
             success: false,
             valid: false
         });
+    }
+};
+
+// ---------------------------------------------------------------
+// Username + password login (preferred)
+// POST /api/admin/auth/login   { username, password }
+// ---------------------------------------------------------------
+export const login = async (request, response) => {
+    try {
+        const { username, password } = request.body || {};
+        if (!username || !password) {
+            return response.status(400).json({
+                success: false,
+                error: true,
+                message: "Username and password are required",
+            });
+        }
+
+        const normalized = String(username).toLowerCase().trim();
+        const admin = await AdminModel.findOne({ username: normalized, isActive: true })
+            .select('+passwordHash');
+
+        if (!admin) {
+            return response.status(401).json({
+                success: false,
+                error: true,
+                message: "Invalid username or password",
+            });
+        }
+
+        const ok = await bcrypt.compare(String(password), admin.passwordHash);
+        if (!ok) {
+            return response.status(401).json({
+                success: false,
+                error: true,
+                message: "Invalid username or password",
+            });
+        }
+
+        admin.lastLoginAt = new Date();
+        await admin.save();
+
+        const token = jwt.sign(
+            {
+                sub: admin._id.toString(),
+                username: admin.username,
+                role: admin.role,
+                email: admin.email || undefined,
+            },
+            process.env.JWT_SECRET,
+            { expiresIn: '12h' },
+        );
+
+        return response.json({
+            success: true,
+            error: false,
+            message: "Login successful",
+            data: {
+                token,
+                user: {
+                    id: admin._id,
+                    username: admin.username,
+                    email: admin.email || null,
+                    fullName: admin.fullName,
+                    role: admin.role,
+                },
+            },
+        });
+    } catch (err) {
+        return response.status(500).json({
+            success: false,
+            error: true,
+            message: err.message || "Login failed",
+        });
+    }
+};
+
+// ---------------------------------------------------------------
+// GET /api/admin/auth/me  - current admin from JWT (used by frontend)
+// ---------------------------------------------------------------
+export const me = async (request, response) => {
+    try {
+        const authHeader = request.headers.authorization;
+        if (!authHeader?.startsWith('Bearer ')) {
+            return response.status(401).json({ success: false, error: true, message: "Unauthorized" });
+        }
+        const token = authHeader.slice(7);
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        const admin = await AdminModel.findById(decoded.sub).lean();
+        if (!admin || !admin.isActive) {
+            return response.status(401).json({ success: false, error: true, message: "Account inactive or removed" });
+        }
+        return response.json({
+            success: true,
+            data: {
+                id: admin._id,
+                username: admin.username,
+                email: admin.email || null,
+                fullName: admin.fullName,
+                role: admin.role,
+                lastLoginAt: admin.lastLoginAt,
+            },
+        });
+    } catch (err) {
+        return response.status(401).json({ success: false, error: true, message: "Invalid or expired token" });
     }
 };
