@@ -12,6 +12,7 @@ import { logger } from './lib/logger.js';
 import { errorHandler } from './middlewares/error.middleware.js';
 import { notFound } from './middlewares/notFound.middleware.js';
 import requireAuth from './middlewares/auth.middleware.js';
+import { auditMutations } from './lib/audit.js';
 
 import categoryRouter from './routes/category.route.js';
 import productRouter from './routes/product.route.js';
@@ -30,6 +31,8 @@ import adminMgmtRouter from './routes/adminMgmt.route.js';
 import siteSettingsRouter from './routes/siteSettings.route.js';
 import footerRouter from './routes/footer.route.js';
 import navMenuRouter from './routes/navMenu.route.js';
+import rbacRouter from './routes/rbac.route.js';
+import auditLogRouter from './routes/auditLog.route.js';
 
 const app = express();
 
@@ -97,6 +100,10 @@ app.use('/api/admin/auth', authLimiter, authRouter);
 // API rate limit for everything else
 app.use('/api', apiLimiter);
 
+// Audit trail for every state-changing admin request (records on response
+// finish; attaches req.audit() so controllers can enrich the entry).
+app.use('/api/admin', auditMutations);
+
 // Admin routes (require auth)
 app.use('/api/admin/category', requireAuth, categoryRouter);
 app.use('/api/admin/product', requireAuth, productRouter);
@@ -104,6 +111,8 @@ app.use('/api/admin/header', requireAuth, headerRouter);
 app.use('/api/admin/order', requireAuth, orderRouter);
 app.use('/api/admin/review', requireAuth, reviewRouter);
 app.use('/api/admin/admins', requireAuth, adminMgmtRouter);
+app.use('/api/admin/rbac', requireAuth, rbacRouter);
+app.use('/api/admin/audit-logs', requireAuth, auditLogRouter);
 app.use('/api/admin/site-settings', requireAuth, siteSettingsRouter.admin);
 app.use('/api/admin/footer', requireAuth, footerRouter.admin);
 app.use('/api/admin/nav-menu', requireAuth, navMenuRouter.admin);

@@ -2,6 +2,8 @@ import OtpModel from "../models/otp.model.js";
 import AdminModel from "../models/admin.model.js";
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
+import { effectivePermissions } from '../lib/permissions.js';
+import { writeAudit } from '../lib/audit.js';
 
 const BREVO_API = 'https://api.brevo.com/v3/smtp/email';
 const BREVO_KEY = process.env.API_KEY || process.env.SMTP_KEY;
@@ -228,6 +230,19 @@ export const login = async (request, response) => {
 
         const ok = await bcrypt.compare(String(password), admin.passwordHash);
         if (!ok) {
+            await writeAudit({
+                actor: { id: admin._id, username: admin.username, role: admin.role },
+                action: 'auth.login_failed',
+                resource: 'Admin',
+                resourceId: String(admin._id),
+                method: 'POST',
+                path: '/api/admin/auth/login',
+                statusCode: 401,
+                ip: request.ip || '',
+                userAgent: (request.headers['user-agent'] || '').slice(0, 300),
+                message: `Failed login for "${admin.username}" (bad password)`,
+                success: false,
+            });
             return response.status(401).json({
                 success: false,
                 error: true,
@@ -237,6 +252,20 @@ export const login = async (request, response) => {
 
         admin.lastLoginAt = new Date();
         await admin.save();
+
+        await writeAudit({
+            actor: { id: admin._id, username: admin.username, role: admin.role },
+            action: 'auth.login',
+            resource: 'Admin',
+            resourceId: String(admin._id),
+            method: 'POST',
+            path: '/api/admin/auth/login',
+            statusCode: 200,
+            ip: request.ip || '',
+            userAgent: (request.headers['user-agent'] || '').slice(0, 300),
+            message: `"${admin.username}" logged in`,
+            success: true,
+        });
 
         const token = jwt.sign(
             {
@@ -296,6 +325,8 @@ export const me = async (request, response) => {
                 email: admin.email || null,
                 fullName: admin.fullName,
                 role: admin.role,
+                permissions: admin.permissions || [],
+                effectivePermissions: [...effectivePermissions(admin)],
                 lastLoginAt: admin.lastLoginAt,
             },
         });

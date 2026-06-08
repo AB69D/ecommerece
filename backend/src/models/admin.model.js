@@ -35,6 +35,12 @@ const adminSchema = new mongoose.Schema(
             default: "admin",
             index: true,
         },
+        // Extra permission grants on top of the role defaults.
+        // Each entry is a "resource:action" string (see lib/permissions.js).
+        permissions: {
+            type: [String],
+            default: [],
+        },
         isActive: {
             type: Boolean,
             default: true,
