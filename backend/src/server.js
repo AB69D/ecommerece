@@ -34,6 +34,7 @@ import navMenuRouter from './routes/navMenu.route.js';
 import rbacRouter from './routes/rbac.route.js';
 import auditLogRouter from './routes/auditLog.route.js';
 import analyticsRouter from './routes/analytics.route.js';
+import chatbotRouter from './routes/chatbot.route.js';
 
 const app = express();
 
@@ -130,6 +131,7 @@ app.use('/api/client/category', clientCategoryRouter);
 app.use('/api/client/site-settings', siteSettingsRouter.client);
 app.use('/api/client/footer', footerRouter.client);
 app.use('/api/client/nav-menu', navMenuRouter.client);
+app.use('/api/client/chatbot', chatbotRouter);
 
 app.use(notFound);
 app.use(errorHandler);

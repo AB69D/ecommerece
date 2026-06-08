@@ -3,7 +3,7 @@ import "./globals.css";
 import Navbar from "@/components/Navbar.jsx";
 import HeaderTop from "@/components/Header-top.jsx";
 import Footer from "@/components/Footer.jsx";
-import ChatFloatingButton from "@/components/ChatFloatingButton.jsx";
+import OrderChatbot from "@/components/OrderChatbot.jsx";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -63,7 +63,7 @@ export default function RootLayout({ children }) {
           {children}
         </main>
         <Footer />
-        <ChatFloatingButton />
+        <OrderChatbot />
       </body>
     </html>
   );
