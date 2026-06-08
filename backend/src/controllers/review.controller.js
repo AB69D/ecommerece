@@ -42,7 +42,9 @@ export const createReview = async (request, response) => {
 
 export const getAllReviews = async (request, response) => {
     try {
-        const reviews = await ReviewModel.find().sort({ createdAt: -1 });
+        const reviews = await ReviewModel.find()
+            .populate('product', 'firstName lastName')
+            .sort({ createdAt: -1 });
 
         return response.json({
             message: "Reviews fetched successfully",

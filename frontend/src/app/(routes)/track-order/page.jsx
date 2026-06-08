@@ -3,10 +3,12 @@ import { useState, useEffect, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { FiPackage, FiCheck, FiTruck, FiClock, FiSearch, FiPhone, FiCalendar, FiAlertCircle, FiStar, FiImage, FiVideo, FiX } from "react-icons/fi";
 import { FaStar, FaStarHalfAlt, FaRegStar } from "react-icons/fa";
+import { useCurrency } from "@/context/CurrencyContext.jsx";
 
 function TrackOrderContent() {
     const searchParams = useSearchParams();
     const router = useRouter();
+    const { symbol } = useCurrency();
     const [orders, setOrders] = useState([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
@@ -238,7 +240,7 @@ function TrackOrderContent() {
                                 <div className="flex items-center justify-between">
                                     <div>
                                         <p className="font-mono font-medium text-gray-800">{order.orderId || order.orderId}</p>
-                                        <p className="text-sm text-gray-500">{order.items?.length || 0} items - ${order.totalAmount}</p>
+                                        <p className="text-sm text-gray-500">{order.items?.length || 0} items - {symbol}{order.totalAmount}</p>
                                     </div>
                                     <div className="text-right">
                                         {getStatusBadge(order.orderStatus)}
@@ -445,8 +447,8 @@ function TrackOrderContent() {
                                         </div>
                                         <div className="flex-1">
                                             <p className="font-medium text-gray-800">{item.productName}</p>
-                                            <p className="text-sm text-gray-500">Qty: {item.quantity} x ${item.price}</p>
-                                            <p className="font-bold">${item.totalPrice}</p>
+                                            <p className="text-sm text-gray-500">Qty: {item.quantity} x {symbol}{item.price}</p>
+                                            <p className="font-bold">{symbol}{item.totalPrice}</p>
                                         </div>
                                     </div>
                                 ))}
@@ -454,15 +456,15 @@ function TrackOrderContent() {
                             <div className="border-t mt-4 pt-4 space-y-2">
                                 <div className="flex justify-between text-sm text-gray-600">
                                     <span>Subtotal</span>
-                                    <span>${selectedOrder.subtotal}</span>
+                                    <span>{symbol}{selectedOrder.subtotal}</span>
                                 </div>
                                 <div className="flex justify-between text-sm text-gray-600">
                                     <span>Delivery</span>
-                                    <span>${selectedOrder.deliveryCharge}</span>
+                                    <span>{symbol}{selectedOrder.deliveryCharge}</span>
                                 </div>
                                 <div className="flex justify-between font-bold text-lg">
                                     <span>Total</span>
-                                    <span>${selectedOrder.totalAmount}</span>
+                                    <span>{symbol}{selectedOrder.totalAmount}</span>
                                 </div>
                             </div>
                         </div>

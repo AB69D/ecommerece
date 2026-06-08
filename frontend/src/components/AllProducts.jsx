@@ -3,12 +3,15 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { FiEye, FiPlus } from "react-icons/fi";
 import { ProductGridSkeleton } from "./ProductCardSkeleton";
+import { useCurrency } from "@/context/CurrencyContext.jsx";
+import ProductRating from "./ProductRating.jsx";
 
 export default function AllProducts() {
     const [products, setProducts] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [hoveredProduct, setHoveredProduct] = useState(null);
+    const { symbol } = useCurrency();
     const router = useRouter();
 
     useEffect(() => {
@@ -148,17 +151,18 @@ export default function AllProducts() {
                                         {product.category.category_name}
                                     </p>
                                 )}
+                                <ProductRating productId={product._id} className="mt-1" />
                                 <div className="mt-1 sm:mt-2 text-center">
                                     {minWeight && (
                                         hasDiscount ? (
                                             <div className="flex items-center justify-center gap-1 sm:gap-2">
-                                                <p className="text-[10px] sm:text-sm text-gray-400 line-through">${minWeight.price}</p>
+                                                <p className="text-[10px] sm:text-sm text-gray-400 line-through">{symbol}{minWeight.price}</p>
                                                 <p className="text-sm sm:text-base font-bold text-emerald-600">
-                                                    ${(minWeight.price - (minWeight.price * minWeight.discountPercent / 100)).toFixed(0)}
+                                                    {symbol}{(minWeight.price - (minWeight.price * minWeight.discountPercent / 100)).toFixed(0)}
                                                 </p>
                                             </div>
                                         ) : (
-                                            <p className="text-sm sm:text-base font-bold text-gray-900">${minWeight.price}</p>
+                                            <p className="text-sm sm:text-base font-bold text-gray-900">{symbol}{minWeight.price}</p>
                                         )
                                     )}
                                 </div>

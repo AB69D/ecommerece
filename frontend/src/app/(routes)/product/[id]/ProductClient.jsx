@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { FiShoppingCart, FiCheck, FiHelpCircle, FiMessageCircle, FiPhoneCall } from "react-icons/fi";
 import { PiWhatsappLogoBold } from "react-icons/pi";
 import { addToCart } from "@/utils/cart";
+import { useCurrency } from "@/context/CurrencyContext.jsx";
+import ProductReviews from "@/components/ProductReviews.jsx";
 
 export default function ProductClient({ productId }) {
     const [product, setProduct] = useState(null);
@@ -18,6 +20,7 @@ export default function ProductClient({ productId }) {
     const [qaExpanded, setQaExpanded] = useState({});
     const [relatedProducts, setRelatedProducts] = useState([]);
     const [relatedLoading, setRelatedLoading] = useState(false);
+    const { symbol } = useCurrency();
     const router = useRouter();
     const productRef = useRef(null);
 
@@ -292,7 +295,7 @@ export default function ProductClient({ productId }) {
                                                     : 'border-gray-300 text-gray-700 hover:border-emerald-400'
                                             }`}
                                         >
-                                            {weight.weight} - ${weight.price}
+                                            {weight.weight} - {symbol}{weight.price}
                                         </button>
                                     ))}
                                 </div>
@@ -346,10 +349,10 @@ export default function ProductClient({ productId }) {
                         {currentWeight?.discountPercent > 0 ? (
                             <div className="flex items-center gap-3">
                                 <p className="text-lg sm:text-xl text-gray-400 line-through">
-                                    ${currentWeight?.price * quantity || 0}
+                                    {symbol}{currentWeight?.price * quantity || 0}
                                 </p>
                                 <p className="text-2xl sm:text-3xl font-bold text-emerald-600">
-                                    ${(currentWeight.price - (currentWeight.price * currentWeight.discountPercent / 100)) * quantity}
+                                    {symbol}{(currentWeight.price - (currentWeight.price * currentWeight.discountPercent / 100)) * quantity}
                                 </p>
                                 <span className="bg-emerald-100 text-emerald-700 text-xs font-bold px-2 py-1 rounded">
                                     -{currentWeight.discountPercent}%
@@ -357,7 +360,7 @@ export default function ProductClient({ productId }) {
                             </div>
                         ) : (
                             <p className="text-2xl sm:text-3xl font-bold text-gray-900">
-                                ${currentWeight?.price * quantity || 0}
+                                {symbol}{currentWeight?.price * quantity || 0}
                             </p>
                         )}
                     </div>
@@ -480,7 +483,7 @@ export default function ProductClient({ productId }) {
                                                      <p className="text-xs text-gray-600 truncate">{item.lastName}</p>
                                                  )}
                                                  <p className="text-sm font-bold text-emerald-600 mt-1">
-                                                     ${item.weights?.[0]?.price || 0}
+                                                     {symbol}{item.weights?.[0]?.price || 0}
                                                  </p>
                                              </div>
                                          </Link>
@@ -491,6 +494,8 @@ export default function ProductClient({ productId }) {
                      )}
                 </div>
             </div>
+
+            <ProductReviews productId={product._id} productName={product.firstName} />
         </div>
     );
 }

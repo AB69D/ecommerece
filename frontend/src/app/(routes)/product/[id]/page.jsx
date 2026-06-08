@@ -4,19 +4,28 @@ export async function generateMetadata({ params }) {
     const { id } = await params;
     const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8080";
     
+    let currencySymbol = "$";
+    try {
+        const sres = await fetch(`${backendUrl}/api/client/site-settings`, { next: { revalidate: 60 } });
+        const sjson = await sres.json();
+        if (sjson?.data?.currencySymbol) currencySymbol = sjson.data.currencySymbol;
+    } catch {
+        // keep default symbol
+    }
+
     try {
         const res = await fetch(`${backendUrl}/api/client/product/product/${id}`);
         const data = await res.json();
-        
+
         if (data.success && data.data) {
             const product = data.data;
             const productName = `${product.firstName} ${product.lastName || ''}`.trim();
             const description = product.description || `${productName} - Available at Ab9dEcommerce`;
             const image = product.cover_image || (product.weights?.[0]?.images?.[0]) || `${backendUrl}/logo.png`;
             const price = product.weights?.[0]?.price || 0;
-            
+
             return {
-                title: `${productName} - $${price} | Ab9dEcommerce`,
+                title: `${productName} - ${currencySymbol}${price} | Ab9dEcommerce`,
                 description: description,
                 keywords: [product.firstName, product.lastName, product.category?.category_name, 'Ab9dEcommerce', 'products'].filter(Boolean).join(', '),
                 openGraph: {

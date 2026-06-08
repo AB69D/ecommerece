@@ -13,6 +13,16 @@ const mediaSchema = new mongoose.Schema({
 }, { _id: false });
 
 const reviewSchema = new mongoose.Schema({
+    // Optional link to a specific product. When present, the review is shown on
+    // that product's page and counts toward its star rating. When absent, the
+    // review is a general/site review (e.g. submitted from the order-tracking
+    // page) and only appears in the homepage testimonial carousel.
+    product: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'product',
+        default: null,
+        index: true
+    },
     name: {
         type: String,
         required: true,

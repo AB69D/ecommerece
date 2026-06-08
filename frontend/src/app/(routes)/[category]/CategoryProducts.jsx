@@ -1,12 +1,15 @@
 "use client";
 import { useState, useEffect } from "react";
 import ProductCardSkeleton from "@/components/ProductCardSkeleton";
+import { useCurrency } from "@/context/CurrencyContext.jsx";
+import ProductRating from "@/components/ProductRating.jsx";
 
 export default function CategoryProducts({ categorySlug }) {
     const [products, setProducts] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [categoryName, setCategoryName] = useState("");
+    const { symbol } = useCurrency();
 
     useEffect(() => {
         const fetchProducts = async () => {
@@ -90,9 +93,10 @@ export default function CategoryProducts({ categorySlug }) {
                                 {product.lastName && (
                                     <p className="text-sm text-gray-500">{product.lastName}</p>
                                 )}
+                                <ProductRating productId={product._id} className="mt-1" />
                                 {product.weights && product.weights.length > 0 && (
                                     <p className="text-emerald-600 font-bold mt-2">
-                                        ${product.weights[0].price}
+                                        {symbol}{product.weights[0].price}
                                     </p>
                                 )}
                             </div>

@@ -2,6 +2,7 @@ import { Router } from 'express';
 import OrderModel from '../models/order.model.js';
 import CartModel from '../models/cart.model.js';
 import ProductModel from '../models/product.model.js';
+import CheckoutLeadModel from '../models/checkoutLead.model.js';
 
 const clientOrderRouter = Router();
 
@@ -107,6 +108,17 @@ clientOrderRouter.post('/create', async (req, res) => {
         
         // Clear cart after order
         await CartModel.deleteOne({ guestId });
+
+        // Mark any abandoned-checkout lead for this guest as converted so it
+        // drops out of the admin "abandoned" list (best-effort).
+        try {
+            await CheckoutLeadModel.updateOne(
+                { guestId },
+                { $set: { status: 'converted', convertedOrderId: orderId, convertedAt: new Date() } }
+            );
+        } catch {
+            // non-fatal
+        }
 
         res.json({
             message: "Order placed successfully",
