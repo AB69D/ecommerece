@@ -1,6 +1,7 @@
 import { SiteSettings } from '../models/siteSettings.model.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { ok } from '../lib/ApiResponse.js';
+import { ApiError } from '../lib/ApiError.js';
 
 const getOrCreate = async () => {
     let doc = await SiteSettings.findOne({ key: 'global' });
@@ -26,5 +27,26 @@ export const updateSettings = asyncHandler(async (req, res) => {
         { $set: patch },
         { new: true, upsert: true, runValidators: true },
     );
+    req.audit?.({
+        action: 'settings.update',
+        resource: 'SiteSettings',
+        resourceId: doc._id,
+        message: 'Updated site settings',
+        after: patch,
+    });
     return ok(res, doc, 'Settings updated');
+});
+
+// POST /api/admin/site-settings/upload — upload a logo / favicon / og image.
+// The cloudinary middleware has already streamed the file and set req.file.path
+// to the hosted URL; we just hand that URL back so the form can save it.
+export const uploadSettingsImage = asyncHandler(async (req, res) => {
+    if (!req.file?.path) throw ApiError.badRequest('No image was uploaded');
+    req.audit?.({
+        action: 'settings.upload_image',
+        resource: 'SiteSettings',
+        message: 'Uploaded a settings image',
+        meta: { url: req.file.path },
+    });
+    return ok(res, { url: req.file.path }, 'Image uploaded');
 });

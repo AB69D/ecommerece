@@ -14,22 +14,25 @@ import {
     reorderSchema,
     menuIdParam,
 } from '../validations/navMenu.schema.js';
+import { requirePermission } from '../middlewares/auth.middleware.js';
 
 const admin = Router();
-admin.get('/', listMenuFlat);
-admin.get('/tree', listMenu);
-admin.post('/', validate({ body: createMenuItemSchema }), createMenuItem);
+admin.get('/', requirePermission('content:read'), listMenuFlat);
+admin.get('/tree', requirePermission('content:read'), listMenu);
+admin.post('/', requirePermission('content:write'), validate({ body: createMenuItemSchema }), createMenuItem);
 admin.post(
     '/reorder',
+    requirePermission('content:write'),
     validate({ body: reorderSchema }),
     reorderMenu,
 );
 admin.patch(
     '/:id',
+    requirePermission('content:write'),
     validate({ params: menuIdParam, body: updateMenuItemSchema }),
     updateMenuItem,
 );
-admin.delete('/:id', validate({ params: menuIdParam }), deleteMenuItem);
+admin.delete('/:id', requirePermission('content:write'), validate({ params: menuIdParam }), deleteMenuItem);
 
 const client = Router();
 client.get('/', listMenu);

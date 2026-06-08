@@ -33,6 +33,7 @@ import footerRouter from './routes/footer.route.js';
 import navMenuRouter from './routes/navMenu.route.js';
 import rbacRouter from './routes/rbac.route.js';
 import auditLogRouter from './routes/auditLog.route.js';
+import analyticsRouter from './routes/analytics.route.js';
 
 const app = express();
 
@@ -113,6 +114,7 @@ app.use('/api/admin/review', requireAuth, reviewRouter);
 app.use('/api/admin/admins', requireAuth, adminMgmtRouter);
 app.use('/api/admin/rbac', requireAuth, rbacRouter);
 app.use('/api/admin/audit-logs', requireAuth, auditLogRouter);
+app.use('/api/admin/analytics', requireAuth, analyticsRouter);
 app.use('/api/admin/site-settings', requireAuth, siteSettingsRouter.admin);
 app.use('/api/admin/footer', requireAuth, footerRouter.admin);
 app.use('/api/admin/nav-menu', requireAuth, navMenuRouter.admin);

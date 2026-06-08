@@ -20,5 +20,12 @@ export const updateFooter = asyncHandler(async (req, res) => {
         { $set: patch },
         { new: true, upsert: true, runValidators: true },
     );
+    req.audit?.({
+        action: 'footer.update',
+        resource: 'Footer',
+        resourceId: doc._id,
+        message: 'Updated footer content',
+        after: patch,
+    });
     return ok(res, doc, 'Footer updated');
 });

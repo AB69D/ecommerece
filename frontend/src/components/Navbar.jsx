@@ -19,6 +19,7 @@ import { GiHoneypot, GiOlive } from "react-icons/gi";
 
 function Navbar() {
     const [categories, setCategories] = useState([]);
+    const [branding, setBranding] = useState({ siteName: "Ab9dEcommerce", logoUrl: "" });
     const [cartCount, setCartCount] = useState(0);
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
     const [mobileCategoriesOpen, setMobileCategoriesOpen] = useState(false);
@@ -70,6 +71,18 @@ function Navbar() {
     useEffect(() => {
         fetchCategories();
         fetchCartCount();
+        (async () => {
+            try {
+                const res = await fetch(`/api/client/site-settings`);
+                const data = await res.json();
+                if (data?.success && data.data) {
+                    setBranding({
+                        siteName: data.data.siteName || "Ab9dEcommerce",
+                        logoUrl: data.data.logoUrl || "",
+                    });
+                }
+            } catch { /* keep defaults */ }
+        })();
 
         const handleCartUpdate = () => fetchCartCount();
         window.addEventListener("cart-updated", handleCartUpdate);
@@ -191,15 +204,16 @@ function Navbar() {
 
                         {/* CENTER ZONE — logo, sits in the visual centre on every breakpoint */}
                         <div className="flex-shrink-0 px-3 sm:px-4">
-                            <Link href="/" className="flex items-center" aria-label="Ab9dEcommerce home">
+                            <Link href="/" className="flex items-center" aria-label={`${branding.siteName} home`}>
                                 <div className="w-28 sm:w-[150px] lg:w-48">
                                     <Image
-                                        src="/logo.png"
-                                        alt="Ab9dEcommerce Logo"
+                                        src={branding.logoUrl || "/logo.png"}
+                                        alt={`${branding.siteName} Logo`}
                                         width={240}
                                         height={60}
                                         className="object-contain w-full h-auto"
                                         priority
+                                        unoptimized={!!branding.logoUrl}
                                     />
                                 </div>
                             </Link>
@@ -271,11 +285,12 @@ function Navbar() {
                                 >
                                     <div className="w-[110px]">
                                         <Image
-                                            src="/logo.png"
-                                            alt="Ab9dEcommerce Logo"
+                                            src={branding.logoUrl || "/logo.png"}
+                                            alt={`${branding.siteName} Logo`}
                                             width={220}
                                             height={70}
                                             className="object-contain w-full h-auto"
+                                            unoptimized={!!branding.logoUrl}
                                         />
                                     </div>
                                 </Link>
