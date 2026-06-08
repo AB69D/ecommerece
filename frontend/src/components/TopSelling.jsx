@@ -3,6 +3,8 @@ import React, { useState, useEffect, useCallback } from "react";
 import { FiArrowLeft, FiArrowRight, FiEye, FiPlus } from "react-icons/fi";
 import { useRouter } from "next/navigation";
 import ProductCardSkeleton from "./ProductCardSkeleton";
+import { useCurrency } from "@/context/CurrencyContext.jsx";
+import ProductRating from "./ProductRating.jsx";
 
 export default function TopSelling() {
     const [products, setProducts] = useState([]);
@@ -11,6 +13,7 @@ export default function TopSelling() {
     const [currentIndex, setCurrentIndex] = useState(0);
     const [productsPerView, setProductsPerView] = useState(2);
     const [hoveredProduct, setHoveredProduct] = useState(null);
+    const { symbol } = useCurrency();
     const router = useRouter();
 
     const containerRef = React.useRef(null);
@@ -208,17 +211,18 @@ export default function TopSelling() {
                                             {product.category.category_name}
                                         </p>
                                     )}
+                                    <ProductRating productId={product._id} className="mt-1" />
                                     <div className="mt-2 text-center">
                                         {minWeight && (
                                             hasDiscount ? (
                                                 <div className="flex items-center justify-center gap-2">
-                                                    <p className="text-sm text-gray-400 line-through">${minWeight.price}</p>
+                                                    <p className="text-sm text-gray-400 line-through">{symbol}{minWeight.price}</p>
                                                     <p className="text-base font-bold text-emerald-600">
-                                                        ${(minWeight.price - (minWeight.price * minWeight.discountPercent / 100)).toFixed(0)}
+                                                        {symbol}{(minWeight.price - (minWeight.price * minWeight.discountPercent / 100)).toFixed(0)}
                                                     </p>
                                                 </div>
                                             ) : (
-                                                <p className="text-base font-bold text-gray-900">${minWeight.price}</p>
+                                                <p className="text-base font-bold text-gray-900">{symbol}{minWeight.price}</p>
                                             )
                                         )}
                                     </div>

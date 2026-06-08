@@ -2,12 +2,15 @@
 import { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
+import { useCurrency } from "@/context/CurrencyContext.jsx";
+import ProductRating from "@/components/ProductRating.jsx";
 
 function SearchContent() {
     const [products, setProducts] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [searchQuery, setSearchQuery] = useState("");
+    const { symbol } = useCurrency();
     const searchParams = useSearchParams();
     useEffect(() => {
         const query = searchParams.get('q') || '';
@@ -95,9 +98,10 @@ function SearchContent() {
                                 {product.lastName && (
                                     <p className="text-sm text-gray-500 line-clamp-1">{product.lastName}</p>
                                 )}
+                                <ProductRating productId={product._id} className="mt-1" />
                                 {product.weights && product.weights.length > 0 && (
                                     <p className="text-emerald-600 font-bold mt-2">
-                                        ${product.weights[0].price}
+                                        {symbol}{product.weights[0].price}
                                     </p>
                                 )}
                             </div>

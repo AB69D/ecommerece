@@ -93,6 +93,15 @@ export default function AdminReviewsPage() {
                                             {renderStars(review.rating)}
                                         </div>
                                     </div>
+                                    {review.product ? (
+                                        <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-700 bg-emerald-50 border border-emerald-100 px-2 py-0.5 rounded-full mb-2">
+                                            {`${review.product.firstName || ''} ${review.product.lastName || ''}`.trim() || 'Product'}
+                                        </span>
+                                    ) : (
+                                        <span className="inline-flex items-center gap-1 text-xs font-medium text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full mb-2">
+                                            General review
+                                        </span>
+                                    )}
                                     <p className="text-gray-600 text-sm leading-relaxed">{review.comment}</p>
                                     {review.media && review.media.length > 0 && (
                                         <div className="flex flex-wrap gap-2 mt-3">

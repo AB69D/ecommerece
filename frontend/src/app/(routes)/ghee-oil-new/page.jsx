@@ -2,6 +2,8 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { FiArrowLeft, FiArrowRight, FiEye, FiPlus } from "react-icons/fi";
 import { useRouter } from "next/navigation";
+import { useCurrency } from "@/context/CurrencyContext.jsx";
+import ProductRating from "@/components/ProductRating.jsx";
 
 export default function GheeOilPage() {
     const [products, setProducts] = useState([]);
@@ -10,6 +12,7 @@ export default function GheeOilPage() {
     const [currentIndex, setCurrentIndex] = useState(0);
     const [productsPerView, setProductsPerView] = useState(2);
     const [hoveredProduct, setHoveredProduct] = useState(null);
+    const { symbol } = useCurrency();
     const router = useRouter();
 
     const containerRef = React.useRef(null);
@@ -197,10 +200,11 @@ export default function GheeOilPage() {
                                             {product.category.category_name}
                                         </p>
                                     )}
+                                    <ProductRating productId={product._id} className="mt-1 justify-center" />
                                     <div className="mt-2">
                                         {product.weights && product.weights.length > 0 && (
                                             <p className="text-base font-bold text-gray-900 text-center">
-                                                ${Math.min(...product.weights.map(w => w.price))}
+                                                {symbol}{Math.min(...product.weights.map(w => w.price))}
                                             </p>
                                         )}
                                     </div>

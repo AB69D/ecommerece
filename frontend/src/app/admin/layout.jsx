@@ -89,6 +89,7 @@ export default function AdminLayout({ children }) {
             title: 'Commerce',
             items: [
                 { name: 'Orders', path: '/admin/orders', icon: <FiTruck className="w-5 h-5" />, perms: ['order:read'] },
+                { name: 'Customers', path: '/admin/customers', icon: <FiUser className="w-5 h-5" />, perms: ['customer:read'] },
                 { name: 'Add Category', path: '/admin/category', icon: <FiGrid className="w-5 h-5" />, perms: ['category:write'] },
                 { name: 'All Categories', path: '/admin/category/all-categories', icon: <FiList className="w-5 h-5" />, perms: ['category:read'] },
                 { name: 'Upload Product', path: '/admin/product', icon: <FiPackage className="w-5 h-5" />, perms: ['product:write'] },

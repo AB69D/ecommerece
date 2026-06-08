@@ -2,12 +2,14 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { FiShoppingCart, FiPlus, FiMinus, FiTrash2, FiArrowLeft } from "react-icons/fi";
+import { useCurrency } from "@/context/CurrencyContext.jsx";
 
 export default function CartPage() {
     const [cart, setCart] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [updating, setUpdating] = useState(false);
+    const { symbol } = useCurrency();
     const router = useRouter();
 
     // Get or create guestId
@@ -172,16 +174,16 @@ export default function CartPage() {
                                  )}
                                  {item.discountPercent > 0 ? (
                                      <div className="flex items-center gap-2 mt-1">
-                                         <p className="text-sm text-gray-400 line-through">${item.price}</p>
+                                         <p className="text-sm text-gray-400 line-through">{symbol}{item.price}</p>
                                          <p className="text-emerald-600 font-bold">
-                                             ${(item.price - (item.price * item.discountPercent / 100)).toFixed(0)}
+                                             {symbol}{(item.price - (item.price * item.discountPercent / 100)).toFixed(0)}
                                          </p>
                                          <span className="text-xs bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded">
                                              -{item.discountPercent}%
                                          </span>
                                      </div>
                                  ) : (
-                                     <p className="text-emerald-600 font-bold mt-1">${item.price}</p>
+                                     <p className="text-emerald-600 font-bold mt-1">{symbol}{item.price}</p>
                                  )}
                                  <div className="flex items-center gap-3 mt-2">
                                      <button
@@ -211,14 +213,14 @@ export default function CartPage() {
                                  </button>
                                  {item.discountPercent > 0 ? (
                                      <div className="text-right">
-                                         <p className="text-xs text-gray-400 line-through">${item.price * item.quantity}</p>
+                                         <p className="text-xs text-gray-400 line-through">{symbol}{item.price * item.quantity}</p>
                                          <p className="font-bold text-gray-800">
-                                             ${((item.price - (item.price * item.discountPercent / 100)) * item.quantity).toFixed(0)}
+                                             {symbol}{((item.price - (item.price * item.discountPercent / 100)) * item.quantity).toFixed(0)}
                                          </p>
                                      </div>
                                  ) : (
                                      <p className="font-bold text-gray-800">
-                                         ${item.price * item.quantity}
+                                         {symbol}{item.price * item.quantity}
                                      </p>
                                  )}
                              </div>
@@ -231,12 +233,12 @@ export default function CartPage() {
                     <div className="space-y-2 text-gray-600">
                          <div className="flex justify-between">
                              <span>Subtotal</span>
-                             <span>${subtotal}</span>
+                             <span>{symbol}{subtotal}</span>
                          </div>
                          {totalDiscount > 0 && (
                              <div className="flex justify-between text-emerald-600">
                                  <span>Discount</span>
-                                 <span>-${totalDiscount.toFixed(0)}</span>
+                                 <span>-{symbol}{totalDiscount.toFixed(0)}</span>
                              </div>
                          )}
                          <div className="flex justify-between">
@@ -245,7 +247,7 @@ export default function CartPage() {
                          </div>
                          <div className="border-t pt-2 flex justify-between font-bold text-gray-800">
                              <span>Total</span>
-                             <span>${afterDiscount}</span>
+                             <span>{symbol}{afterDiscount}</span>
                          </div>
                      </div>
                     <button

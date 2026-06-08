@@ -2,6 +2,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { FiArrowLeft, FiCheck } from "react-icons/fi";
+import { useCurrency } from "@/context/CurrencyContext.jsx";
 
 export default function CheckoutPage() {
     const [cart, setCart] = useState(null);
@@ -9,6 +10,7 @@ export default function CheckoutPage() {
     const [placingOrder, setPlacingOrder] = useState(false);
     const [orderPlaced, setOrderPlaced] = useState(false);
     const [orderData, setOrderData] = useState(null);
+    const { symbol } = useCurrency();
     const router = useRouter();
 
     const getGuestId = () => {
@@ -44,6 +46,32 @@ export default function CheckoutPage() {
     useEffect(() => {
         fetchCart();
     }, []);
+
+    // Abandoned-checkout capture: once the customer has typed a name or phone,
+    // debounce-save their progress so the admin can follow up even if they never
+    // complete the order. The backend marks this lead "converted" on order create.
+    useEffect(() => {
+        if (orderPlaced) return undefined;
+        const hasContact = formData.customerName.trim() || formData.customerPhone.trim();
+        if (!hasContact) return undefined;
+
+        const timer = setTimeout(() => {
+            const guestId = getGuestId();
+            fetch(`/api/client/checkout/lead`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'guest-id': guestId },
+                body: JSON.stringify({
+                    customerName: formData.customerName,
+                    customerPhone: formData.customerPhone,
+                    customerEmail: formData.customerEmail,
+                    shippingAddress: formData.shippingAddress,
+                    deliveryArea: formData.deliveryArea
+                })
+            }).catch(() => {});
+        }, 1200);
+
+        return () => clearTimeout(timer);
+    }, [formData, orderPlaced]);
 
     const fetchCart = async () => {
         try {
@@ -229,8 +257,8 @@ export default function CheckoutPage() {
                                         onChange={handleChange}
                                         className="w-full px-4 py-2 border border-gray-300 rounded-lg"
                                     >
-                                        <option value="local">Local Delivery (70$)</option>
-                                        <option value="regional">Regional Delivery (100$)</option>
+                                        <option value="local">Local Delivery ({symbol}70)</option>
+                                        <option value="regional">Regional Delivery ({symbol}100)</option>
                                     </select>
                                 </div>
                                 <div className="md:col-span-2">
@@ -253,7 +281,7 @@ export default function CheckoutPage() {
                             disabled={placingOrder}
                             className="w-full bg-emerald-600 text-white font-bold py-3 rounded-lg hover:bg-emerald-700 disabled:opacity-50"
                         >
-                            {placingOrder ? 'Placing Order...' : `Place Order - $${totalAmount}`}
+                            {placingOrder ? 'Placing Order...' : `Place Order - ${symbol}${totalAmount}`}
                         </button>
                     </form>
                 </div>
@@ -276,13 +304,13 @@ export default function CheckoutPage() {
                                         <p className="text-xs text-gray-500">Qty: {item.quantity}</p>
                                         {item.discountPercent > 0 ? (
                                             <div className="flex items-center gap-2">
-                                                <p className="text-xs text-gray-400 line-through">${item.price * item.quantity}</p>
+                                                <p className="text-xs text-gray-400 line-through">{symbol}{item.price * item.quantity}</p>
                                                 <p className="text-sm font-bold text-emerald-600">
-                                                    ${(item.price - (item.price * item.discountPercent / 100)) * item.quantity}
+                                                    {symbol}{(item.price - (item.price * item.discountPercent / 100)) * item.quantity}
                                                 </p>
                                             </div>
                                         ) : (
-                                            <p className="text-sm font-bold">${item.price * item.quantity}</p>
+                                            <p className="text-sm font-bold">{symbol}{item.price * item.quantity}</p>
                                         )}
                                     </div>
                                 </div>
@@ -291,21 +319,21 @@ export default function CheckoutPage() {
                         <div className="border-t mt-4 pt-4 space-y-2">
                             <div className="flex justify-between text-gray-600">
                                 <span>Subtotal</span>
-                                <span>${subtotal}</span>
+                                <span>{symbol}{subtotal}</span>
                             </div>
                             {totalDiscount > 0 && (
                                 <div className="flex justify-between text-emerald-600">
                                     <span>Discount</span>
-                                    <span>-${totalDiscount.toFixed(0)}</span>
+                                    <span>-{symbol}{totalDiscount.toFixed(0)}</span>
                                 </div>
                             )}
                             <div className="flex justify-between text-gray-600">
                                 <span>Shipping ({deliveryLabels[formData.deliveryArea]})</span>
-                                <span>${deliveryCharges[formData.deliveryArea]}</span>
+                                <span>{symbol}{deliveryCharges[formData.deliveryArea]}</span>
                             </div>
                             <div className="flex justify-between font-bold text-gray-800 text-lg">
                                 <span>Total</span>
-                                <span>${totalAmount}</span>
+                                <span>{symbol}{totalAmount}</span>
                             </div>
                         </div>
                     </div>

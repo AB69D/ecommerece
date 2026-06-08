@@ -4,6 +4,8 @@ import Navbar from "@/components/Navbar.jsx";
 import HeaderTop from "@/components/Header-top.jsx";
 import Footer from "@/components/Footer.jsx";
 import OrderChatbot from "@/components/OrderChatbot.jsx";
+import { CurrencyProvider } from "@/context/CurrencyContext.jsx";
+import { fetchSiteSettings } from "@/lib/dynamicContent.js";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -50,20 +52,25 @@ export const metadata = {
   },
 };
 
-export default function RootLayout({ children }) {
+export default async function RootLayout({ children }) {
+  const settings = await fetchSiteSettings();
+  const currencySymbol = settings?.currencySymbol || "$";
+  const currencyCode = settings?.currencyCode || "USD";
   return (
     <html
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
-        <HeaderTop />
-        <Navbar />
-        <main className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          {children}
-        </main>
-        <Footer />
-        <OrderChatbot />
+        <CurrencyProvider initialSymbol={currencySymbol} initialCode={currencyCode}>
+          <HeaderTop />
+          <Navbar />
+          <main className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            {children}
+          </main>
+          <Footer />
+          <OrderChatbot />
+        </CurrencyProvider>
       </body>
     </html>
   );
