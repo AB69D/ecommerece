@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { FiShoppingCart, FiCheck, FiHelpCircle, FiMessageCircle, FiPhoneCall } from "react-icons/fi";
+import { FiShoppingCart, FiCheck, FiHelpCircle, FiMessageCircle, FiPhoneCall, FiPackage, FiArrowLeft } from "react-icons/fi";
 import { PiWhatsappLogoBold } from "react-icons/pi";
 import { addToCart } from "@/utils/cart";
 import { useCurrency } from "@/context/CurrencyContext.jsx";
@@ -193,18 +193,35 @@ export default function ProductClient({ productId }) {
         );
     }
 
-    if (error) {
+    if (error || !product) {
         return (
-            <div className="w-full min-h-[60vh] flex items-center justify-center">
-                <p className="text-red-500">{error}</p>
-            </div>
-        );
-    }
-
-    if (!product) {
-        return (
-            <div className="w-full min-h-[60vh] flex items-center justify-center">
-                <p className="text-gray-500">Product not found</p>
+            <div className="w-full min-h-[70vh] flex items-center justify-center px-4 py-12">
+                <div className="w-full max-w-md text-center">
+                    <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-emerald-50">
+                        <FiPackage className="h-9 w-9 text-emerald-600" />
+                    </div>
+                    <h1 className="text-xl sm:text-2xl font-semibold text-gray-900">
+                        Product not available
+                    </h1>
+                    <p className="mt-2 text-sm sm:text-base text-gray-500">
+                        This product may have been removed or is no longer sold online.
+                    </p>
+                    <div className="mt-8 flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-3">
+                        <Link
+                            href="/"
+                            className="inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-600 px-5 py-3 text-sm font-medium text-white transition-colors hover:bg-emerald-700"
+                        >
+                            <FiArrowLeft className="h-4 w-4" />
+                            Continue shopping
+                        </Link>
+                        <Link
+                            href="/search"
+                            className="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-300 px-5 py-3 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50"
+                        >
+                            Browse products
+                        </Link>
+                    </div>
+                </div>
             </div>
         );
     }
