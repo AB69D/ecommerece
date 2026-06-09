@@ -18,17 +18,59 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    env:
+      VPS_HOST: ${{ secrets.VPS_HOST }}
+      VPS_USER: ${{ secrets.VPS_USER || 'root' }}
+      VPS_PORT: ${{ secrets.VPS_SSH_PORT || '22' }}
     steps:
       - name: Set up SSH
         run: |
+          set -euo pipefail
+
+          # --- Validate required secrets up front, with actionable errors ---
+          if [ -z "${VPS_HOST}" ]; then
+            echo "::error::Repo secret VPS_HOST is empty or not set. Add it under Settings → Secrets and variables → Actions (the VPS public IP or hostname)."
+            exit 1
+          fi
+          if [ -z "${{ secrets.VPS_SSH_PRIVATE_KEY }}" ]; then
+            echo "::error::Repo secret VPS_SSH_PRIVATE_KEY is empty or not set. Paste the FULL private key including the BEGIN/END lines."
+            exit 1
+          fi
+
           mkdir -p ~/.ssh
-          echo "${{ secrets.VPS_SSH_PRIVATE_KEY }}" > ~/.ssh/id_ed25519
-          chmod 600 ~/.ssh/id_ed25519
-          ssh-keyscan -H "${{ secrets.VPS_HOST }}" >> ~/.ssh/known_hosts
+          chmod 700 ~/.ssh
+
+          # Write the key guaranteeing a trailing newline — OpenSSH rejects keys
+          # without one with a misleading "invalid format" error.
+          install -m 600 /dev/null ~/.ssh/id_deploy
+          printf '%s\n' "${{ secrets.VPS_SSH_PRIVATE_KEY }}" > ~/.ssh/id_deploy
+
+          # Fail early (with a clear message) if the key itself is malformed,
+          # instead of a cryptic auth failure later.
+          if ! ssh-keygen -y -f ~/.ssh/id_deploy >/dev/null 2>&1; then
+            echo "::error::VPS_SSH_PRIVATE_KEY is not a valid private key. Re-copy the whole key (e.g. cat ~/.ssh/id_ed25519) including header/footer lines."
+            exit 1
+          fi
+
+          # Best-effort known_hosts. Not fatal: the deploy step uses
+          # StrictHostKeyChecking=accept-new, so a keyscan miss won't block us.
+          ssh-keyscan -p "${VPS_PORT}" -H "${VPS_HOST}" >> ~/.ssh/known_hosts 2>/dev/null \
+            || echo "::warning::ssh-keyscan could not reach ${VPS_HOST}:${VPS_PORT} — relying on accept-new. Check the host/port and that the VPS is up."
+
+      - name: Verify SSH connectivity
+        run: |
+          set -euo pipefail
+          if ! ssh -i ~/.ssh/id_deploy -o StrictHostKeyChecking=accept-new -o ConnectTimeout=15 \
+                 -p "${VPS_PORT}" "${VPS_USER}@${VPS_HOST}" 'echo "SSH OK on $(hostname)"'; then
+            echo "::error::Could not SSH to ${VPS_USER}@${VPS_HOST}:${VPS_PORT}. Verify VPS_HOST/VPS_USER/VPS_SSH_PORT and that this key's public half is in the VPS ~/.ssh/authorized_keys."
+            exit 1
+          fi
 
       - name: Pull + rebuild backend on VPS
         run: |
-          ssh -o StrictHostKeyChecking=no root@${{ secrets.VPS_HOST }} bash -s <<'EOF'
+          set -euo pipefail
+          ssh -i ~/.ssh/id_deploy -o StrictHostKeyChecking=accept-new -p "${VPS_PORT}" \
+              "${VPS_USER}@${VPS_HOST}" bash -s <<'EOF'
           set -euo pipefail
           cd /opt/ab9d-ecommerce
           echo "Current commit (before): $(git rev-parse --short HEAD)"
