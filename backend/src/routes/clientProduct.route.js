@@ -21,6 +21,10 @@ clientProductRouter.get('/products', async (req, res) => {
             query.category = category;
         }
 
+        // Storefront only: hide POS-only products ($ne:false also keeps legacy
+        // products where the field was never set).
+        query.showInEcommerce = { $ne: false };
+
         const skip = (pageNum - 1) * limitNum;
 
         const [data, totalCount] = await Promise.all([
@@ -49,7 +53,11 @@ clientProductRouter.get('/product/:id', async (req, res) => {
     try {
         const { id } = req.params;
 
-        const product = await ProductModel.findById(id).populate('category');
+        // Storefront only: a POS-only product must 404 here even via direct link.
+        const product = await ProductModel.findOne({
+            _id: id,
+            showInEcommerce: { $ne: false }
+        }).populate('category');
 
         if (!product) {
             return res.status(404).json({
@@ -96,7 +104,8 @@ clientProductRouter.get('/top-selling', async (req, res) => {
         const productIds = topSelling.map(item => item._id);
 
         const products = await ProductModel.find({
-            _id: { $in: productIds }
+            _id: { $in: productIds },
+            showInEcommerce: { $ne: false }
         }).populate('category');
 
         const productsWithSales = products.map(product => {

@@ -60,7 +60,15 @@ const productSchema = new mongoose.Schema({
         type: String,
         default: ""
     },
-    qa: [qaSchema]
+    qa: [qaSchema],
+    // When false, the product is hidden from the public e-commerce storefront
+    // but still sellable at the POS terminal. Defaults to true so existing
+    // products (and the common case) stay visible online.
+    showInEcommerce: {
+        type: Boolean,
+        default: true,
+        index: true
+    }
 }, {
     timestamps: true
 });

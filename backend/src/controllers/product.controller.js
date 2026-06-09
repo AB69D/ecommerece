@@ -10,8 +10,15 @@ export const createProductController = async (request, response) => {
             category,
             weights,
             description,
-            qa
+            qa,
+            showInEcommerce
         } = request.body;
+
+        // Sent over multipart form-data, so it arrives as a string ("true"/"false").
+        // Default to visible when the field is omitted.
+        const showOnStorefront = showInEcommerce === undefined
+            ? true
+            : (showInEcommerce === true || showInEcommerce === 'true' || showInEcommerce === '1');
 
         const files = request.files || {};
         const coverImageFile = files['cover_image'];
@@ -86,7 +93,8 @@ export const createProductController = async (request, response) => {
             category: categoryId,
             weights: processedWeights,
             description: description || "",
-            qa: qaArray
+            qa: qaArray,
+            showInEcommerce: showOnStorefront
         });
 
         const saveProduct = await product.save();
@@ -212,6 +220,15 @@ export const updateProductDetails = async (request, response) => {
 
         const updateData = { ...request.body };
         delete updateData._id;
+
+        // Normalise the storefront visibility flag to a real boolean.
+        if (updateData.showInEcommerce !== undefined) {
+            updateData.showInEcommerce =
+                updateData.showInEcommerce === true ||
+                updateData.showInEcommerce === 'true' ||
+                updateData.showInEcommerce === 1 ||
+                updateData.showInEcommerce === '1';
+        }
 
         const updateProduct = await ProductModel.updateOne({ _id: _id }, updateData);
 

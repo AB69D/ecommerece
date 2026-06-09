@@ -12,6 +12,7 @@ export default function CreateProductPage() {
     const [coverImagePreview, setCoverImagePreview] = useState("");
     const [qaList, setQaList] = useState([{ question: "", answer: "" }]);
     const [qaExpanded, setQaExpanded] = useState(true);
+    const [showInEcommerce, setShowInEcommerce] = useState(true);
 
     useEffect(() => {
         const fetchCategories = async () => {
@@ -93,6 +94,7 @@ export default function CreateProductPage() {
         }))));
         formData.append("description", e.target.description.value);
         formData.append("qa", JSON.stringify(filteredQA));
+        formData.append("showInEcommerce", showInEcommerce);
 
         weights.forEach((weight, index) => {
             weight.images.forEach((file) => {
@@ -114,6 +116,7 @@ export default function CreateProductPage() {
                 setCoverImage(null);
                 setCoverImagePreview("");
                 setQaList([{ question: "", answer: "" }]);
+                setShowInEcommerce(true);
             } else {
                 setMessage(`Error: ${data.message}`);
             }
@@ -192,6 +195,26 @@ export default function CreateProductPage() {
                             </option>
                         ))}
                     </select>
+                </div>
+
+                <div>
+                    <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">Visibility</label>
+                    <label className="flex items-start gap-2.5 sm:gap-3 p-3 sm:p-4 border border-gray-300 rounded-lg bg-gray-50 cursor-pointer hover:bg-gray-100 transition">
+                        <input
+                            type="checkbox"
+                            checked={showInEcommerce}
+                            onChange={(e) => setShowInEcommerce(e.target.checked)}
+                            className="mt-0.5 w-4 h-4 sm:w-5 sm:h-5 accent-emerald-600 shrink-0"
+                        />
+                        <span className="text-xs sm:text-sm">
+                            <span className="font-medium text-gray-800 block">Show on e-commerce storefront</span>
+                            <span className="text-gray-500">
+                                {showInEcommerce
+                                    ? "Visible to online shoppers and sellable at the POS."
+                                    : "Hidden from the website — available at the POS terminal only."}
+                            </span>
+                        </span>
+                    </label>
                 </div>
 
                 <div className="border-t pt-4 sm:pt-5">

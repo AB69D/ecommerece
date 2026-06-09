@@ -13,8 +13,14 @@ export default function AllProductsPage() {
     const [totalPages, setTotalPages] = useState(1);
     const [deleteModal, setDeleteModal] = useState({ show: false, product: null });
     const [editModal, setEditModal] = useState({ show: false, product: null });
+    const [editShowEcom, setEditShowEcom] = useState(true);
     const [categories, setCategories] = useState([]);
     const [message, setMessage] = useState("");
+
+    const openEdit = (product) => {
+        setEditShowEcom(product.showInEcommerce !== false);
+        setEditModal({ show: true, product });
+    };
 
     const limit = 10;
 
@@ -95,7 +101,8 @@ export default function AllProductsPage() {
             lastName: formData.get("lastName"),
             category: formData.get("category"),
             description: formData.get("description"),
-            qa: formData.get("qa") ? JSON.parse(formData.get("qa")) : []
+            qa: formData.get("qa") ? JSON.parse(formData.get("qa")) : [],
+            showInEcommerce: editShowEcom
         };
 
         try {
@@ -189,6 +196,11 @@ export default function AllProductsPage() {
                                             <td className="px-4 py-3">
                                                 <p className="font-medium text-gray-800">{product.firstName}</p>
                                                 {product.lastName && <p className="text-sm text-gray-500">{product.lastName}</p>}
+                                                {product.showInEcommerce === false && (
+                                                    <span className="inline-block mt-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700">
+                                                        POS only
+                                                    </span>
+                                                )}
                                             </td>
                                             <td className="px-4 py-3 text-sm text-gray-600">
                                                 {product.category?.category_name || 'N/A'}
@@ -204,7 +216,7 @@ export default function AllProductsPage() {
                                             <td className="px-4 py-3">
                                                 <div className="flex items-center gap-2">
                                                     <button
-                                                        onClick={() => setEditModal({ show: true, product })}
+                                                        onClick={() => openEdit(product)}
                                                         className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
                                                     >
                                                         <FiEdit className="w-4 h-4" />
@@ -291,6 +303,25 @@ export default function AllProductsPage() {
                             <div className="mb-4">
                                 <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
                                 <textarea name="description" defaultValue={editModal.product.description} rows={4} className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none resize-none" />
+                            </div>
+                            <div className="mb-4">
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Visibility</label>
+                                <label className="flex items-start gap-3 p-3 border border-gray-300 rounded-lg bg-gray-50 cursor-pointer hover:bg-gray-100 transition">
+                                    <input
+                                        type="checkbox"
+                                        checked={editShowEcom}
+                                        onChange={(e) => setEditShowEcom(e.target.checked)}
+                                        className="mt-0.5 w-5 h-5 accent-emerald-600 shrink-0"
+                                    />
+                                    <span className="text-sm">
+                                        <span className="font-medium text-gray-800 block">Show on e-commerce storefront</span>
+                                        <span className="text-gray-500">
+                                            {editShowEcom
+                                                ? "Visible to online shoppers and sellable at the POS."
+                                                : "Hidden from the website — available at the POS terminal only."}
+                                        </span>
+                                    </span>
+                                </label>
                             </div>
                             <div className="hidden">
                                 <input type="hidden" name="qa" value={JSON.stringify(editModal.product.qa || [])} />
