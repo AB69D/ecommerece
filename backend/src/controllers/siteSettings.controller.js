@@ -9,6 +9,21 @@ const getOrCreate = async () => {
     return doc;
 };
 
+// Flatten a nested patch into Mongo dot-paths so a partial update (e.g.
+// toggling a single feature flag) never clobbers sibling keys. Arrays are
+// treated as leaves and set wholesale.
+const flattenForSet = (obj, prefix = '', out = {}) => {
+    for (const [k, v] of Object.entries(obj)) {
+        const path = prefix ? `${prefix}.${k}` : k;
+        if (v && typeof v === 'object' && !Array.isArray(v)) {
+            flattenForSet(v, path, out);
+        } else {
+            out[path] = v;
+        }
+    }
+    return out;
+};
+
 export const getPublicSettings = asyncHandler(async (_req, res) => {
     const doc = await getOrCreate();
     const { _id, key, createdAt, updatedAt, __v, ...publicView } = doc.toObject();
@@ -24,7 +39,7 @@ export const updateSettings = asyncHandler(async (req, res) => {
     const { key: _ignoredKey, _id: _ignoredId, ...patch } = req.body;
     const doc = await SiteSettings.findOneAndUpdate(
         { key: 'global' },
-        { $set: patch },
+        { $set: flattenForSet(patch) },
         { new: true, upsert: true, runValidators: true },
     );
     req.audit?.({
