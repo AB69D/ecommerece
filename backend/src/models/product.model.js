@@ -20,6 +20,24 @@ const weightSchema = new mongoose.Schema({
         min: 0,
         max: 100
     },
+    // Cost price for this variant — used for profit / margin reporting (Phase 2).
+    costPrice: {
+        type: Number,
+        default: 0,
+        min: 0
+    },
+    // Stock-keeping unit + scannable barcode (Phase 1). Both optional; a barcode
+    // is auto-generated on save when left blank so every variant is scannable.
+    sku: {
+        type: String,
+        default: '',
+        trim: true
+    },
+    barcode: {
+        type: String,
+        default: '',
+        trim: true
+    },
     images: {
         type: Array,
         default: []
@@ -79,6 +97,47 @@ productSchema.index({
     description: 'text'
 });
 
+// Fast scanner lookups by barcode / SKU (sparse-ish; blanks are filtered out
+// at query time so empty strings don't all collide on a unique index).
+productSchema.index({ 'weights.barcode': 1 });
+productSchema.index({ 'weights.sku': 1 });
+
+// Build a GS1 "internal use" (prefix 2) numeric barcode that any CODE128
+// reader can scan. Kept self-contained so every variant is always scannable
+// even if the admin never types one in.
+const genBarcode = (index = 0) => {
+    const ts = String(Date.now()).slice(-8);
+    const rand = String(Math.floor(Math.random() * 90) + 10); // 2 digits
+    const idx = String(index % 100).padStart(2, '0');
+    return `2${ts}${rand}${idx}`; // 13 digits
+};
+
+const slug3 = (s = '') => (s || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 3) || 'PRD';
+
+// Fill a single variant's blank barcode / SKU in place and return it. Shared
+// by the pre('save') hook and the update controller (updateOne skips hooks),
+// so a variant is guaranteed scannable however it was written.
+const ensureVariantCodes = (w, index = 0, firstName = '') => {
+    if (!w || typeof w !== 'object') return w;
+    if (!w.barcode || !String(w.barcode).trim()) {
+        w.barcode = genBarcode(index);
+    }
+    if (!w.sku || !String(w.sku).trim()) {
+        const wt = String(w.weight || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+        w.sku = `${slug3(firstName)}-${wt || index + 1}-${String(w.barcode).slice(-4)}`;
+    }
+    return w;
+};
+
+// Auto-fill blank barcode / SKU before saving so the catalogue is scannable.
+productSchema.pre('save', function autoCodes(next) {
+    if (Array.isArray(this.weights)) {
+        this.weights.forEach((w, i) => ensureVariantCodes(w, i, this.firstName));
+    }
+    next();
+});
+
 const ProductModel = mongoose.model('product', productSchema);
 
+export { genBarcode, ensureVariantCodes };
 export default ProductModel;

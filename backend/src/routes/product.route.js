@@ -1,5 +1,5 @@
 import { Router } from 'express'
-import { createProductController, deleteProductDetails, getProductByCategory, getProductController, getProductDetails, searchProduct, updateProductDetails, updateProductDiscount } from '../controllers/product.controller.js'
+import { backfillProductCodes, createProductController, deleteProductDetails, getProductByCategory, getProductController, getProductDetails, searchProduct, updateProductDetails, updateProductDiscount } from '../controllers/product.controller.js'
 import cloudinary_upload, { processAndUploadImages } from '../middlewares/uploadImage.js'
 
 const productRouter = Router()
@@ -32,5 +32,8 @@ productRouter.delete('/delete-product', deleteProductDetails)
 
 productRouter.post('/search-product', searchProduct)
 productRouter.post('/update-discount', updateProductDiscount)
+
+// One-time maintenance: generate scannable barcodes/SKUs for legacy products.
+productRouter.post('/backfill-codes', backfillProductCodes)
 
 export default productRouter

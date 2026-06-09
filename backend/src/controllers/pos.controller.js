@@ -77,11 +77,62 @@ export const getPosProducts = asyncHandler(async (req, res) => {
             price: Number(w.price) || 0,
             discountPercent: Number(w.discountPercent) || 0,
             salePrice: retailUnitPrice(w),
+            sku: w.sku || '',
+            barcode: w.barcode || '',
             image: (Array.isArray(w.images) && w.images[0]) || p.cover_image || '',
         })),
     }));
 
     return ok(res, data, 'POS products fetched');
+});
+
+// ---------------------------------------------------------------
+// GET /api/admin/pos/lookup?code=<barcode|sku>
+// Scanner endpoint: resolve a scanned barcode or typed SKU to the exact
+// product + variant so the cashier can drop it straight into the cart.
+// Matches on the variant's barcode first, then its SKU (both indexed).
+// ---------------------------------------------------------------
+export const lookupByCode = asyncHandler(async (req, res) => {
+    const code = String(req.query.code || '').trim();
+    if (!code) throw ApiError.badRequest('A barcode or SKU is required');
+
+    const product = await ProductModel.findOne({
+        $or: [{ 'weights.barcode': code }, { 'weights.sku': code }],
+    })
+        .populate('category', 'category_name')
+        .lean();
+
+    if (!product) throw ApiError.notFound(`No product matches "${code}"`);
+
+    // Find the exact variant that carries this code (barcode wins over sku).
+    const weights = product.weights || [];
+    let idx = weights.findIndex((w) => w.barcode && w.barcode === code);
+    if (idx < 0) idx = weights.findIndex((w) => w.sku && w.sku === code);
+    if (idx < 0) idx = 0; // matched the product but not a specific variant
+    const w = weights[idx] || {};
+
+    return ok(
+        res,
+        {
+            productId: String(product._id),
+            name: productDisplayName(product),
+            coverImage: product.cover_image || '',
+            category: product.category?.category_name || 'Uncategorized',
+            categoryId: product.category?._id ? String(product.category._id) : null,
+            variant: {
+                weightIndex: idx,
+                weight: w.weight,
+                stock: w.stock || 0,
+                price: Number(w.price) || 0,
+                discountPercent: Number(w.discountPercent) || 0,
+                salePrice: retailUnitPrice(w),
+                sku: w.sku || '',
+                barcode: w.barcode || '',
+                image: (Array.isArray(w.images) && w.images[0]) || product.cover_image || '',
+            },
+        },
+        'Product found',
+    );
 });
 
 // ---------------------------------------------------------------

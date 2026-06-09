@@ -1,4 +1,4 @@
-import ProductModel from "../models/product.model.js";
+import ProductModel, { ensureVariantCodes } from "../models/product.model.js";
 import CategoryModel from "../models/category.model.js";
 import mongoose from "mongoose";
 
@@ -75,6 +75,10 @@ export const createProductController = async (request, response) => {
                 weight: weightObj.weight,
                 stock: weightObj.stock,
                 price: weightObj.price,
+                discountPercent: weightObj.discountPercent || 0,
+                costPrice: weightObj.costPrice || 0,
+                sku: weightObj.sku || '',
+                barcode: weightObj.barcode || '',
                 images: weightImages
             };
         });
@@ -230,6 +234,24 @@ export const updateProductDetails = async (request, response) => {
                 updateData.showInEcommerce === '1';
         }
 
+        // updateOne() does NOT run the model's pre('save') hook, so back-fill any
+        // blank barcode / SKU here to keep every variant scannable after an edit.
+        if (updateData.weights !== undefined) {
+            let weightsArr = updateData.weights;
+            if (typeof weightsArr === 'string') {
+                try { weightsArr = JSON.parse(weightsArr); } catch { weightsArr = null; }
+            }
+            if (Array.isArray(weightsArr)) {
+                // SKU slug needs the product name; fall back to the stored doc.
+                let nameSeed = updateData.firstName;
+                if (!nameSeed) {
+                    const existing = await ProductModel.findById(_id).select('firstName').lean();
+                    nameSeed = existing?.firstName || '';
+                }
+                updateData.weights = weightsArr.map((w, i) => ensureVariantCodes(w, i, nameSeed));
+            }
+        }
+
         const updateProduct = await ProductModel.updateOne({ _id: _id }, updateData);
 
         return response.json({
@@ -356,6 +378,51 @@ export const searchProduct = async (request, response) => {
             message: error.message || error,
             error: true,
             success: false
+        });
+    }
+};
+
+// POST /api/admin/product/backfill-codes
+// One-time maintenance: give every existing variant a scannable barcode + SKU.
+// Products created before the barcode feature have blank codes, so this walks
+// the catalogue and saves any product with a missing code (firing the
+// pre('save') hook to generate them). Idempotent — re-running is a no-op.
+export const backfillProductCodes = async (request, response) => {
+    try {
+        const products = await ProductModel.find({
+            $or: [
+                { 'weights.barcode': { $in: ['', null] } },
+                { 'weights.sku': { $in: ['', null] } },
+                { 'weights.barcode': { $exists: false } },
+                { 'weights.sku': { $exists: false } },
+            ],
+        });
+
+        let updated = 0;
+        for (const product of products) {
+            const before = JSON.stringify(
+                (product.weights || []).map((w) => [w.barcode, w.sku]),
+            );
+            // Touching the doc + save() runs the pre('save') hook which fills blanks.
+            product.markModified('weights');
+            await product.save();
+            const after = JSON.stringify(
+                (product.weights || []).map((w) => [w.barcode, w.sku]),
+            );
+            if (before !== after) updated += 1;
+        }
+
+        return response.json({
+            message: `Generated codes for ${updated} product(s)`,
+            error: false,
+            success: true,
+            data: { scanned: products.length, updated },
+        });
+    } catch (error) {
+        return response.status(500).json({
+            message: error.message || error,
+            error: true,
+            success: false,
         });
     }
 };

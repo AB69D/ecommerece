@@ -35,3 +35,7 @@ export const productsQuerySchema = z.object({
     search: z.string().max(120).optional(),
     categoryId: z.string().max(64).optional(),
 });
+
+export const lookupQuerySchema = z.object({
+    code: z.string().min(1).max(64),
+});

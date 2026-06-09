@@ -1,12 +1,22 @@
 "use client";
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import Image from "next/image";
 import {
     FiSearch, FiPlus, FiMinus, FiTrash2, FiShoppingCart, FiX, FiPackage,
-    FiCreditCard, FiDollarSign, FiUser, FiPhone, FiCheckCircle,
+    FiCreditCard, FiDollarSign, FiUser, FiPhone, FiCheckCircle, FiCamera,
 } from "react-icons/fi";
 import { useCurrency } from "@/context/CurrencyContext.jsx";
-import { getPosProducts, createPosSale } from "@/services/pos";
+import { getPosProducts, createPosSale, lookupPosProductByCode } from "@/services/pos";
+
+// Small inline barcode glyph (no extra icon dependency).
+function BarcodeGlyph({ className = "" }) {
+    return (
+        <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden="true">
+            <path d="M3 5v14M6 5v14M9 5v9M12 5v14M15.5 5v14M19 5v9M21 5v14"
+                stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+        </svg>
+    );
+}
 
 const lineKey = (productId, weightIndex) => `${productId}::${weightIndex}`;
 
@@ -26,6 +36,17 @@ export default function SellView({ mode, notify }) {
     const [paymentMethod, setPaymentMethod] = useState("cash");
     const [submitting, setSubmitting] = useState(false);
     const [cartOpen, setCartOpen] = useState(false);
+
+    // Barcode scanner: USB/manual input + optional camera (native BarcodeDetector).
+    const [scanCode, setScanCode] = useState("");
+    const [scanning, setScanning] = useState(false);
+    const [cameraOpen, setCameraOpen] = useState(false);
+    const [cameraSupported, setCameraSupported] = useState(false);
+    const lastScanRef = useRef({ code: "", at: 0 });
+
+    useEffect(() => {
+        setCameraSupported(typeof window !== "undefined" && "BarcodeDetector" in window);
+    }, []);
 
     useEffect(() => {
         const t = setTimeout(() => setDebounced(search.trim()), 300);
@@ -88,6 +109,46 @@ export default function SellView({ mode, notify }) {
         });
     };
 
+    // Resolve a scanned barcode / typed SKU to a product+variant and drop it
+    // into the cart. Debounced so a camera reading the same code across frames
+    // (or a double-trigger USB scanner) only adds once.
+    const handleScan = useCallback(async (raw) => {
+        const code = String(raw || "").trim();
+        if (!code) return;
+        const now = Date.now();
+        if (lastScanRef.current.code === code && now - lastScanRef.current.at < 1200) return;
+        lastScanRef.current = { code, at: now };
+
+        setScanning(true);
+        try {
+            const res = await lookupPosProductByCode(code);
+            if (res?.success && res.data?.variant) {
+                const d = res.data;
+                const v = d.variant;
+                if ((v.stock || 0) <= 0) {
+                    notify("error", `${d.name} (${v.weight}) is out of stock`);
+                } else {
+                    addToCart({ _id: d.productId, name: d.name, coverImage: d.coverImage }, v);
+                    notify("success", `Added ${d.name} · ${v.weight}`);
+                }
+            } else {
+                notify("error", res?.message || `No product for "${code}"`);
+            }
+        } catch {
+            notify("error", "Scan lookup failed");
+        } finally {
+            setScanning(false);
+        }
+        // addToCart only uses setCart (stable functional updates), safe to omit.
+    }, [notify]);
+
+    const onScanSubmit = (e) => {
+        e.preventDefault();
+        const code = scanCode;
+        setScanCode("");
+        handleScan(code);
+    };
+
     const changeQty = (key, delta) =>
         setCart((prev) =>
             prev.map((l) => {
@@ -144,6 +205,43 @@ export default function SellView({ mode, notify }) {
             {/* Catalog */}
             <section className="flex-1 min-w-0 flex flex-col h-full">
                 <div className="p-3 sm:p-4 bg-white border-b border-slate-200 space-y-3">
+                    {/* Barcode / SKU scanner — works with USB scanners, manual typing,
+                        and (where supported) the device camera. */}
+                    <form onSubmit={onScanSubmit} className="flex items-center gap-2">
+                        <div className="relative flex-1">
+                            <BarcodeGlyph className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-teal-500" />
+                            <input
+                                value={scanCode}
+                                onChange={(e) => setScanCode(e.target.value)}
+                                placeholder="Scan barcode / SKU — or type a code and press Enter"
+                                autoComplete="off"
+                                autoCapitalize="off"
+                                spellCheck={false}
+                                className="w-full pl-9 pr-9 py-2.5 bg-teal-50/60 border border-teal-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+                            />
+                            {scanning && (
+                                <span className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 border-2 border-teal-200 border-t-teal-500 rounded-full animate-spin" />
+                            )}
+                        </div>
+                        <button
+                            type="submit"
+                            disabled={!scanCode.trim() || scanning}
+                            className="shrink-0 px-3.5 py-2.5 rounded-xl bg-teal-500 text-white text-sm font-semibold hover:bg-teal-400 disabled:opacity-50"
+                        >
+                            Add
+                        </button>
+                        {cameraSupported && (
+                            <button
+                                type="button"
+                                onClick={() => setCameraOpen(true)}
+                                title="Scan with camera"
+                                className="shrink-0 px-3 py-2.5 rounded-xl border border-teal-200 text-teal-600 hover:bg-teal-50"
+                            >
+                                <FiCamera className="w-4 h-4" />
+                            </button>
+                        )}
+                    </form>
+
                     <div className="flex items-center gap-2">
                         <div className="relative flex-1">
                             <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
@@ -214,6 +312,11 @@ export default function SellView({ mode, notify }) {
                 />
             </aside>
 
+            {/* Camera barcode scanner */}
+            {cameraOpen && (
+                <CameraScanModal onClose={() => setCameraOpen(false)} onDetect={handleScan} />
+            )}
+
             {/* Cart — mobile floating button */}
             {cartCount > 0 && (
                 <button
@@ -262,6 +365,106 @@ export default function SellView({ mode, notify }) {
                     </div>
                 </div>
             )}
+        </div>
+    );
+}
+
+// Camera-based scanner using the browser's native BarcodeDetector (Chrome /
+// Android). Stays open so the cashier can scan several items in a row; the
+// parent debounces duplicate reads. Falls back to a clear message where the
+// API is unavailable (e.g. desktop Safari) — the USB/manual input still works.
+function CameraScanModal({ onClose, onDetect }) {
+    const videoRef = useRef(null);
+    const [err, setErr] = useState("");
+
+    useEffect(() => {
+        let stream;
+        let raf;
+        let cancelled = false;
+
+        const start = async () => {
+            try {
+                if (!("BarcodeDetector" in window)) {
+                    setErr("Camera scanning isn't supported on this browser. Use a USB scanner or type the code.");
+                    return;
+                }
+                let formats = ["code_128", "ean_13", "ean_8", "upc_a", "upc_e", "code_39", "qr_code"];
+                try {
+                    const supported = await window.BarcodeDetector.getSupportedFormats?.();
+                    if (Array.isArray(supported) && supported.length) {
+                        formats = formats.filter((f) => supported.includes(f));
+                        if (!formats.length) formats = supported;
+                    }
+                } catch { /* use defaults */ }
+                const detector = new window.BarcodeDetector({ formats });
+
+                stream = await navigator.mediaDevices.getUserMedia({
+                    video: { facingMode: "environment" },
+                });
+                if (cancelled) {
+                    stream.getTracks().forEach((t) => t.stop());
+                    return;
+                }
+                const v = videoRef.current;
+                if (v) {
+                    v.srcObject = stream;
+                    await v.play().catch(() => {});
+                }
+
+                const tick = async () => {
+                    if (cancelled || !videoRef.current) return;
+                    try {
+                        const codes = await detector.detect(videoRef.current);
+                        if (codes && codes.length && codes[0].rawValue) {
+                            onDetect(codes[0].rawValue);
+                        }
+                    } catch { /* transient detect error, keep scanning */ }
+                    raf = requestAnimationFrame(tick);
+                };
+                raf = requestAnimationFrame(tick);
+            } catch {
+                setErr("Couldn't access the camera. Check the browser's camera permission and try again.");
+            }
+        };
+
+        start();
+        return () => {
+            cancelled = true;
+            if (raf) cancelAnimationFrame(raf);
+            if (stream) stream.getTracks().forEach((t) => t.stop());
+        };
+    }, [onDetect]);
+
+    return (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-black/70" onClick={onClose} />
+            <div className="relative w-full max-w-sm bg-white rounded-2xl overflow-hidden shadow-2xl">
+                <div className="flex items-center justify-between p-3 border-b border-slate-100">
+                    <h3 className="font-semibold text-slate-800 flex items-center gap-2 text-sm">
+                        <FiCamera className="w-4 h-4 text-teal-500" /> Scan a barcode
+                    </h3>
+                    <button onClick={onClose} className="p-1.5 text-slate-400 hover:text-slate-600">
+                        <FiX className="w-5 h-5" />
+                    </button>
+                </div>
+                <div className="relative aspect-[4/3] bg-black">
+                    {err ? (
+                        <div className="absolute inset-0 flex items-center justify-center text-center text-slate-200 text-sm p-6">
+                            {err}
+                        </div>
+                    ) : (
+                        <>
+                            <video ref={videoRef} muted playsInline className="w-full h-full object-cover" />
+                            <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+                                <div className="w-3/4 h-1/3 border-2 border-teal-400/80 rounded-lg shadow-[0_0_0_9999px_rgba(0,0,0,0.25)]" />
+                            </div>
+                        </>
+                    )}
+                </div>
+                <div className="p-3 text-center text-xs text-slate-500">
+                    Point the camera at a product barcode. Items are added to the cart automatically.
+                </div>
+            </div>
         </div>
     );
 }

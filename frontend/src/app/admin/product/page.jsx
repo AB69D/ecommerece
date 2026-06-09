@@ -3,11 +3,20 @@ import { authFetch } from "@/services/api";
 import React, { useState, useEffect } from "react";
 import { FiUploadCloud, FiPlus, FiTrash2, FiChevronDown, FiChevronUp } from "react-icons/fi";
 
+// Mirror of the backend GS1 "internal use" (prefix 2) barcode so the admin can
+// preview/lock a code in the form. The server fills any blank code on save.
+const genBarcodePreview = (index = 0) => {
+    const ts = String(Date.now()).slice(-8);
+    const rand = String(Math.floor(Math.random() * 90) + 10);
+    const idx = String(index % 100).padStart(2, "0");
+    return `2${ts}${rand}${idx}`;
+};
+
 export default function CreateProductPage() {
     const [loading, setLoading] = useState(false);
     const [message, setMessage] = useState("");
     const [categories, setCategories] = useState([]);
-    const [weights, setWeights] = useState([{ weight: "", stock: "", price: "", images: [] }]);
+    const [weights, setWeights] = useState([{ weight: "", stock: "", price: "", costPrice: "", sku: "", barcode: "", images: [] }]);
     const [coverImage, setCoverImage] = useState(null);
     const [coverImagePreview, setCoverImagePreview] = useState("");
     const [qaList, setQaList] = useState([{ question: "", answer: "" }]);
@@ -45,7 +54,7 @@ export default function CreateProductPage() {
     };
 
     const addWeight = () => {
-        setWeights([...weights, { weight: "", stock: "", price: "", images: [] }]);
+        setWeights([...weights, { weight: "", stock: "", price: "", costPrice: "", sku: "", barcode: "", images: [] }]);
     };
 
     const removeWeight = (index) => {
@@ -90,7 +99,10 @@ export default function CreateProductPage() {
         formData.append("weights", JSON.stringify(weights.map(w => ({
             weight: w.weight,
             stock: parseInt(w.stock) || 0,
-            price: parseFloat(w.price) || 0
+            price: parseFloat(w.price) || 0,
+            costPrice: parseFloat(w.costPrice) || 0,
+            sku: (w.sku || "").trim(),
+            barcode: (w.barcode || "").trim()
         }))));
         formData.append("description", e.target.description.value);
         formData.append("qa", JSON.stringify(filteredQA));
@@ -112,7 +124,7 @@ export default function CreateProductPage() {
             if (data.success) {
                 setMessage(`Success: ${data.message}`);
                 e.target.reset();
-                setWeights([{ weight: "", stock: "", price: "", images: [] }]);
+                setWeights([{ weight: "", stock: "", price: "", costPrice: "", sku: "", barcode: "", images: [] }]);
                 setCoverImage(null);
                 setCoverImagePreview("");
                 setQaList([{ question: "", answer: "" }]);
@@ -268,14 +280,58 @@ export default function CreateProductPage() {
                                 </div>
                                 <div>
                                     <label className="block text-[10px] sm:text-xs text-gray-500 mb-1">Price ($)</label>
-                                    <input 
-                                        type="number" 
+                                    <input
+                                        type="number"
                                         value={weight.price}
                                         onChange={(e) => updateWeight(index, "price", e.target.value)}
                                         required
-                                        className="w-full px-2 sm:px-3 py-1.5 sm:py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none text-gray-700 text-xs sm:text-sm" 
-                                        placeholder="850" 
+                                        className="w-full px-2 sm:px-3 py-1.5 sm:py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none text-gray-700 text-xs sm:text-sm"
+                                        placeholder="850"
                                     />
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-2 sm:gap-3 lg:gap-4 mb-2 sm:mb-3">
+                                <div>
+                                    <label className="block text-[10px] sm:text-xs text-gray-500 mb-1">Cost Price ($)</label>
+                                    <input
+                                        type="number"
+                                        min="0"
+                                        step="0.01"
+                                        value={weight.costPrice}
+                                        onChange={(e) => updateWeight(index, "costPrice", e.target.value)}
+                                        className="w-full px-2 sm:px-3 py-1.5 sm:py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none text-gray-700 text-xs sm:text-sm"
+                                        placeholder="for profit reports"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-[10px] sm:text-xs text-gray-500 mb-1">SKU</label>
+                                    <input
+                                        type="text"
+                                        value={weight.sku}
+                                        onChange={(e) => updateWeight(index, "sku", e.target.value)}
+                                        className="w-full px-2 sm:px-3 py-1.5 sm:py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none text-gray-700 text-xs sm:text-sm"
+                                        placeholder="auto-generated if blank"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-[10px] sm:text-xs text-gray-500 mb-1">Barcode</label>
+                                    <div className="flex gap-1.5">
+                                        <input
+                                            type="text"
+                                            value={weight.barcode}
+                                            onChange={(e) => updateWeight(index, "barcode", e.target.value)}
+                                            className="w-full px-2 sm:px-3 py-1.5 sm:py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none text-gray-700 text-xs sm:text-sm"
+                                            placeholder="auto-generated if blank"
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={() => updateWeight(index, "barcode", genBarcodePreview(index))}
+                                            title="Generate a barcode now"
+                                            className="shrink-0 px-2.5 rounded-lg bg-emerald-50 text-emerald-700 text-[10px] sm:text-xs font-semibold hover:bg-emerald-100"
+                                        >
+                                            Gen
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                             <div>

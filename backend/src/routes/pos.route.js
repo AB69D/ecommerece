@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import {
     getPosProducts,
+    lookupByCode,
     createPosSale,
     returnPosSale,
     getPosSales,
@@ -13,12 +14,16 @@ import {
     returnSaleSchema,
     salesQuerySchema,
     productsQuerySchema,
+    lookupQuerySchema,
 } from '../validations/pos.schema.js';
 
 const router = Router();
 
 // Catalog for the terminal.
 router.get('/products', requirePermission('pos:read'), validate({ query: productsQuerySchema }), getPosProducts);
+
+// Scanner: resolve a scanned barcode / typed SKU to a product + variant.
+router.get('/lookup', requirePermission('pos:read'), validate({ query: lookupQuerySchema }), lookupByCode);
 
 // Ring up a retail / wholesale sale, or process a return.
 router.post('/sale', requirePermission('pos:sell'), validate({ body: createSaleSchema }), createPosSale);

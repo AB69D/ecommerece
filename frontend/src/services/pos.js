@@ -68,6 +68,10 @@ const qs = (params) => {
 
 export const getPosProducts = (params) => posFetch(`/pos/products${qs(params)}`).then(json);
 
+// Scanner lookup — resolve a scanned barcode / typed SKU to a product + variant.
+export const lookupPosProductByCode = (code) =>
+    posFetch(`/pos/lookup${qs({ code })}`).then(json);
+
 export const createPosSale = (payload) =>
     posFetch(`/pos/sale`, { method: "POST", headers: jsonHeaders, body: JSON.stringify(payload) }).then(json);
 

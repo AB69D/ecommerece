@@ -5,6 +5,14 @@ import Link from "next/link";
 import { FiEdit, FiTrash2, FiSearch, FiX, FiImage } from "react-icons/fi";
 import { useRouter } from "next/navigation";
 
+// Mirror of the backend GS1 (prefix 2) barcode generator for in-form previews.
+const genBarcodePreview = (index = 0) => {
+    const ts = String(Date.now()).slice(-8);
+    const rand = String(Math.floor(Math.random() * 90) + 10);
+    const idx = String(index % 100).padStart(2, "0");
+    return `2${ts}${rand}${idx}`;
+};
+
 export default function AllProductsPage() {
     const [products, setProducts] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -14,12 +22,29 @@ export default function AllProductsPage() {
     const [deleteModal, setDeleteModal] = useState({ show: false, product: null });
     const [editModal, setEditModal] = useState({ show: false, product: null });
     const [editShowEcom, setEditShowEcom] = useState(true);
+    const [editWeights, setEditWeights] = useState([]);
     const [categories, setCategories] = useState([]);
     const [message, setMessage] = useState("");
 
     const openEdit = (product) => {
         setEditShowEcom(product.showInEcommerce !== false);
+        setEditWeights(
+            (product.weights || []).map((w) => ({
+                weight: w.weight ?? "",
+                stock: w.stock ?? "",
+                price: w.price ?? "",
+                costPrice: w.costPrice ?? "",
+                discountPercent: w.discountPercent ?? 0,
+                sku: w.sku ?? "",
+                barcode: w.barcode ?? "",
+                images: w.images || [],
+            })),
+        );
         setEditModal({ show: true, product });
+    };
+
+    const updateEditWeight = (index, field, value) => {
+        setEditWeights((prev) => prev.map((w, i) => (i === index ? { ...w, [field]: value } : w)));
     };
 
     const limit = 10;
@@ -102,7 +127,18 @@ export default function AllProductsPage() {
             category: formData.get("category"),
             description: formData.get("description"),
             qa: formData.get("qa") ? JSON.parse(formData.get("qa")) : [],
-            showInEcommerce: editShowEcom
+            showInEcommerce: editShowEcom,
+            // Preserve each variant's images; persist edited stock/price/codes.
+            weights: editWeights.map((w) => ({
+                weight: w.weight,
+                stock: parseInt(w.stock) || 0,
+                price: parseFloat(w.price) || 0,
+                costPrice: parseFloat(w.costPrice) || 0,
+                discountPercent: parseFloat(w.discountPercent) || 0,
+                sku: (w.sku || "").trim(),
+                barcode: (w.barcode || "").trim(),
+                images: w.images || [],
+            })),
         };
 
         try {
@@ -323,6 +359,50 @@ export default function AllProductsPage() {
                                     </span>
                                 </label>
                             </div>
+                            {editWeights.length > 0 && (
+                                <div className="mb-4 border-t pt-4">
+                                    <h4 className="text-sm font-semibold text-gray-800 mb-3">Variants · Stock, SKU &amp; Barcode</h4>
+                                    <div className="space-y-3">
+                                        {editWeights.map((w, index) => (
+                                            <div key={index} className="bg-gray-50 border rounded-lg p-3">
+                                                <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-2">
+                                                    <div>
+                                                        <label className="block text-[10px] text-gray-500 mb-1">Weight</label>
+                                                        <input type="text" value={w.weight} onChange={(e) => updateEditWeight(index, "weight", e.target.value)} className="w-full px-2 py-1.5 border rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 outline-none" />
+                                                    </div>
+                                                    <div>
+                                                        <label className="block text-[10px] text-gray-500 mb-1">Stock</label>
+                                                        <input type="number" value={w.stock} onChange={(e) => updateEditWeight(index, "stock", e.target.value)} className="w-full px-2 py-1.5 border rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 outline-none" />
+                                                    </div>
+                                                    <div>
+                                                        <label className="block text-[10px] text-gray-500 mb-1">Price ($)</label>
+                                                        <input type="number" value={w.price} onChange={(e) => updateEditWeight(index, "price", e.target.value)} className="w-full px-2 py-1.5 border rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 outline-none" />
+                                                    </div>
+                                                    <div>
+                                                        <label className="block text-[10px] text-gray-500 mb-1">Cost ($)</label>
+                                                        <input type="number" value={w.costPrice} onChange={(e) => updateEditWeight(index, "costPrice", e.target.value)} className="w-full px-2 py-1.5 border rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 outline-none" placeholder="for profit" />
+                                                    </div>
+                                                </div>
+                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                                                    <div>
+                                                        <label className="block text-[10px] text-gray-500 mb-1">SKU</label>
+                                                        <input type="text" value={w.sku} onChange={(e) => updateEditWeight(index, "sku", e.target.value)} className="w-full px-2 py-1.5 border rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 outline-none" placeholder="auto if blank" />
+                                                    </div>
+                                                    <div>
+                                                        <label className="block text-[10px] text-gray-500 mb-1">Barcode</label>
+                                                        <div className="flex gap-1.5">
+                                                            <input type="text" value={w.barcode} onChange={(e) => updateEditWeight(index, "barcode", e.target.value)} className="w-full px-2 py-1.5 border rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 outline-none" placeholder="auto if blank" />
+                                                            <button type="button" onClick={() => updateEditWeight(index, "barcode", genBarcodePreview(index))} title="Generate a barcode" className="shrink-0 px-2.5 rounded-lg bg-emerald-50 text-emerald-700 text-xs font-semibold hover:bg-emerald-100">Gen</button>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                    <p className="text-[11px] text-gray-400 mt-2">Leave SKU / barcode blank to auto-generate a scannable code on save.</p>
+                                </div>
+                            )}
+
                             <div className="hidden">
                                 <input type="hidden" name="qa" value={JSON.stringify(editModal.product.qa || [])} />
                             </div>
