@@ -2,11 +2,18 @@
 import { useState, useEffect, useCallback } from "react";
 import {
     FiCalendar, FiTrendingUp, FiDollarSign, FiRotateCcw, FiTag, FiShoppingCart, FiClock,
+    FiDownload, FiAlertCircle, FiCheckCircle,
 } from "react-icons/fi";
 import { useCurrency } from "@/context/CurrencyContext.jsx";
-import { getPosReport } from "@/services/pos";
+import { getPosReport, getPosSales } from "@/services/pos";
 
 const fmtDate = (d) => (d ? new Date(d).toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "—");
+
+// CSV cell escaping: wrap in quotes if the value contains a comma, quote or newline.
+const csvEscape = (v) => {
+    const s = String(v ?? "");
+    return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+};
 
 export default function ReportsView() {
     const { symbol } = useCurrency();
@@ -14,6 +21,13 @@ export default function ReportsView() {
 
     const [report, setReport] = useState(null);
     const [loading, setLoading] = useState(true);
+    const [downloading, setDownloading] = useState(false);
+    const [toast, setToast] = useState(null); // { type:'error'|'success', text }
+
+    const flash = (type, text) => {
+        setToast({ type, text });
+        setTimeout(() => setToast(null), 3500);
+    };
 
     const load = useCallback(async () => {
         setLoading(true);
@@ -26,6 +40,75 @@ export default function ReportsView() {
     }, []);
 
     useEffect(() => { load(); }, [load]);
+
+    // Pull every sale (paginated) and download as a CSV file the user can open
+    // in Excel / Google Sheets. Scope matches the report: own sales, or all
+    // sellers' sales for a pos:manage account.
+    const downloadCsv = useCallback(async () => {
+        setDownloading(true);
+        try {
+            const all = [];
+            let page = 1;
+            const limit = 100;
+            for (let i = 0; i < 50; i++) { // hard cap: 5,000 rows
+                const res = await getPosSales({ page, limit });
+                if (!res?.success) {
+                    if (all.length === 0) { flash("error", "Could not load sales to export"); return; }
+                    break;
+                }
+                const rows = res.data || [];
+                all.push(...rows);
+                const totalPages = res.totalNoPage || 1;
+                if (page >= totalPages || rows.length === 0) break;
+                page += 1;
+            }
+
+            if (all.length === 0) { flash("error", "No sales to export yet"); return; }
+
+            const headers = [
+                "Order ID", "Date", "Time", "Type", "Customer", "Phone",
+                "Payment", "Status", "Items", "Subtotal", "Total", "Seller",
+            ];
+            const lines = [headers.map(csvEscape).join(",")];
+            for (const o of all) {
+                const d = o.createdAt ? new Date(o.createdAt) : null;
+                const itemsStr = (o.items || [])
+                    .map((it) => `${it.productName}${it.weight ? ` (${it.weight})` : ""} x${it.quantity}`)
+                    .join(" | ");
+                lines.push([
+                    o.orderId,
+                    d ? d.toLocaleDateString() : "",
+                    d ? d.toLocaleTimeString() : "",
+                    o.saleType || "retail",
+                    o.customerName || "",
+                    o.customerPhone || "",
+                    o.paymentMethod || "",
+                    o.orderStatus || "",
+                    itemsStr,
+                    o.subtotal ?? "",
+                    o.totalAmount ?? "",
+                    o.soldBy?.fullName || o.soldBy?.username || "",
+                ].map(csvEscape).join(","));
+            }
+
+            // Prepend a BOM so Excel reads UTF-8 (currency symbols) correctly.
+            const csv = "﻿" + lines.join("\r\n");
+            const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = `pos-sales-${new Date().toISOString().slice(0, 10)}.csv`;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            URL.revokeObjectURL(url);
+            flash("success", `Exported ${all.length} sale${all.length === 1 ? "" : "s"}`);
+        } catch {
+            flash("error", "Export failed — please try again");
+        } finally {
+            setDownloading(false);
+        }
+    }, []);
 
     if (loading) {
         return (
@@ -43,12 +126,31 @@ export default function ReportsView() {
     return (
         <div className="h-full overflow-y-auto bg-slate-100">
             <div className="max-w-4xl mx-auto p-3 sm:p-5 space-y-5">
-                <div className="flex items-center justify-between">
-                    <h2 className="text-lg font-bold text-slate-800">Your sales</h2>
-                    {r.scope === "all" && (
-                        <span className="text-xs bg-indigo-100 text-indigo-700 px-2.5 py-1 rounded-full font-medium">All sellers</span>
-                    )}
+                <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2">
+                        <h2 className="text-lg font-bold text-slate-800">Your sales</h2>
+                        {r.scope === "all" && (
+                            <span className="text-xs bg-indigo-100 text-indigo-700 px-2.5 py-1 rounded-full font-medium">All sellers</span>
+                        )}
+                    </div>
+                    <button
+                        onClick={downloadCsv}
+                        disabled={downloading}
+                        className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-sm font-medium disabled:opacity-60 shrink-0"
+                    >
+                        {downloading
+                            ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                            : <FiDownload className="w-4 h-4" />}
+                        <span className="hidden sm:inline">{downloading ? "Preparing…" : "Download CSV"}</span>
+                    </button>
                 </div>
+
+                {toast && (
+                    <div className={`p-3 rounded-xl flex items-center gap-2 text-sm border ${toast.type === "error" ? "bg-red-50 text-red-700 border-red-200" : "bg-emerald-50 text-emerald-700 border-emerald-200"}`}>
+                        {toast.type === "error" ? <FiAlertCircle className="w-4 h-4" /> : <FiCheckCircle className="w-4 h-4" />}
+                        {toast.text}
+                    </div>
+                )}
 
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
                     <StatCard icon={<FiCalendar className="w-5 h-5" />} accent="#14b8a6" label="Today" value={money(r.today?.revenue)} sub={`${r.today?.count || 0} sales`} />
