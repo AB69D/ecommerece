@@ -37,6 +37,7 @@ import analyticsRouter from './routes/analytics.route.js';
 import chatbotRouter from './routes/chatbot.route.js';
 import customerRouter from './routes/customer.route.js';
 import clientCheckoutRouter from './routes/clientCheckout.route.js';
+import posRouter from './routes/pos.route.js';
 
 const app = express();
 
@@ -118,6 +119,7 @@ app.use('/api/admin/admins', requireAuth, adminMgmtRouter);
 app.use('/api/admin/rbac', requireAuth, rbacRouter);
 app.use('/api/admin/audit-logs', requireAuth, auditLogRouter);
 app.use('/api/admin/analytics', requireAuth, analyticsRouter);
+app.use('/api/admin/pos', requireAuth, posRouter);
 app.use('/api/admin/customer', requireAuth, customerRouter);
 app.use('/api/admin/site-settings', requireAuth, siteSettingsRouter.admin);
 app.use('/api/admin/footer', requireAuth, footerRouter.admin);

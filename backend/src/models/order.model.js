@@ -42,6 +42,27 @@ const orderSchema = new Schema({
         required: true,
         unique: true
     },
+    // Where the sale originated. 'ecommerce' = storefront checkout (default,
+    // keeps all historical orders valid), 'pos' = in-store POS terminal.
+    source: {
+        type: String,
+        enum: ['ecommerce', 'pos'],
+        default: 'ecommerce',
+        index: true
+    },
+    // For POS orders: 'retail' (normal walk-in price) or 'wholesale'
+    // (cashier-overridden per-line unit price). null for ecommerce orders.
+    saleType: {
+        type: String,
+        enum: ['retail', 'wholesale', null],
+        default: null
+    },
+    // Snapshot of the POS cashier who rang up the sale. null for ecommerce.
+    soldBy: {
+        id: { type: String, default: null },
+        username: { type: String, default: null },
+        fullName: { type: String, default: null }
+    },
     guestId: {
         type: String,
         required: true
@@ -75,7 +96,8 @@ const orderSchema = new Schema({
     },
     paymentMethod: {
         type: String,
-        enum: ['cash_on_delivery', 'online'],
+        // cash_on_delivery / online -> e-commerce; cash / card -> POS counter
+        enum: ['cash_on_delivery', 'online', 'cash', 'card'],
         default: 'cash_on_delivery'
     },
     paymentStatus: {

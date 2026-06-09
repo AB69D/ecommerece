@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import { usePathname } from "next/navigation";
 import { FiMapPin, FiPhone, FiMail } from "react-icons/fi";
 import {
     FaFacebookF,
@@ -80,6 +81,7 @@ const merge = (fallback, dynamic) => {
 };
 
 export default function Footer() {
+    const pathname = usePathname();
     const [settings, setSettings] = useState(FALLBACK_SETTINGS);
     const [footer, setFooter] = useState(FALLBACK_FOOTER);
 
@@ -106,6 +108,9 @@ export default function Footer() {
 
     const columns = (footer.columns?.length ? footer.columns : FALLBACK_FOOTER.columns).slice();
     columns.sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+
+    // The POS terminal renders full-screen without storefront chrome.
+    if (pathname?.startsWith("/pos")) return null;
 
     return (
         <footer className="relative mt-16 text-emerald-50 overflow-hidden">

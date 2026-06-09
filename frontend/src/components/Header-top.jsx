@@ -1,8 +1,12 @@
 "use client";
+import { usePathname } from "next/navigation";
 import { FaPhoneAlt } from "react-icons/fa";
 import { PiWhatsappLogoBold } from "react-icons/pi";
 
 export default function HeaderTop() {
+    const pathname = usePathname();
+    // The POS terminal is a self-contained full-screen app — no storefront chrome.
+    if (pathname?.startsWith("/pos")) return null;
     return (
         <div className="bg-black mb-2 sm:mb-3">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">

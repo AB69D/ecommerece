@@ -1,13 +1,17 @@
 "use client";
 import { authFetch } from "@/services/api";
+import { listAdminUsers } from "@/services/adminUsers";
 import React, { useState, useEffect } from "react";
-import { FiSearch, FiEye, FiCheck, FiX, FiPackage, FiTruck, FiClock, FiChevronRight, FiDollarSign, FiCalendar, FiUser, FiMapPin, FiPhone, FiMail } from "react-icons/fi";
+import { FiSearch, FiEye, FiCheck, FiX, FiPackage, FiTruck, FiClock, FiChevronRight, FiDollarSign, FiCalendar, FiUser, FiMapPin, FiPhone, FiMail, FiShoppingBag, FiGlobe } from "react-icons/fi";
 
 export default function AdminOrdersPage() {
     const [orders, setOrders] = useState([]);
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState("");
     const [statusFilter, setStatusFilter] = useState("all");
+    const [sourceFilter, setSourceFilter] = useState("all");
+    const [soldByFilter, setSoldByFilter] = useState("all");
+    const [sellers, setSellers] = useState([]);
     const [dateFrom, setDateFrom] = useState("");
     const [dateTo, setDateTo] = useState("");
     const [selectedOrder, setSelectedOrder] = useState(null);
@@ -17,12 +21,31 @@ export default function AdminOrdersPage() {
 
     useEffect(() => {
         fetchOrders();
-    }, [statusFilter]);
+    }, [statusFilter, sourceFilter, soldByFilter]);
+
+    // Load POS sellers once for the salesman filter. Silently no-op if the
+    // viewer lacks user:read — the filter simply stays empty.
+    useEffect(() => {
+        (async () => {
+            try {
+                const res = await listAdminUsers();
+                if (res?.success && Array.isArray(res.data)) {
+                    setSellers(res.data.filter((u) => u.role === "pos-seller"));
+                }
+            } catch {
+                /* ignore — viewer may not have user:read */
+            }
+        })();
+    }, []);
 
     const fetchOrders = async () => {
         setLoading(true);
         try {
-            const body = { status: statusFilter !== "all" ? statusFilter : undefined };
+            const body = {
+                status: statusFilter !== "all" ? statusFilter : undefined,
+                source: sourceFilter !== "all" ? sourceFilter : undefined,
+                soldById: soldByFilter !== "all" ? soldByFilter : undefined,
+            };
             const res = await authFetch(`/api/admin/order/get-all`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -167,6 +190,30 @@ export default function AdminOrdersPage() {
         );
     };
 
+    const getChannelBadge = (order) => {
+        if (order.source === "pos") {
+            const who = order.soldBy?.fullName || order.soldBy?.username;
+            return (
+                <div className="flex flex-col gap-0.5">
+                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium border bg-purple-100 text-purple-700 border-purple-200 w-fit">
+                        <FiShoppingBag className="w-3 h-3" />
+                        POS
+                        {order.saleType && (
+                            <span className="capitalize opacity-75">· {order.saleType}</span>
+                        )}
+                    </span>
+                    {who && <span className="text-[11px] text-gray-500 pl-1">by {who}</span>}
+                </div>
+            );
+        }
+        return (
+            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium border bg-sky-100 text-sky-700 border-sky-200 w-fit">
+                <FiGlobe className="w-3 h-3" />
+                E-commerce
+            </span>
+        );
+    };
+
     const getNextStatuses = (currentStatus) => {
         const flow = {
             pending: [{ key: 'confirmed', label: 'Confirm', color: 'bg-emerald-600 hover:bg-emerald-700 text-white' }],
@@ -232,7 +279,31 @@ export default function AdminOrdersPage() {
                             <option value="shipped">Shipped</option>
                             <option value="delivered">Delivered</option>
                             <option value="cancelled">Cancelled</option>
+                            <option value="returned">Returned</option>
                         </select>
+                        <select
+                            value={sourceFilter}
+                            onChange={(e) => { setSourceFilter(e.target.value); if (e.target.value !== "pos") setSoldByFilter("all"); }}
+                            className="px-4 py-2.5 border border-gray-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                        >
+                            <option value="all">All Channels</option>
+                            <option value="ecommerce">E-commerce</option>
+                            <option value="pos">POS</option>
+                        </select>
+                        {sourceFilter === "pos" && (
+                            <select
+                                value={soldByFilter}
+                                onChange={(e) => setSoldByFilter(e.target.value)}
+                                className="px-4 py-2.5 border border-gray-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                            >
+                                <option value="all">All Salesmen</option>
+                                {sellers.map((s) => (
+                                    <option key={s._id} value={s._id}>
+                                        {s.fullName || s.username}
+                                    </option>
+                                ))}
+                            </select>
+                        )}
                     </div>
                 </div>
 
@@ -322,6 +393,7 @@ export default function AdminOrdersPage() {
                                 <tr>
                                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Order ID</th>
                                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Customer</th>
+                                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Channel</th>
                                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Items</th>
                                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Total</th>
                                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Status</th>
@@ -349,6 +421,9 @@ export default function AdminOrdersPage() {
                                                     <p className="text-xs text-gray-500">{order.customerPhone}</p>
                                                 </div>
                                             </div>
+                                        </td>
+                                        <td className="px-4 py-4">
+                                            {getChannelBadge(order)}
                                         </td>
                                         <td className="px-4 py-4">
                                             <span className="text-sm text-gray-600">{order.items?.length || 0} items</span>
@@ -400,10 +475,13 @@ export default function AdminOrdersPage() {
 
                         <div className="p-6 space-y-6">
                             {/* Status Badge */}
-                            <div className="flex items-center justify-between">
-                                {getStatusBadge(selectedOrder.orderStatus)}
+                            <div className="flex items-center justify-between gap-3 flex-wrap">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                    {getStatusBadge(selectedOrder.orderStatus)}
+                                    {getChannelBadge(selectedOrder)}
+                                </div>
                                 <span className="text-sm text-gray-500">
-                                    {new Date(selectedOrder.createdAt).toLocaleDateString('en-GB', { 
+                                    {new Date(selectedOrder.createdAt).toLocaleDateString('en-GB', {
                                         day: 'numeric', month: 'long', year: 'numeric',
                                         hour: '2-digit', minute: '2-digit'
                                     })}

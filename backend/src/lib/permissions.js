@@ -66,6 +66,16 @@ export const PERMISSION_GROUPS = Object.freeze([
         ],
     },
     {
+        key: 'pos',
+        label: 'Point of Sale',
+        resources: [
+            // pos:sell  -> ring up retail / wholesale sales and returns
+            // pos:read  -> view own sales history & reports
+            // pos:manage-> manage POS settings / all sellers' data
+            { key: 'pos', label: 'POS Terminal', actions: ['read', 'sell', 'manage'] },
+        ],
+    },
+    {
         key: 'insights',
         label: 'Insights',
         resources: [
@@ -107,6 +117,7 @@ export const ROLES = Object.freeze([
     'manager',
     'support',
     'viewer',
+    'pos-seller',
 ]);
 
 const readEverything = ALL_PERMISSIONS.filter((p) => p.endsWith(':read'));
@@ -138,6 +149,7 @@ export const ROLE_PERMISSIONS = Object.freeze({
         'content:read', 'content:write',
         'header:read', 'header:write', 'header:delete',
         'analytics:read',
+        'pos:read', 'pos:sell', 'pos:manage',
     ],
 
     // Customer support: read most, act on orders / reviews / customers.
@@ -153,6 +165,16 @@ export const ROLE_PERMISSIONS = Object.freeze({
     viewer: readEverything.filter(
         (p) => !p.startsWith('audit:') && !p.startsWith('integration:') && !p.startsWith('role:'),
     ),
+
+    // POS cashier: ring up sales/returns at the in-store terminal and read
+    // the catalog + their own reports. No access to the main admin panel.
+    'pos-seller': [
+        'pos:sell',
+        'pos:read',
+        'product:read',
+        'category:read',
+        'inventory:read',
+    ],
 });
 
 // ---------------------------------------------------------------

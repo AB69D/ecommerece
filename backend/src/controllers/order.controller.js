@@ -110,7 +110,7 @@ export const updateOrderStatusController = async (request, response) => {
 
 export const getAllOrdersController = async (request, response) => {
     try {
-        let { page, limit, search, status } = request.body;
+        let { page, limit, search, status, source, soldById } = request.body;
 
         if (!page) page = 1;
         if (!limit) limit = 20;
@@ -127,6 +127,16 @@ export const getAllOrdersController = async (request, response) => {
 
         if (status && status !== 'all') {
             query.orderStatus = status;
+        }
+
+        // Channel filter: e-commerce vs POS.
+        if (source && source !== 'all') {
+            query.source = source;
+        }
+
+        // POS salesman filter (implies POS channel).
+        if (soldById && soldById !== 'all') {
+            query['soldBy.id'] = soldById;
         }
 
         const skip = (page - 1) * limit;

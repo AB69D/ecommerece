@@ -3,7 +3,7 @@ import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import {
     FiDollarSign, FiShoppingCart, FiPackage, FiAlertTriangle, FiTrendingUp, FiTrendingDown,
-    FiGrid, FiTruck, FiStar, FiArrowRight,
+    FiGrid, FiTruck, FiStar, FiArrowRight, FiShoppingBag, FiGlobe, FiUsers,
 } from "react-icons/fi";
 import { authFetch } from "@/services/api";
 import { getDashboardOverview } from "@/services/analytics";
@@ -102,6 +102,21 @@ export default function DashboardPage() {
         .filter((x) => x.count > 0)
         .map((x) => ({ label: x.label, value: x.count, color: x.color }));
 
+    // --- POS analytics ------------------------------------------------
+    const pos = overview?.pos;
+    const posChannel = pos?.channel || { ecommerce: { revenue: 0, orders: 0 }, pos: { revenue: 0, orders: 0 } };
+    const posByType = pos?.byType || { retail: { revenue: 0, orders: 0 }, wholesale: { revenue: 0, orders: 0 } };
+    const posSellers = pos?.sellers || [];
+    const posSeries = pos?.series || [];
+    const posTypeData = [
+        { label: "Retail", value: posByType.retail.orders, color: "#8b5cf6" },
+        { label: "Wholesale", value: posByType.wholesale.orders, color: "#f59e0b" },
+    ].filter((d) => d.value > 0);
+    const channelData = [
+        { label: "E-commerce", value: posChannel.ecommerce.orders, color: "#0ea5e9" },
+        { label: "POS", value: posChannel.pos.orders, color: "#8b5cf6" },
+    ].filter((d) => d.value > 0);
+
     return (
         <div className="space-y-6">
             <div className="flex flex-wrap items-center justify-between gap-3">
@@ -183,6 +198,116 @@ export default function DashboardPage() {
                                 color="#6366f1"
                                 formatValue={(v) => `${v} sold`}
                             />
+                        </div>
+                    </div>
+
+                    {/* POS analytics */}
+                    <div className="space-y-4">
+                        <div className="flex items-center gap-2 pt-1">
+                            <span className="w-9 h-9 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center">
+                                <FiShoppingBag className="w-5 h-5" />
+                            </span>
+                            <div>
+                                <h2 className="text-lg font-bold text-gray-800">Point of Sale</h2>
+                                <p className="text-xs text-gray-400">In-store sales by your POS sellers</p>
+                            </div>
+                            <Link href="/admin/pos-sellers" className="ml-auto text-sm text-indigo-600 hover:text-indigo-700 font-medium flex items-center gap-1">
+                                Manage sellers <FiArrowRight className="w-4 h-4" />
+                            </Link>
+                        </div>
+
+                        {/* Channel + type comparison cards */}
+                        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+                            <div className="bg-white border border-gray-200 rounded-2xl p-4 sm:p-5">
+                                <div className="flex items-center justify-between">
+                                    <p className="text-xs text-gray-500">E-commerce sales</p>
+                                    <span className="w-8 h-8 rounded-lg bg-sky-50 text-sky-600 flex items-center justify-center"><FiGlobe className="w-4 h-4" /></span>
+                                </div>
+                                <p className="text-xl font-bold text-gray-800 mt-2">{money(posChannel.ecommerce.revenue)}</p>
+                                <p className="text-xs text-gray-400 mt-0.5">{posChannel.ecommerce.orders} orders</p>
+                            </div>
+                            <div className="bg-white border border-gray-200 rounded-2xl p-4 sm:p-5">
+                                <div className="flex items-center justify-between">
+                                    <p className="text-xs text-gray-500">POS sales</p>
+                                    <span className="w-8 h-8 rounded-lg bg-purple-50 text-purple-600 flex items-center justify-center"><FiShoppingBag className="w-4 h-4" /></span>
+                                </div>
+                                <p className="text-xl font-bold text-gray-800 mt-2">{money(posChannel.pos.revenue)}</p>
+                                <p className="text-xs text-gray-400 mt-0.5">{posChannel.pos.orders} orders</p>
+                            </div>
+                            <div className="bg-white border border-gray-200 rounded-2xl p-4 sm:p-5">
+                                <div className="flex items-center justify-between">
+                                    <p className="text-xs text-gray-500">POS retail</p>
+                                    <span className="w-8 h-8 rounded-lg bg-violet-50 text-violet-600 flex items-center justify-center"><FiShoppingCart className="w-4 h-4" /></span>
+                                </div>
+                                <p className="text-xl font-bold text-gray-800 mt-2">{money(posByType.retail.revenue)}</p>
+                                <p className="text-xs text-gray-400 mt-0.5">{posByType.retail.orders} orders</p>
+                            </div>
+                            <div className="bg-white border border-gray-200 rounded-2xl p-4 sm:p-5">
+                                <div className="flex items-center justify-between">
+                                    <p className="text-xs text-gray-500">POS wholesale</p>
+                                    <span className="w-8 h-8 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center"><FiPackage className="w-4 h-4" /></span>
+                                </div>
+                                <p className="text-xl font-bold text-gray-800 mt-2">{money(posByType.wholesale.revenue)}</p>
+                                <p className="text-xs text-gray-400 mt-0.5">{posByType.wholesale.orders} orders</p>
+                            </div>
+                        </div>
+
+                        {/* POS revenue trend + channel donut */}
+                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                            <div className="lg:col-span-2 bg-white border border-gray-200 rounded-2xl p-4 sm:p-5">
+                                <div className="flex items-center justify-between mb-3">
+                                    <h2 className="font-semibold text-gray-800">POS revenue</h2>
+                                    <span className="text-xs text-gray-400">last {days} days</span>
+                                </div>
+                                <AreaLineChart data={posSeries} valueKey="revenue" color="#8b5cf6" formatValue={money} />
+                            </div>
+                            <div className="bg-white border border-gray-200 rounded-2xl p-4 sm:p-5">
+                                <h2 className="font-semibold text-gray-800 mb-3">Sales channel split</h2>
+                                <DonutChart data={channelData} />
+                                <div className="mt-4 space-y-1.5">
+                                    {channelData.length === 0 && (
+                                        <p className="text-xs text-gray-400 text-center">No sales yet</p>
+                                    )}
+                                    {channelData.map((d) => (
+                                        <div key={d.label} className="flex items-center gap-2 text-xs">
+                                            <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: d.color }} />
+                                            <span className="text-gray-600">{d.label}</span>
+                                            <span className="text-gray-400 ml-auto">{d.value} orders</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Seller leaderboard + retail/wholesale split */}
+                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                            <div className="lg:col-span-2 bg-white border border-gray-200 rounded-2xl p-4 sm:p-5">
+                                <h2 className="font-semibold text-gray-800 mb-4 flex items-center gap-2">
+                                    <FiUsers className="w-4 h-4 text-purple-500" /> Top POS sellers
+                                </h2>
+                                <HBarList
+                                    data={posSellers.map((p) => ({ label: `${p.name}${p.orders ? ` · ${p.orders} orders` : ""}`, value: p.revenue }))}
+                                    color="#8b5cf6"
+                                    formatValue={money}
+                                    emptyText="No POS sales yet"
+                                />
+                            </div>
+                            <div className="bg-white border border-gray-200 rounded-2xl p-4 sm:p-5">
+                                <h2 className="font-semibold text-gray-800 mb-3">Retail vs wholesale</h2>
+                                <DonutChart data={posTypeData} />
+                                <div className="mt-4 space-y-1.5">
+                                    {posTypeData.length === 0 && (
+                                        <p className="text-xs text-gray-400 text-center">No POS sales yet</p>
+                                    )}
+                                    {posTypeData.map((d) => (
+                                        <div key={d.label} className="flex items-center gap-2 text-xs">
+                                            <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: d.color }} />
+                                            <span className="text-gray-600">{d.label}</span>
+                                            <span className="text-gray-400 ml-auto">{d.value} orders</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
                         </div>
                     </div>
 

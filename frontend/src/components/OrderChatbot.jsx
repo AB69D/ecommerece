@@ -159,7 +159,7 @@ export default function OrderChatbot() {
         if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }, [messages, loading, open, cartOpen]);
 
-    if (pathname?.startsWith("/admin")) return null;
+    if (pathname?.startsWith("/admin") || pathname?.startsWith("/pos")) return null;
 
     const onSubmit = (e) => {
         e.preventDefault();

@@ -2,7 +2,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { useState, useEffect, useCallback } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import {
     FiSearch,
     FiShoppingCart,
@@ -26,6 +26,7 @@ function Navbar() {
     const [searchQuery, setSearchQuery] = useState("");
     const [isHydrated, setIsHydrated] = useState(false);
     const router = useRouter();
+    const pathname = usePathname();
 
     useEffect(() => {
         setIsHydrated(true);
@@ -99,6 +100,9 @@ function Navbar() {
             document.body.style.overflow = "unset";
         };
     }, [mobileMenuOpen]);
+
+    // The POS terminal renders full-screen without storefront chrome.
+    if (pathname?.startsWith("/pos")) return null;
 
     const handleSearch = (e) => {
         e.preventDefault();

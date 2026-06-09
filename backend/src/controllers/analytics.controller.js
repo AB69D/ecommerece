@@ -39,6 +39,10 @@ export const getDashboardOverview = asyncHandler(async (req, res) => {
         topProductsAgg,
         last7Agg,
         prev7Agg,
+        channelAgg,
+        posDailyAgg,
+        sellerAgg,
+        posTypeAgg,
     ] = await Promise.all([
         OrderModel.countDocuments(),
         ProductModel.countDocuments(),
@@ -90,6 +94,46 @@ export const getDashboardOverview = asyncHandler(async (req, res) => {
             { $match: { ...REVENUE_STATUSES, createdAt: { $gte: prev7Start, $lt: last7 } } },
             { $group: { _id: null, revenue: { $sum: '$totalAmount' }, orders: { $sum: 1 } } },
         ]),
+        // Channel split: e-commerce vs POS (revenue + order count).
+        OrderModel.aggregate([
+            { $match: REVENUE_STATUSES },
+            {
+                $group: {
+                    _id: { $ifNull: ['$source', 'ecommerce'] },
+                    revenue: { $sum: '$totalAmount' },
+                    orders: { $sum: 1 },
+                },
+            },
+        ]),
+        // POS-only daily series for the selected range.
+        OrderModel.aggregate([
+            { $match: { ...REVENUE_STATUSES, source: 'pos', createdAt: { $gte: since } } },
+            {
+                $group: {
+                    _id: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } },
+                    orders: { $sum: 1 },
+                    revenue: { $sum: '$totalAmount' },
+                },
+            },
+        ]),
+        // POS seller leaderboard.
+        OrderModel.aggregate([
+            { $match: { ...REVENUE_STATUSES, source: 'pos' } },
+            {
+                $group: {
+                    _id: { id: '$soldBy.id', username: '$soldBy.username', fullName: '$soldBy.fullName' },
+                    revenue: { $sum: '$totalAmount' },
+                    orders: { $sum: 1 },
+                },
+            },
+            { $sort: { revenue: -1 } },
+            { $limit: 8 },
+        ]),
+        // POS retail vs wholesale split.
+        OrderModel.aggregate([
+            { $match: { ...REVENUE_STATUSES, source: 'pos' } },
+            { $group: { _id: '$saleType', revenue: { $sum: '$totalAmount' }, orders: { $sum: 1 } } },
+        ]),
     ]);
 
     // Zero-fill the daily series so the chart line is continuous.
@@ -113,6 +157,38 @@ export const getDashboardOverview = asyncHandler(async (req, res) => {
         return Math.round(((cur - prev) / prev) * 1000) / 10;
     };
 
+    // --- POS / channel breakdown -------------------------------------
+    const channel = { ecommerce: { revenue: 0, orders: 0 }, pos: { revenue: 0, orders: 0 } };
+    for (const row of channelAgg) {
+        const key = row._id === 'pos' ? 'pos' : 'ecommerce';
+        channel[key] = { revenue: Math.round(row.revenue || 0), orders: row.orders || 0 };
+    }
+
+    // Zero-filled POS daily series (aligned with the e-commerce `series`).
+    const posByDay = Object.fromEntries(posDailyAgg.map((d) => [d._id, d]));
+    const posSeries = [];
+    for (let i = 0; i < days; i += 1) {
+        const date = ymd(new Date(since.getTime() + i * 86400000));
+        const hit = posByDay[date];
+        posSeries.push({ date, orders: hit?.orders || 0, revenue: Math.round(hit?.revenue || 0) });
+    }
+
+    const posByType = { retail: { revenue: 0, orders: 0 }, wholesale: { revenue: 0, orders: 0 } };
+    for (const row of posTypeAgg) {
+        const key = row._id === 'wholesale' ? 'wholesale' : 'retail';
+        posByType[key] = { revenue: Math.round(row.revenue || 0), orders: row.orders || 0 };
+    }
+
+    const sellers = sellerAgg
+        .filter((s) => s._id?.id)
+        .map((s) => ({
+            id: s._id.id,
+            name: s._id.fullName || s._id.username || 'Unknown',
+            username: s._id.username || '',
+            revenue: Math.round(s.revenue || 0),
+            orders: s.orders || 0,
+        }));
+
     return ok(res, {
         summary: {
             totalOrders,
@@ -134,5 +210,11 @@ export const getDashboardOverview = asyncHandler(async (req, res) => {
             revenue: Math.round(p.revenue || 0),
             image: p.image || '',
         })),
+        pos: {
+            channel,
+            byType: posByType,
+            series: posSeries,
+            sellers,
+        },
     });
 });
