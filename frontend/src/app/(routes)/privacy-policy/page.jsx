@@ -1,3 +1,6 @@
+import { fetchPage } from "@/lib/dynamicContent";
+import CmsArticle from "@/components/CmsArticle";
+
 export const metadata = {
     title: "Privacy Policy | Ab9dEcommerce",
     description: "Read Ab9dEcommerce's Privacy Policy to understand how we collect, use, and protect your personal information when you use our products delivery service.",
@@ -11,7 +14,9 @@ export const metadata = {
     }
 };
 
-export default function PrivacyPolicyPage() {
+export default async function PrivacyPolicyPage() {
+    const page = await fetchPage("privacy-policy");
+    if (page?.body) return <CmsArticle title={page.title} html={page.body} />;
     return (
         <div className="min-h-screen bg-gray-50">
             {/* Hero Section */}

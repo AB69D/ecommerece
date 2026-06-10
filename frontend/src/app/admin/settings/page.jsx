@@ -9,6 +9,7 @@ import {
 import { getSiteSettings, updateSiteSettings, uploadSiteImage } from "@/services/siteSettings";
 import { getFooterSettings, updateFooterSettings } from "@/services/footer";
 import { useAdminAuth } from "@/context/AdminAuthContext";
+import { SITE_PAGES, PAGE_BY_PATH } from "@/lib/sitePages";
 
 const TABS = [
     { id: "branding", label: "Branding", icon: <FiType className="w-4 h-4" /> },
@@ -48,6 +49,32 @@ function Field({ label, hint, children }) {
 }
 
 const inputCls = "w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500";
+
+// Footer link picker: choose one of the site's fixed pages (path is locked to
+// that page) or "Custom" to type any internal path / external URL by hand.
+function PagePicker({ link, onPick }) {
+    const known = link.url && PAGE_BY_PATH[link.url];
+    return (
+        <select
+            className="px-2 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs text-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500 shrink-0 max-w-[8.5rem]"
+            value={known ? link.url : ""}
+            onChange={(e) => {
+                const path = e.target.value;
+                if (!path) { onPick({ url: "" }); return; }
+                const page = PAGE_BY_PATH[path];
+                const patch = { url: path };
+                if (!link.label?.trim() && page?.label) patch.label = page.label;
+                onPick(patch);
+            }}
+            title="Link to a fixed page (locks the path) or pick Custom for a free-form URL"
+        >
+            <option value="">Custom URL…</option>
+            {SITE_PAGES.map((p) => (
+                <option key={p.slug} value={p.path}>{p.label}</option>
+            ))}
+        </select>
+    );
+}
 
 function Toggle({ checked, onChange, label, hint }) {
     return (
@@ -512,16 +539,22 @@ export default function SettingsPage() {
                                                 className="px-2.5 text-gray-400 hover:text-red-500"><FiTrash2 className="w-4 h-4" /></button>
                                         </div>
                                         <div className="space-y-2 pl-1">
-                                            {(col.links || []).map((lnk, li) => (
-                                                <div key={li} className="flex gap-2">
-                                                    <input className={`${inputCls} flex-1`} placeholder="Label" value={lnk.label || ""}
-                                                        onChange={(e) => { const arr = [...footer.columns]; const links = [...(arr[ci].links || [])]; links[li] = { ...links[li], label: e.target.value }; arr[ci] = { ...arr[ci], links }; setF({ columns: arr }); }} />
-                                                    <input className={`${inputCls} flex-[2]`} placeholder="/path or https://..." value={lnk.url || ""}
-                                                        onChange={(e) => { const arr = [...footer.columns]; const links = [...(arr[ci].links || [])]; links[li] = { ...links[li], url: e.target.value }; arr[ci] = { ...arr[ci], links }; setF({ columns: arr }); }} />
-                                                    <button type="button" onClick={() => { const arr = [...footer.columns]; arr[ci] = { ...arr[ci], links: arr[ci].links.filter((_, j) => j !== li) }; setF({ columns: arr }); }}
-                                                        className="px-2 text-gray-400 hover:text-red-500"><FiX className="w-4 h-4" /></button>
-                                                </div>
-                                            ))}
+                                            {(col.links || []).map((lnk, li) => {
+                                                const patchLink = (p) => { const arr = [...footer.columns]; const links = [...(arr[ci].links || [])]; links[li] = { ...links[li], ...p }; arr[ci] = { ...arr[ci], links }; setF({ columns: arr }); };
+                                                const locked = !!(lnk.url && PAGE_BY_PATH[lnk.url]);
+                                                return (
+                                                    <div key={li} className="flex gap-2">
+                                                        <input className={`${inputCls} flex-1`} placeholder="Label" value={lnk.label || ""}
+                                                            onChange={(e) => patchLink({ label: e.target.value })} />
+                                                        <PagePicker link={lnk} onPick={patchLink} />
+                                                        <input className={`${inputCls} flex-[2] ${locked ? "opacity-60 cursor-not-allowed" : ""}`} placeholder="/path or https://..." value={lnk.url || ""}
+                                                            disabled={locked} readOnly={locked}
+                                                            onChange={(e) => patchLink({ url: e.target.value })} />
+                                                        <button type="button" onClick={() => { const arr = [...footer.columns]; arr[ci] = { ...arr[ci], links: arr[ci].links.filter((_, j) => j !== li) }; setF({ columns: arr }); }}
+                                                            className="px-2 text-gray-400 hover:text-red-500"><FiX className="w-4 h-4" /></button>
+                                                    </div>
+                                                );
+                                            })}
                                             <button type="button" onClick={() => { const arr = [...footer.columns]; arr[ci] = { ...arr[ci], links: [...(arr[ci].links || []), { label: "", url: "" }] }; setF({ columns: arr }); }}
                                                 className="text-xs text-indigo-600 hover:text-indigo-700 inline-flex items-center gap-1"><FiPlus className="w-3.5 h-3.5" /> Add link</button>
                                         </div>
@@ -538,16 +571,22 @@ export default function SettingsPage() {
                                     className="inline-flex items-center gap-1 text-sm text-indigo-600 hover:text-indigo-700 font-medium"><FiPlus className="w-4 h-4" /> Add</button>
                             </div>
                             <div className="space-y-2">
-                                {(footer.bottomLinks || []).map((l, i) => (
-                                    <div key={i} className="flex gap-2">
-                                        <input className={`${inputCls} flex-1`} placeholder="Label" value={l.label || ""}
-                                            onChange={(e) => { const arr = [...footer.bottomLinks]; arr[i] = { ...arr[i], label: e.target.value }; setF({ bottomLinks: arr }); }} />
-                                        <input className={`${inputCls} flex-[2]`} placeholder="/path or https://..." value={l.url || ""}
-                                            onChange={(e) => { const arr = [...footer.bottomLinks]; arr[i] = { ...arr[i], url: e.target.value }; setF({ bottomLinks: arr }); }} />
-                                        <button type="button" onClick={() => setF({ bottomLinks: footer.bottomLinks.filter((_, j) => j !== i) })}
-                                            className="px-2.5 text-gray-400 hover:text-red-500"><FiX className="w-4 h-4" /></button>
-                                    </div>
-                                ))}
+                                {(footer.bottomLinks || []).map((l, i) => {
+                                    const patchLink = (p) => { const arr = [...footer.bottomLinks]; arr[i] = { ...arr[i], ...p }; setF({ bottomLinks: arr }); };
+                                    const locked = !!(l.url && PAGE_BY_PATH[l.url]);
+                                    return (
+                                        <div key={i} className="flex gap-2">
+                                            <input className={`${inputCls} flex-1`} placeholder="Label" value={l.label || ""}
+                                                onChange={(e) => patchLink({ label: e.target.value })} />
+                                            <PagePicker link={l} onPick={patchLink} />
+                                            <input className={`${inputCls} flex-[2] ${locked ? "opacity-60 cursor-not-allowed" : ""}`} placeholder="/path or https://..." value={l.url || ""}
+                                                disabled={locked} readOnly={locked}
+                                                onChange={(e) => patchLink({ url: e.target.value })} />
+                                            <button type="button" onClick={() => setF({ bottomLinks: footer.bottomLinks.filter((_, j) => j !== i) })}
+                                                className="px-2.5 text-gray-400 hover:text-red-500"><FiX className="w-4 h-4" /></button>
+                                        </div>
+                                    );
+                                })}
                             </div>
                         </div>
                     </>

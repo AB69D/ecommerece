@@ -1,3 +1,6 @@
+import { fetchPage } from "@/lib/dynamicContent";
+import CmsArticle from "@/components/CmsArticle";
+
 export const metadata = {
     title: "Terms & Conditions | Ab9dEcommerce",
     description: "Read the Terms & Conditions for using Ab9dEcommerce's website and services. Learn about our policies, user responsibilities, and legal agreements.",
@@ -11,7 +14,9 @@ export const metadata = {
     }
 };
 
-export default function TermsConditionPage() {
+export default async function TermsConditionPage() {
+    const page = await fetchPage("terms-condition");
+    if (page?.body) return <CmsArticle title={page.title} html={page.body} />;
     return (
         <div className="min-h-screen bg-gray-50">
             {/* Hero Section */}

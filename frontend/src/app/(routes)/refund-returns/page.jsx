@@ -1,4 +1,9 @@
-export default function RefundReturnsPage() {
+import { fetchPage } from "@/lib/dynamicContent";
+import CmsArticle from "@/components/CmsArticle";
+
+export default async function RefundReturnsPage() {
+    const page = await fetchPage("refund-returns");
+    if (page?.body) return <CmsArticle title={page.title} html={page.body} />;
     return (
         <div className="py-8 px-4 max-w-4xl mx-auto">
             <h1 className="text-2xl sm:text-3xl font-bold text-gray-800 mb-8">Refund & Returns Policy</h1>

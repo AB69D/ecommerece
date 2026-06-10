@@ -109,6 +109,7 @@ export default function AdminLayout({ children }) {
             items: [
                 { name: 'Headers', path: '/admin/header', icon: <FiLayout className="w-5 h-5" />, perms: ['header:read'] },
                 { name: 'Reviews', path: '/admin/reviews', icon: <FiStar className="w-5 h-5" />, perms: ['review:read'] },
+                { name: 'Pages', path: '/admin/pages', icon: <FiFileText className="w-5 h-5" />, perms: ['content:read'] },
                 { name: 'Site Settings', path: '/admin/settings', icon: <FiSettings className="w-5 h-5" />, perms: ['content:read'] },
             ],
         },

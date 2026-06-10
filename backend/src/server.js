@@ -31,6 +31,7 @@ import authRouter from './routes/auth.route.js';
 import adminMgmtRouter from './routes/adminMgmt.route.js';
 import siteSettingsRouter from './routes/siteSettings.route.js';
 import footerRouter from './routes/footer.route.js';
+import pageRouter from './routes/page.route.js';
 import navMenuRouter from './routes/navMenu.route.js';
 import rbacRouter from './routes/rbac.route.js';
 import auditLogRouter from './routes/auditLog.route.js';
@@ -128,6 +129,7 @@ app.use('/api/admin/customer', requireAuth, customerRouter);
 app.use('/api/admin/coupon', requireAuth, couponRouter.admin);
 app.use('/api/admin/site-settings', requireAuth, siteSettingsRouter.admin);
 app.use('/api/admin/footer', requireAuth, footerRouter.admin);
+app.use('/api/admin/page', requireAuth, pageRouter.admin);
 app.use('/api/admin/nav-menu', requireAuth, navMenuRouter.admin);
 
 // Public/client routes
@@ -143,6 +145,7 @@ app.use('/api/client/category', clientCategoryRouter);
 app.use('/api/client/coupon', couponRouter.client);
 app.use('/api/client/site-settings', siteSettingsRouter.client);
 app.use('/api/client/footer', footerRouter.client);
+app.use('/api/client/page', pageRouter.client);
 app.use('/api/client/nav-menu', navMenuRouter.client);
 app.use('/api/client/chatbot', chatbotRouter);
 

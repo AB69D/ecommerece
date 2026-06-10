@@ -1,3 +1,6 @@
+import { fetchPage } from "@/lib/dynamicContent";
+import CmsArticle from "@/components/CmsArticle";
+
 export const metadata = {
     title: "About Ab9dEcommerce | Quality Products",
     description: "Learn about Ab9dEcommerce - Your trusted source for our authentic products. We provide pure various products, pickles, and traditional food items directly from local farmers.",
@@ -25,7 +28,10 @@ export const metadata = {
     }
 };
 
-export default function AboutPage() {
+export default async function AboutPage() {
+    const page = await fetchPage("about");
+    if (page?.body) return <CmsArticle title={page.title} html={page.body} />;
+
     return (
         <div className="min-h-screen bg-gray-50">
             {/* Hero Section */}

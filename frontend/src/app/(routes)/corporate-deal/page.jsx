@@ -1,6 +1,10 @@
 import Image from "next/image";
+import { fetchPage } from "@/lib/dynamicContent";
+import CmsArticle from "@/components/CmsArticle";
 
-export default function CorporateDealPage() {
+export default async function CorporateDealPage() {
+    const page = await fetchPage("corporate-deal");
+    if (page?.body) return <CmsArticle title={page.title} html={page.body} />;
     return (
         <div className="py-8 px-4 max-w-7xl mx-auto">
             <h1 className="text-2xl sm:text-3xl font-bold text-gray-800 mb-8 text-center">Corporate Deals</h1>

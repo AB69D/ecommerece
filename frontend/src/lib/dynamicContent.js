@@ -26,3 +26,7 @@ export const fetchSiteSettings = () => fetchJson('/api/client/site-settings');
 export const fetchFooter = () => fetchJson('/api/client/footer');
 export const fetchNavMenu = (location) =>
     fetchJson(location ? `/api/client/nav-menu?location=${location}` : '/api/client/nav-menu');
+
+// Admin-overridable content for a fixed page (returns null when no override has
+// been saved, so the route renders its built-in default content).
+export const fetchPage = (slug) => fetchJson(`/api/client/page/${slug}`);
