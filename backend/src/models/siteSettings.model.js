@@ -52,6 +52,7 @@ const siteSettingsSchema = new mongoose.Schema(
             pwa: { type: Boolean, default: true },
             whatsapp: { type: Boolean, default: false },
             analytics: { type: Boolean, default: true },
+            productReviews: { type: Boolean, default: true },
         },
 
         // POS receipt + storefront invoice customization.

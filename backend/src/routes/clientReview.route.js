@@ -3,6 +3,7 @@ import mongoose from 'mongoose';
 import multer from 'multer';
 import cloudinary from '../config/cloudinary.js';
 import ReviewModel from '../models/review.model.js';
+import { isFeatureEnabled } from '../lib/siteSettings.js';
 
 const storage = multer.memoryStorage();
 const upload = multer({
@@ -54,6 +55,15 @@ const clientReviewRouter = Router();
 
 clientReviewRouter.post('/create', upload.array('media', 5), async (req, res) => {
     try {
+        // Honour the admin "Product reviews" feature toggle.
+        if (!(await isFeatureEnabled('productReviews'))) {
+            return res.status(403).json({
+                message: "Reviews are currently disabled",
+                error: true,
+                success: false
+            });
+        }
+
         const { name, rating, comment, productId } = req.body;
 
         if (!name || !rating || !comment) {
@@ -108,6 +118,17 @@ clientReviewRouter.post('/create', upload.array('media', 5), async (req, res) =>
 // Reviews + rating summary for a single product (used on the product detail page).
 clientReviewRouter.get('/product/:productId', async (req, res) => {
     try {
+        // When reviews are turned off, behave as if the product has none so the
+        // storefront simply hides the section.
+        if (!(await isFeatureEnabled('productReviews'))) {
+            return res.json({
+                message: "Reviews are disabled",
+                error: false,
+                success: true,
+                data: { productId: req.params.productId, average: 0, count: 0, distribution: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 }, reviews: [] }
+            });
+        }
+
         const { productId } = req.params;
         if (!mongoose.Types.ObjectId.isValid(productId)) {
             return res.status(400).json({
@@ -155,6 +176,10 @@ clientReviewRouter.get('/product/:productId', async (req, res) => {
 // GET /summary?productIds=id1,id2,id3
 clientReviewRouter.get('/summary', async (req, res) => {
     try {
+        if (!(await isFeatureEnabled('productReviews'))) {
+            return res.json({ message: "Reviews are disabled", error: false, success: true, data: {} });
+        }
+
         const raw = (req.query.productIds || '').toString();
         const ids = raw
             .split(',')
@@ -202,6 +227,10 @@ clientReviewRouter.get('/summary', async (req, res) => {
 
 clientReviewRouter.get('/reviews', async (req, res) => {
     try {
+        if (!(await isFeatureEnabled('productReviews'))) {
+            return res.json({ message: "Reviews are disabled", error: false, success: true, data: [] });
+        }
+
         const reviews = await ReviewModel.find().sort({ createdAt: -1 });
 
         return res.json({
