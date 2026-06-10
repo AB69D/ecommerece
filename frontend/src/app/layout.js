@@ -34,7 +34,10 @@ export async function generateMetadata() {
     settings?.tagline ||
     `${siteName} is promising to deliver products from our store to your door`;
   const ogImage = absoluteUrl(seo.ogImage || settings?.logoUrl || "/logo.png");
-  const favicon = settings?.faviconUrl || "/icons/icon-192.png";
+  // Browser-tab + iOS home-screen icons follow the admin logo: favicon first,
+  // then the company logo, and only then the bundled placeholder.
+  const favicon = settings?.faviconUrl || settings?.logoUrl || "/icons/icon-192.png";
+  const appleIcon = settings?.faviconUrl || settings?.logoUrl || "/icons/apple-touch-icon.png";
 
   return {
     metadataBase: new URL(SITE_URL),
@@ -71,7 +74,7 @@ export async function generateMetadata() {
     },
     icons: {
       icon: favicon,
-      apple: settings?.faviconUrl || "/icons/apple-touch-icon.png",
+      apple: appleIcon,
     },
   };
 }
