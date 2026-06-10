@@ -4,7 +4,7 @@ import Image from "next/image";
 import {
     FiSearch, FiPlus, FiMinus, FiTrash2, FiShoppingCart, FiX, FiPackage,
     FiCreditCard, FiDollarSign, FiUser, FiPhone, FiCheckCircle, FiCamera, FiTag,
-    FiWifiOff, FiRefreshCw,
+    FiWifiOff, FiRefreshCw, FiPause, FiClock, FiPlayCircle,
 } from "react-icons/fi";
 import { useCurrency } from "@/context/CurrencyContext.jsx";
 import { getPosProducts, createPosSale, lookupPosProductByCode, getPosSettings } from "@/services/pos";
@@ -51,6 +51,13 @@ export default function SellView({ mode, notify }) {
     // wholesale, where a blanket markdown is the norm; also usable at retail.
     const [discountType, setDiscountType] = useState("percent");
     const [discountValue, setDiscountValue] = useState("");
+
+    // Parked / held sales — set a cart aside to serve another customer and
+    // resume it later. Persisted to this device's localStorage, scoped per sale
+    // mode (retail vs wholesale) so the two don't get mixed up.
+    const heldKey = `pos_held_${mode}`;
+    const [heldSales, setHeldSales] = useState([]);
+    const [heldOpen, setHeldOpen] = useState(false);
 
     // Barcode scanner: USB/manual input + optional camera (native BarcodeDetector).
     const [scanCode, setScanCode] = useState("");
@@ -324,6 +331,58 @@ export default function SellView({ mode, notify }) {
         setDiscountValue(isWholesale && wpct > 0 ? String(wpct) : "");
     };
 
+    // ---- Parked / held sales -------------------------------------------
+    useEffect(() => {
+        try {
+            const raw = localStorage.getItem(heldKey);
+            setHeldSales(raw ? JSON.parse(raw) : []);
+        } catch { setHeldSales([]); }
+    }, [heldKey]);
+
+    const persistHeld = useCallback((list) => {
+        setHeldSales(list);
+        try { localStorage.setItem(heldKey, JSON.stringify(list)); } catch { /* ignore */ }
+    }, [heldKey]);
+
+    const holdSale = () => {
+        if (cart.length === 0) return;
+        const entry = {
+            id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+            at: Date.now(),
+            label: customerName.trim() || `${cartCount} item${cartCount > 1 ? "s" : ""}`,
+            total,
+            count: cartCount,
+            cart,
+            customerName,
+            customerPhone,
+            paymentMethod,
+            discountType,
+            discountValue,
+            couponCode: appliedCoupon?.code || "",
+        };
+        persistHeld([entry, ...heldSales]);
+        notify("info", "Sale held — resume it any time from Held sales");
+        clearCart();
+        setCartOpen(false);
+    };
+
+    const resumeSale = (id) => {
+        const entry = heldSales.find((h) => h.id === id);
+        if (!entry) return;
+        setCart(entry.cart || []);
+        setCustomerName(entry.customerName || "");
+        setCustomerPhone(entry.customerPhone || "");
+        setPaymentMethod(entry.paymentMethod || "cash");
+        setDiscountType(entry.discountType || "percent");
+        setDiscountValue(entry.discountValue || "");
+        if (entry.couponCode) applyCoupon(entry.couponCode); else removeCoupon();
+        persistHeld(heldSales.filter((h) => h.id !== id));
+        setHeldOpen(false);
+        setCartOpen(true);
+    };
+
+    const deleteHeld = (id) => persistHeld(heldSales.filter((h) => h.id !== id));
+
     const completeSale = async () => {
         if (cart.length === 0) return;
         if (isWholesale && cart.some((l) => !(Number(l.unitPrice) >= 0))) {
@@ -492,6 +551,17 @@ export default function SellView({ mode, notify }) {
                                 className="w-full pl-9 pr-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
                             />
                         </div>
+                        {heldSales.length > 0 && (
+                            <button
+                                type="button"
+                                onClick={() => setHeldOpen(true)}
+                                className="shrink-0 inline-flex items-center gap-1.5 px-3 py-2.5 rounded-xl border border-amber-300 bg-amber-50 text-amber-700 text-sm font-semibold hover:bg-amber-100"
+                            >
+                                <FiClock className="w-4 h-4" />
+                                Held
+                                <span className="inline-flex items-center justify-center min-w-5 h-5 px-1 rounded-full bg-amber-500 text-white text-[11px]">{heldSales.length}</span>
+                            </button>
+                        )}
                         {isWholesale && (
                             <span className="hidden sm:inline-flex items-center px-3 py-1.5 rounded-lg bg-amber-100 text-amber-700 text-xs font-semibold">
                                 Wholesale pricing
@@ -552,6 +622,7 @@ export default function SellView({ mode, notify }) {
                     coupon={coupon}
                     discount={discount}
                     total={total}
+                    onHold={holdSale}
                 />
             </aside>
 
@@ -567,6 +638,17 @@ export default function SellView({ mode, notify }) {
                     settings={settings}
                     symbol={symbol}
                     onClose={() => setReceiptOrder(null)}
+                />
+            )}
+
+            {/* Held / parked sales */}
+            {heldOpen && (
+                <HeldSalesModal
+                    heldSales={heldSales}
+                    money={money}
+                    onResume={resumeSale}
+                    onDelete={deleteHeld}
+                    onClose={() => setHeldOpen(false)}
                 />
             )}
 
@@ -616,6 +698,7 @@ export default function SellView({ mode, notify }) {
                             coupon={coupon}
                             discount={discount}
                             total={total}
+                            onHold={holdSale}
                             embedded
                         />
                     </div>
@@ -787,7 +870,7 @@ function CartPanel(props) {
     const {
         mode, cart, money, lineUnit, subtotal, cartCount, changeQty, removeLine, setUnitPrice,
         clearCart, customerName, setCustomerName, customerPhone, setCustomerPhone,
-        paymentMethod, setPaymentMethod, submitting, completeSale, coupon, discount, total, embedded,
+        paymentMethod, setPaymentMethod, submitting, completeSale, coupon, discount, total, onHold, embedded,
     } = props;
     const isWholesale = mode === "wholesale";
     const couponEnabled = coupon?.enabled;
@@ -1033,19 +1116,90 @@ function CartPanel(props) {
                     </div>
                 </div>
 
-                <button
-                    onClick={completeSale}
-                    disabled={cart.length === 0 || submitting}
-                    className="w-full py-3 rounded-xl bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-400 hover:to-emerald-400 disabled:opacity-50 text-white font-semibold flex items-center justify-center gap-2 transition-all"
-                >
-                    {submitting ? (
-                        <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                    ) : (
-                        <><FiCheckCircle className="w-5 h-5" /> Complete {isWholesale ? "wholesale " : ""}sale</>
+                <div className="flex gap-2">
+                    {onHold && (
+                        <button
+                            onClick={onHold}
+                            disabled={cart.length === 0 || submitting}
+                            title="Hold this sale to serve another customer"
+                            className="shrink-0 px-4 py-3 rounded-xl border border-amber-300 text-amber-600 font-semibold flex items-center justify-center gap-1.5 hover:bg-amber-50 disabled:opacity-40"
+                        >
+                            <FiPause className="w-5 h-5" /> Hold
+                        </button>
                     )}
-                </button>
+                    <button
+                        onClick={completeSale}
+                        disabled={cart.length === 0 || submitting}
+                        className="flex-1 py-3 rounded-xl bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-400 hover:to-emerald-400 disabled:opacity-50 text-white font-semibold flex items-center justify-center gap-2 transition-all"
+                    >
+                        {submitting ? (
+                            <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                        ) : (
+                            <><FiCheckCircle className="w-5 h-5" /> Complete {isWholesale ? "wholesale " : ""}sale</>
+                        )}
+                    </button>
+                </div>
             </div>
         </>
+    );
+}
+
+// Lists the sales the cashier has parked on this device. Each can be resumed
+// back into the cart (replacing whatever's there) or discarded.
+function HeldSalesModal({ heldSales, money, onResume, onDelete, onClose }) {
+    const when = (ts) => {
+        const d = new Date(ts);
+        return `${d.toLocaleDateString()} ${d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`;
+    };
+    return (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-black/60" onClick={onClose} />
+            <div className="relative w-full max-w-md bg-white rounded-2xl overflow-hidden shadow-2xl flex flex-col max-h-[88vh]">
+                <div className="flex items-center justify-between p-3 border-b border-slate-100 shrink-0">
+                    <h3 className="font-semibold text-slate-800 flex items-center gap-2 text-sm">
+                        <FiClock className="w-4 h-4 text-amber-500" /> Held sales
+                        <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">{heldSales.length}</span>
+                    </h3>
+                    <button onClick={onClose} className="p-1.5 text-slate-400 hover:text-slate-600">
+                        <FiX className="w-5 h-5" />
+                    </button>
+                </div>
+                <div className="overflow-y-auto p-3 space-y-2">
+                    {heldSales.length === 0 ? (
+                        <div className="py-10 text-center text-slate-300">
+                            <FiClock className="w-10 h-10 mx-auto mb-2" />
+                            <p className="text-sm">No held sales</p>
+                        </div>
+                    ) : (
+                        heldSales.map((h) => (
+                            <div key={h.id} className="flex items-center gap-3 p-3 rounded-xl border border-slate-100 bg-slate-50/60">
+                                <div className="flex-1 min-w-0">
+                                    <p className="text-sm font-semibold text-slate-800 truncate">{h.label}</p>
+                                    <p className="text-[11px] text-slate-400">
+                                        {h.count} item{h.count > 1 ? "s" : ""} · {money(h.total)}
+                                        {h.couponCode ? ` · ${h.couponCode}` : ""}
+                                    </p>
+                                    <p className="text-[11px] text-slate-400">{when(h.at)}</p>
+                                </div>
+                                <button
+                                    onClick={() => onResume(h.id)}
+                                    className="shrink-0 inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-teal-500 text-white text-xs font-semibold hover:bg-teal-400"
+                                >
+                                    <FiPlayCircle className="w-4 h-4" /> Resume
+                                </button>
+                                <button
+                                    onClick={() => onDelete(h.id)}
+                                    title="Discard held sale"
+                                    className="shrink-0 p-2 text-slate-300 hover:text-red-500"
+                                >
+                                    <FiTrash2 className="w-4 h-4" />
+                                </button>
+                            </div>
+                        ))
+                    )}
+                </div>
+            </div>
+        </div>
     );
 }
 
