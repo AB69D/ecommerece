@@ -63,6 +63,13 @@ const orderSchema = new Schema({
         username: { type: String, default: null },
         fullName: { type: String, default: null }
     },
+    // The open POS shift this sale was attributed to (Shift._id), when the
+    // posShift feature is enabled. null for ecommerce / shift-less sales.
+    shiftId: {
+        type: String,
+        default: null,
+        index: true
+    },
     guestId: {
         type: String,
         required: true

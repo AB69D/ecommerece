@@ -12,11 +12,13 @@
 import OrderModel from '../models/order.model.js';
 import ProductModel from '../models/product.model.js';
 import CouponModel from '../models/coupon.model.js';
+import ShiftModel from '../models/shift.model.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { ApiError } from '../lib/ApiError.js';
 import { ok, created } from '../lib/ApiResponse.js';
 import { setHasPermission } from '../lib/permissions.js';
 import { evaluateCoupon } from '../lib/coupon.js';
+import { getSettings } from '../lib/siteSettings.js';
 
 // Net unit price for a product weight after its own discount.
 const retailUnitPrice = (w) => {
@@ -163,6 +165,24 @@ export const createPosSale = asyncHandler(async (req, res) => {
     }
     const isWholesale = saleType === 'wholesale';
 
+    // Resolve the POS shift to attribute this sale to (when the feature is
+    // enabled). Done before touching stock so a `requireShift` rejection
+    // leaves inventory untouched.
+    let shiftId = null;
+    const settings = await getSettings();
+    const shiftEnabled = settings?.features?.posShift !== false;
+    if (shiftEnabled) {
+        const openShift = await ShiftModel.findOne({
+            'cashier.id': String(req.adminDoc?._id),
+            status: 'open',
+        }).select('_id').lean();
+        if (openShift) {
+            shiftId = String(openShift._id);
+        } else if (settings?.pos?.requireShift) {
+            throw ApiError.badRequest('Please open a POS shift before making a sale.');
+        }
+    }
+
     // Load every referenced product once.
     const ids = [...new Set(items.map((i) => i.productId))];
     const products = await ProductModel.find({ _id: { $in: ids } }).lean();
@@ -260,6 +280,7 @@ export const createPosSale = asyncHandler(async (req, res) => {
         source: 'pos',
         saleType: isWholesale ? 'wholesale' : 'retail',
         soldBy: seller,
+        shiftId,
         guestId: `pos_${seller.id || 'staff'}_${Date.now()}`,
         customerName: customerName?.trim() || 'Walk-in Customer',
         customerPhone: customerPhone?.trim() || 'N/A',
