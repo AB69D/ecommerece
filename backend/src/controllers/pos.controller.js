@@ -19,6 +19,7 @@ import { ok, created } from '../lib/ApiResponse.js';
 import { setHasPermission } from '../lib/permissions.js';
 import { evaluateCoupon } from '../lib/coupon.js';
 import { getSettings } from '../lib/siteSettings.js';
+import { recordStockMovements, actorFromReq } from '../lib/stockLedger.js';
 
 // Net unit price for a product weight after its own discount.
 const retailUnitPrice = (w) => {
@@ -311,6 +312,18 @@ export const createPosSale = asyncHandler(async (req, res) => {
         }
     }
 
+    // Record the stock draw-down in the ledger (best-effort, feature-gated).
+    await recordStockMovements(
+        orderItems.map((i) => ({
+            productId: i.productId,
+            productName: i.productName,
+            weightIndex: i.weightIndex,
+            weight: i.weight,
+            delta: -i.quantity,
+        })),
+        { reason: 'sale', channel: 'pos', orderId, actor: seller },
+    );
+
     return created(res, order, 'Sale completed');
 });
 
@@ -348,6 +361,18 @@ export const returnPosSale = asyncHandler(async (req, res) => {
     order.cancelledAt = new Date();
     order.adminNotes = `${order.adminNotes ? `${order.adminNotes}\n` : ''}Returned at POS by ${req.adminDoc?.username || 'staff'}`;
     await order.save();
+
+    // Record the restock in the ledger (best-effort, feature-gated).
+    await recordStockMovements(
+        order.items.map((i) => ({
+            productId: i.productId,
+            productName: i.productName,
+            weightIndex: i.weightIndex,
+            weight: i.weight,
+            delta: i.quantity,
+        })),
+        { reason: 'return', channel: 'pos', orderId: order.orderId, actor: actorFromReq(req) },
+    );
 
     return ok(res, order, 'Sale returned and stock restored');
 });

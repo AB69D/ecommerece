@@ -11,6 +11,7 @@ import ProductModel from '../models/product.model.js';
 import CategoryModel from '../models/category.model.js';
 import OrderModel from '../models/order.model.js';
 import { SiteSettings } from '../models/siteSettings.model.js';
+import { recordStockMovements } from '../lib/stockLedger.js';
 
 // ---- constants ----------------------------------------------------------
 
@@ -429,6 +430,18 @@ async function placeOrder(ctx, symbol) {
             { $inc: { [`weights.${it.weightIndex}.stock`]: -it.quantity } },
         ).catch(() => {});
     }
+
+    // Record the stock draw-down in the ledger (best-effort, feature-gated).
+    await recordStockMovements(
+        items.map((it) => ({
+            productId: it.productId,
+            productName: it.productName,
+            weightIndex: it.weightIndex,
+            weight: it.weight,
+            delta: -it.quantity,
+        })),
+        { reason: 'sale', channel: 'chatbot', orderId: order.orderId },
+    );
 
     const placed = {
         orderId: order.orderId,

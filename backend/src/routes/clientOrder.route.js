@@ -5,6 +5,7 @@ import ProductModel from '../models/product.model.js';
 import CheckoutLeadModel from '../models/checkoutLead.model.js';
 import CouponModel from '../models/coupon.model.js';
 import { evaluateCoupon } from '../lib/coupon.js';
+import { recordStockMovements } from '../lib/stockLedger.js';
 
 const clientOrderRouter = Router();
 
@@ -151,7 +152,20 @@ clientOrderRouter.post('/create', async (req, res) => {
                 );
             }
         }
-        
+
+        // Record the stock draw-down in the ledger (best-effort, feature-gated).
+        // Customer-driven, so there is no actor.
+        await recordStockMovements(
+            orderItems.map((i) => ({
+                productId: i.productId,
+                productName: i.productName,
+                weightIndex: i.weightIndex,
+                weight: i.weight,
+                delta: -i.quantity,
+            })),
+            { reason: 'sale', channel: 'ecommerce', orderId }
+        );
+
         // Clear cart after order
         await CartModel.deleteOne({ guestId });
 

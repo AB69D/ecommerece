@@ -1,5 +1,6 @@
 import OrderModel from "../models/order.model.js";
 import ProductModel from "../models/product.model.js";
+import { recordStockMovements, actorFromReq } from "../lib/stockLedger.js";
 
 export const createOrderController = async (request, response) => {
     try {
@@ -38,6 +39,17 @@ export const createOrderController = async (request, response) => {
                 );
             }
         }
+
+        await recordStockMovements(
+            items.map((i) => ({
+                productId: i.productId,
+                productName: i.productName,
+                weightIndex: i.weightIndex,
+                weight: i.weight,
+                delta: -i.quantity,
+            })),
+            { reason: 'sale', channel: 'admin', orderId, actor: actorFromReq(request) }
+        );
 
         return response.json({
             message: "Order created successfully",
@@ -90,6 +102,17 @@ export const updateOrderStatusController = async (request, response) => {
                     );
                 }
             }
+
+            await recordStockMovements(
+                order.items.map((i) => ({
+                    productId: i.productId,
+                    productName: i.productName,
+                    weightIndex: i.weightIndex,
+                    weight: i.weight,
+                    delta: i.quantity,
+                })),
+                { reason: 'cancel', channel: 'admin', orderId, actor: actorFromReq(request), note: `Order ${orderStatus}` }
+            );
         }
 
         return response.json({
@@ -302,6 +325,19 @@ export const updateStockController = async (request, response) => {
         await ProductModel.updateOne(
             { _id: productId },
             { $inc: { [`weights.${weightIndex}.stock`]: stockChange } }
+        );
+
+        const variant = product.weights[weightIndex] || {};
+        await recordStockMovements(
+            [{
+                productId,
+                productName: `${product.firstName || ''}${product.lastName ? ` ${product.lastName}` : ''}`.trim(),
+                weightIndex: Number(weightIndex),
+                weight: variant.weight || '',
+                delta: stockChange,
+                balanceAfter: currentStock + stockChange,
+            }],
+            { reason: 'adjustment', channel: 'admin', actor: actorFromReq(request), note: `Manual ${action}` }
         );
 
         return response.json({

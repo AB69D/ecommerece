@@ -40,6 +40,7 @@ import customerRouter from './routes/customer.route.js';
 import clientCheckoutRouter from './routes/clientCheckout.route.js';
 import posRouter from './routes/pos.route.js';
 import couponRouter from './routes/coupon.route.js';
+import stockRouter from './routes/stock.route.js';
 
 const app = express();
 
@@ -122,6 +123,7 @@ app.use('/api/admin/rbac', requireAuth, rbacRouter);
 app.use('/api/admin/audit-logs', requireAuth, auditLogRouter);
 app.use('/api/admin/analytics', requireAuth, analyticsRouter);
 app.use('/api/admin/pos', requireAuth, posRouter);
+app.use('/api/admin/stock', requireAuth, stockRouter);
 app.use('/api/admin/customer', requireAuth, customerRouter);
 app.use('/api/admin/coupon', requireAuth, couponRouter.admin);
 app.use('/api/admin/site-settings', requireAuth, siteSettingsRouter.admin);
