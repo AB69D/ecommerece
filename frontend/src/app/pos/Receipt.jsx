@@ -20,6 +20,16 @@ export default function ReceiptModal({ order, settings, symbol = "$", onClose })
     const discount = Number(order.discount || 0);
     const couponCode = order.couponCode || "";
 
+    // The order's `discount` total folds in both a coupon and any manual markdown
+    // the cashier applied. Split them so the receipt itemises each one; the coupon
+    // portion is whatever's left after the manual discount.
+    const manual = order.manualDiscount || null;
+    const manualAmount = Number(manual?.amount || 0);
+    const couponDiscount = Math.max(0, discount - manualAmount);
+    const manualLabel = manual?.type === "percent"
+        ? `Discount (${Number(manual.value)}%)`
+        : "Discount";
+
     // The POS stores tax-inclusive prices, so when the admin enables a tax line
     // we show the tax portion *contained* in the total (keeps totals consistent).
     const taxPercent = Number(pos.taxPercent) || 0;
@@ -128,8 +138,11 @@ export default function ReceiptModal({ order, settings, symbol = "$", onClose })
                             </table>
                             <hr />
                             <div className="row"><span>Subtotal</span><span>{money(subtotal)}</span></div>
-                            {discount > 0 ? (
-                                <div className="row"><span>Discount{couponCode ? ` (${couponCode})` : ""}</span><span>-{money(discount)}</span></div>
+                            {couponDiscount > 0 ? (
+                                <div className="row"><span>Coupon{couponCode ? ` (${couponCode})` : ""}</span><span>-{money(couponDiscount)}</span></div>
+                            ) : null}
+                            {manualAmount > 0 ? (
+                                <div className="row"><span>{manualLabel}</span><span>-{money(manualAmount)}</span></div>
                             ) : null}
                             {showTax ? <div className="row"><span>{taxLabel} ({taxPercent}% incl.)</span><span>{money(taxAmount)}</span></div> : null}
                             <div className="row b big"><span>Total</span><span>{money(total)}</span></div>

@@ -113,6 +113,19 @@ const orderSchema = new Schema({
         type: Number,
         default: 0
     },
+    // Manual ad-hoc markdown applied at the POS counter (separate from a
+    // coupon) — e.g. a wholesale discount. The computed `amount` is also folded
+    // into `discount` above so revenue/profit reports stay correct; this
+    // sub-doc only preserves the percent/flat breakdown for the receipt.
+    manualDiscount: {
+        type: {
+            type: String,
+            enum: ['percent', 'flat', null],
+            default: null
+        },
+        value: { type: Number, default: 0 },
+        amount: { type: Number, default: 0 }
+    },
     totalAmount: {
         type: Number,
         required: true

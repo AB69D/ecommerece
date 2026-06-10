@@ -82,6 +82,9 @@ const siteSettingsSchema = new mongoose.Schema(
             taxLabel: { type: String, default: 'VAT' },
             requireShift: { type: Boolean, default: false },  // force open shift before selling
             allowNegativeStock: { type: Boolean, default: false },
+            // Default % discount pre-filled on a wholesale sale (cashier can edit
+            // or clear it per sale). 0 disables the pre-fill.
+            wholesaleDiscountPercent: { type: Number, default: 0 },
         },
 
         // Web analytics (injected into the storefront <head> when set).

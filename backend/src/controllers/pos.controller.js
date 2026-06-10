@@ -250,11 +250,12 @@ export const createPosSale = asyncHandler(async (req, res) => {
         applied.push(line);
     }
 
-    const subtotal = Math.round(orderItems.reduce((s, i) => s + i.totalPrice, 0) * 100) / 100;
+    const round2 = (n) => Math.round((n || 0) * 100) / 100;
+    const subtotal = round2(orderItems.reduce((s, i) => s + i.totalPrice, 0));
 
     // Re-validate any coupon server-side; an invalid code is ignored (the sale
     // still completes) rather than rejected at the till.
-    let discount = 0;
+    let couponDiscount = 0;
     let appliedCoupon = '';
     let couponDoc = null;
     const wantCoupon = String(couponCode || '').trim().toUpperCase();
@@ -262,13 +263,28 @@ export const createPosSale = asyncHandler(async (req, res) => {
         couponDoc = await CouponModel.findOne({ code: wantCoupon });
         const result = evaluateCoupon(couponDoc, { subtotal, channel: 'pos' });
         if (result.ok && result.discount > 0) {
-            discount = result.discount;
+            couponDiscount = result.discount;
             appliedCoupon = couponDoc.code;
         } else {
             couponDoc = null;
         }
     }
-    const totalAmount = Math.max(0, Math.round((subtotal - discount) * 100) / 100);
+
+    // Manual ad-hoc markdown (e.g. a wholesale discount). Trusted, authenticated
+    // staff input — clamped so it never pushes the total below zero and never
+    // double-counts whatever the coupon already removed.
+    let manualDiscount = { type: null, value: 0, amount: 0 };
+    const dType = req.body.discountType;
+    const dValue = Number(req.body.discountValue);
+    if ((dType === 'percent' || dType === 'flat') && Number.isFinite(dValue) && dValue > 0) {
+        const raw = dType === 'percent' ? subtotal * (Math.min(dValue, 100) / 100) : dValue;
+        const room = Math.max(0, round2(subtotal - couponDiscount));
+        const amount = Math.min(round2(raw), room);
+        manualDiscount = { type: dType, value: round2(dValue), amount };
+    }
+
+    const discount = round2(couponDiscount + manualDiscount.amount);
+    const totalAmount = Math.max(0, round2(subtotal - discount));
 
     const seller = sellerSnapshot(req);
 
@@ -294,6 +310,7 @@ export const createPosSale = asyncHandler(async (req, res) => {
         deliveryCharge: 0,
         couponCode: appliedCoupon,
         discount,
+        manualDiscount,
         totalAmount,
         paymentMethod: ['cash', 'card', 'online'].includes(paymentMethod) ? paymentMethod : 'cash',
         paymentStatus: 'paid',

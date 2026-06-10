@@ -47,6 +47,11 @@ export default function SellView({ mode, notify }) {
     const [couponError, setCouponError] = useState("");
     const [couponLoading, setCouponLoading] = useState(false);
 
+    // Manual order-level discount (percent or flat). The headline tool for
+    // wholesale, where a blanket markdown is the norm; also usable at retail.
+    const [discountType, setDiscountType] = useState("percent");
+    const [discountValue, setDiscountValue] = useState("");
+
     // Barcode scanner: USB/manual input + optional camera (native BarcodeDetector).
     const [scanCode, setScanCode] = useState("");
     const [scanning, setScanning] = useState(false);
@@ -68,8 +73,18 @@ export default function SellView({ mode, notify }) {
 
     useEffect(() => {
         setCameraSupported(typeof window !== "undefined" && "BarcodeDetector" in window);
-        getPosSettings().then((res) => { if (res?.success) setSettings(res.data); }).catch(() => {});
-    }, []);
+        getPosSettings().then((res) => {
+            if (!res?.success) return;
+            setSettings(res.data);
+            // Pre-fill the configured default wholesale discount so the cashier
+            // doesn't have to type it on every wholesale sale.
+            const wpct = Number(res.data?.pos?.wholesaleDiscountPercent) || 0;
+            if (isWholesale && wpct > 0) {
+                setDiscountType("percent");
+                setDiscountValue(String(wpct));
+            }
+        }).catch(() => {});
+    }, [isWholesale]);
 
     const refreshQueue = useCallback(async () => {
         setQueuedCount(await countQueued());
@@ -148,7 +163,19 @@ export default function SellView({ mode, notify }) {
 
     const couponsEnabled = !isWholesale && settings?.features?.coupons !== false;
     const couponDiscount = couponsEnabled ? Math.min(appliedCoupon?.discount || 0, subtotal) : 0;
-    const total = Math.max(0, subtotal - couponDiscount);
+
+    // Manual discount amount derived from the cashier's percent/flat input,
+    // mirroring the server-side clamp (never below zero, never double-counting
+    // whatever the coupon already removed).
+    const manualDiscountAmount = useMemo(() => {
+        const v = Number(discountValue);
+        if (!Number.isFinite(v) || v <= 0) return 0;
+        const raw = discountType === "percent" ? subtotal * (Math.min(v, 100) / 100) : v;
+        const room = Math.max(0, subtotal - couponDiscount);
+        return Math.min(Math.round(raw * 100) / 100, room);
+    }, [discountValue, discountType, subtotal, couponDiscount]);
+
+    const total = Math.max(0, subtotal - couponDiscount - manualDiscountAmount);
 
     const applyCoupon = useCallback(async (rawCode) => {
         const code = String(rawCode || "").trim();
@@ -291,6 +318,10 @@ export default function SellView({ mode, notify }) {
         setAppliedCoupon(null);
         setCouponInput("");
         setCouponError("");
+        // Reset the discount, re-applying the wholesale default for the next sale.
+        const wpct = Number(settings?.pos?.wholesaleDiscountPercent) || 0;
+        setDiscountType("percent");
+        setDiscountValue(isWholesale && wpct > 0 ? String(wpct) : "");
     };
 
     const completeSale = async () => {
@@ -306,6 +337,7 @@ export default function SellView({ mode, notify }) {
             customerName: customerName.trim() || undefined,
             customerPhone: customerPhone.trim() || undefined,
             ...(couponsEnabled && appliedCoupon?.code ? { couponCode: appliedCoupon.code } : {}),
+            ...(manualDiscountAmount > 0 ? { discountType, discountValue: Number(discountValue) } : {}),
             items: cart.map((l) => ({
                 productId: l.productId,
                 weightIndex: l.weightIndex,
@@ -366,6 +398,15 @@ export default function SellView({ mode, notify }) {
         remove: removeCoupon,
         discount: couponDiscount,
         total,
+    };
+
+    const discount = {
+        type: discountType,
+        setType: setDiscountType,
+        value: discountValue,
+        setValue: setDiscountValue,
+        amount: manualDiscountAmount,
+        isWholesale,
     };
 
     return (
@@ -509,6 +550,8 @@ export default function SellView({ mode, notify }) {
                     submitting={submitting}
                     completeSale={completeSale}
                     coupon={coupon}
+                    discount={discount}
+                    total={total}
                 />
             </aside>
 
@@ -571,6 +614,8 @@ export default function SellView({ mode, notify }) {
                             submitting={submitting}
                             completeSale={completeSale}
                             coupon={coupon}
+                            discount={discount}
+                            total={total}
                             embedded
                         />
                     </div>
@@ -742,13 +787,16 @@ function CartPanel(props) {
     const {
         mode, cart, money, lineUnit, subtotal, cartCount, changeQty, removeLine, setUnitPrice,
         clearCart, customerName, setCustomerName, customerPhone, setCustomerPhone,
-        paymentMethod, setPaymentMethod, submitting, completeSale, coupon, embedded,
+        paymentMethod, setPaymentMethod, submitting, completeSale, coupon, discount, total, embedded,
     } = props;
     const isWholesale = mode === "wholesale";
     const couponEnabled = coupon?.enabled;
     const couponApplied = coupon?.applied;
     const couponDiscount = coupon?.discount || 0;
-    const grandTotal = couponEnabled ? (coupon?.total ?? subtotal) : subtotal;
+    const manualDiscount = discount?.amount || 0;
+    // The parent computes the authoritative total (subtotal − coupon − manual
+    // discount, clamped at zero); fall back to subtotal if it wasn't passed.
+    const grandTotal = total ?? subtotal;
 
     return (
         <>
@@ -904,18 +952,80 @@ function CartPanel(props) {
                     </div>
                 )}
 
+                {/* Manual order-level discount (percent / flat). The headline tool
+                    for wholesale, where a blanket markdown is expected. */}
+                {discount && cart.length > 0 && (
+                    <div className="space-y-1.5">
+                        <div className="flex items-center gap-2">
+                            <div className="flex rounded-lg border border-slate-200 overflow-hidden shrink-0">
+                                <button
+                                    type="button"
+                                    onClick={() => discount.setType("percent")}
+                                    className={`px-2.5 py-2 text-xs font-semibold transition-colors ${
+                                        discount.type === "percent" ? "bg-amber-500 text-white" : "bg-white text-slate-500 hover:bg-slate-50"
+                                    }`}
+                                >
+                                    %
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => discount.setType("flat")}
+                                    className={`px-2.5 py-2 text-xs font-semibold border-l border-slate-200 transition-colors ${
+                                        discount.type === "flat" ? "bg-amber-500 text-white" : "bg-white text-slate-500 hover:bg-slate-50"
+                                    }`}
+                                >
+                                    {money(0).replace(/[0-9.,\s]/g, "") || "$"}
+                                </button>
+                            </div>
+                            <div className="relative flex-1">
+                                <FiTag className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-amber-400" />
+                                <input
+                                    type="number"
+                                    min="0"
+                                    step="0.01"
+                                    value={discount.value}
+                                    onChange={(e) => discount.setValue(e.target.value)}
+                                    placeholder={discount.type === "percent" ? "Discount %" : "Discount amount"}
+                                    className="w-full pl-8 pr-2 py-2 text-xs bg-amber-50/50 border border-amber-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-amber-400"
+                                />
+                            </div>
+                            {Number(discount.value) > 0 && (
+                                <button
+                                    type="button"
+                                    onClick={() => discount.setValue("")}
+                                    className="shrink-0 text-slate-300 hover:text-red-500"
+                                    title="Clear discount"
+                                >
+                                    <FiX className="w-4 h-4" />
+                                </button>
+                            )}
+                        </div>
+                    </div>
+                )}
+
                 <div className="space-y-1 text-sm">
+                    {(couponDiscount > 0 || manualDiscount > 0) && (
+                        <div className="flex items-center justify-between text-slate-500">
+                            <span>Subtotal</span>
+                            <span>{money(subtotal)}</span>
+                        </div>
+                    )}
                     {couponEnabled && couponDiscount > 0 && (
-                        <>
-                            <div className="flex items-center justify-between text-slate-500">
-                                <span>Subtotal</span>
-                                <span>{money(subtotal)}</span>
-                            </div>
-                            <div className="flex items-center justify-between text-emerald-600">
-                                <span>Discount</span>
-                                <span>−{money(couponDiscount)}</span>
-                            </div>
-                        </>
+                        <div className="flex items-center justify-between text-emerald-600">
+                            <span>Coupon discount</span>
+                            <span>−{money(couponDiscount)}</span>
+                        </div>
+                    )}
+                    {manualDiscount > 0 && (
+                        <div className="flex items-center justify-between text-amber-600">
+                            <span>
+                                Discount
+                                {discount?.type === "percent" && Number(discount?.value) > 0 && (
+                                    <span className="text-amber-400 font-normal"> ({Number(discount.value)}%)</span>
+                                )}
+                            </span>
+                            <span>−{money(manualDiscount)}</span>
+                        </div>
                     )}
                     <div className="flex items-center justify-between">
                         <span className="text-slate-500">Total</span>

@@ -53,6 +53,7 @@ const pos = z
         taxLabel: z.string().max(20),
         requireShift: z.boolean(),
         allowNegativeStock: z.boolean(),
+        wholesaleDiscountPercent: z.number().min(0).max(100),
     })
     .partial();
 

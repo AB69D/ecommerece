@@ -179,6 +179,7 @@ export default function SettingsPage() {
                     taxLabel: settings.pos?.taxLabel || "VAT",
                     requireShift: !!settings.pos?.requireShift,
                     allowNegativeStock: !!settings.pos?.allowNegativeStock,
+                    wholesaleDiscountPercent: Number(settings.pos?.wholesaleDiscountPercent) || 0,
                 },
                 analytics: {
                     ga4Id: settings.analytics?.ga4Id || "",
@@ -402,9 +403,14 @@ export default function SettingsPage() {
                                     <input type="number" min="0" max="100" step="0.01" className={inputCls} value={settings.pos?.taxPercent ?? 0} onChange={(e) => setPos({ taxPercent: e.target.value })} />
                                 </Field>
                             </div>
-                            <Field label="Tax label" hint="e.g. VAT, GST, Sales Tax.">
-                                <input className={inputCls} value={settings.pos?.taxLabel || ""} onChange={(e) => setPos({ taxLabel: e.target.value })} />
-                            </Field>
+                            <div className="grid grid-cols-2 gap-3">
+                                <Field label="Tax label" hint="e.g. VAT, GST, Sales Tax.">
+                                    <input className={inputCls} value={settings.pos?.taxLabel || ""} onChange={(e) => setPos({ taxLabel: e.target.value })} />
+                                </Field>
+                                <Field label="Default wholesale discount %" hint="Pre-filled on wholesale sales. Cashier can edit or clear it. 0 = off.">
+                                    <input type="number" min="0" max="100" step="0.01" className={inputCls} value={settings.pos?.wholesaleDiscountPercent ?? 0} onChange={(e) => setPos({ wholesaleDiscountPercent: e.target.value })} />
+                                </Field>
+                            </div>
                             <Toggle label="Require an open shift before selling" checked={!!settings.pos?.requireShift} onChange={(v) => setPos({ requireShift: v })} />
                             <Toggle label="Allow selling into negative stock" checked={!!settings.pos?.allowNegativeStock} onChange={(v) => setPos({ allowNegativeStock: v })} />
                         </div>

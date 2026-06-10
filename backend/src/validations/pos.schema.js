@@ -18,6 +18,10 @@ export const createSaleSchema = z.object({
     notes: z.string().max(400).optional(),
     // Optional cart-level coupon code applied at the till.
     couponCode: z.string().max(40).optional(),
+    // Optional manual markdown applied by the cashier (e.g. wholesale discount).
+    // `percent` is a 0–100 rate; `flat` is a fixed currency amount off the subtotal.
+    discountType: z.enum(['percent', 'flat']).optional(),
+    discountValue: z.coerce.number().nonnegative().max(10_000_000).optional(),
 });
 
 export const returnSaleSchema = z.object({
