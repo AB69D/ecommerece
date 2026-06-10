@@ -17,6 +17,8 @@ export default function ReceiptModal({ order, settings, symbol = "$", onClose })
     const items = order.items || [];
     const subtotal = Number(order.subtotal ?? order.totalAmount ?? 0);
     const total = Number(order.totalAmount ?? subtotal);
+    const discount = Number(order.discount || 0);
+    const couponCode = order.couponCode || "";
 
     // The POS stores tax-inclusive prices, so when the admin enables a tax line
     // we show the tax portion *contained* in the total (keeps totals consistent).
@@ -126,6 +128,9 @@ export default function ReceiptModal({ order, settings, symbol = "$", onClose })
                             </table>
                             <hr />
                             <div className="row"><span>Subtotal</span><span>{money(subtotal)}</span></div>
+                            {discount > 0 ? (
+                                <div className="row"><span>Discount{couponCode ? ` (${couponCode})` : ""}</span><span>-{money(discount)}</span></div>
+                            ) : null}
                             {showTax ? <div className="row"><span>{taxLabel} ({taxPercent}% incl.)</span><span>{money(taxAmount)}</span></div> : null}
                             <div className="row b big"><span>Total</span><span>{money(total)}</span></div>
                             <div className="row"><span>Paid</span><span style={{ textTransform: "capitalize" }}>{order.paymentMethod}</span></div>

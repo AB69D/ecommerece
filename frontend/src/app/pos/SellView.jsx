@@ -3,10 +3,11 @@ import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import Image from "next/image";
 import {
     FiSearch, FiPlus, FiMinus, FiTrash2, FiShoppingCart, FiX, FiPackage,
-    FiCreditCard, FiDollarSign, FiUser, FiPhone, FiCheckCircle, FiCamera,
+    FiCreditCard, FiDollarSign, FiUser, FiPhone, FiCheckCircle, FiCamera, FiTag,
 } from "react-icons/fi";
 import { useCurrency } from "@/context/CurrencyContext.jsx";
 import { getPosProducts, createPosSale, lookupPosProductByCode, getPosSettings } from "@/services/pos";
+import { validateCouponAdmin } from "@/services/coupons";
 import ReceiptModal from "./Receipt.jsx";
 
 // Small inline barcode glyph (no extra icon dependency).
@@ -37,6 +38,12 @@ export default function SellView({ mode, notify }) {
     const [paymentMethod, setPaymentMethod] = useState("cash");
     const [submitting, setSubmitting] = useState(false);
     const [cartOpen, setCartOpen] = useState(false);
+
+    // Cart-level coupon (retail only — wholesale already uses custom pricing).
+    const [couponInput, setCouponInput] = useState("");
+    const [appliedCoupon, setAppliedCoupon] = useState(null);
+    const [couponError, setCouponError] = useState("");
+    const [couponLoading, setCouponLoading] = useState(false);
 
     // Barcode scanner: USB/manual input + optional camera (native BarcodeDetector).
     const [scanCode, setScanCode] = useState("");
@@ -89,6 +96,64 @@ export default function SellView({ mode, notify }) {
     const cartCount = cart.reduce((s, l) => s + l.quantity, 0);
     const lineUnit = useCallback((l) => (isWholesale ? Number(l.unitPrice) || 0 : l.salePrice), [isWholesale]);
     const subtotal = cart.reduce((s, l) => s + lineUnit(l) * l.quantity, 0);
+
+    const couponsEnabled = !isWholesale && settings?.features?.coupons !== false;
+    const couponDiscount = couponsEnabled ? Math.min(appliedCoupon?.discount || 0, subtotal) : 0;
+    const total = Math.max(0, subtotal - couponDiscount);
+
+    const applyCoupon = useCallback(async (rawCode) => {
+        const code = String(rawCode || "").trim();
+        if (!code) return;
+        setCouponLoading(true);
+        setCouponError("");
+        try {
+            const res = await validateCouponAdmin(code, subtotal, "pos");
+            if (res?.valid && res.coupon) {
+                setAppliedCoupon(res.coupon);
+                setCouponInput("");
+                notify("success", `Coupon ${res.coupon.code} applied`);
+            } else {
+                setAppliedCoupon(null);
+                setCouponError(res?.reason || "Invalid coupon");
+            }
+        } catch {
+            setCouponError("Could not validate coupon");
+        } finally {
+            setCouponLoading(false);
+        }
+    }, [subtotal, notify]);
+
+    const removeCoupon = useCallback(() => {
+        setAppliedCoupon(null);
+        setCouponInput("");
+        setCouponError("");
+    }, []);
+
+    // Re-validate an applied coupon when the cart subtotal changes — a minimum
+    // spend may no longer be met after removing items. Silently drops the coupon
+    // and surfaces the reason so the cashier isn't surprised at total time.
+    useEffect(() => {
+        if (!appliedCoupon?.code) return;
+        if (!couponsEnabled) { setAppliedCoupon(null); return; }
+        let cancelled = false;
+        (async () => {
+            try {
+                const res = await validateCouponAdmin(appliedCoupon.code, subtotal, "pos");
+                if (cancelled) return;
+                if (res?.valid && res.coupon) {
+                    setAppliedCoupon(res.coupon);
+                } else {
+                    setAppliedCoupon(null);
+                    setCouponError(res?.reason || "Coupon no longer valid");
+                    notify("info", `Coupon removed: ${res?.reason || "no longer valid"}`);
+                }
+            } catch { /* keep current coupon on transient errors */ }
+        })();
+        return () => { cancelled = true; };
+        // Re-run only when the subtotal or applied code changes (not on every
+        // appliedCoupon object identity change) to avoid an update loop.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [subtotal, appliedCoupon?.code, couponsEnabled]);
 
     const addToCart = (product, variant) => {
         if (variant.stock <= 0) return;
@@ -170,7 +235,14 @@ export default function SellView({ mode, notify }) {
         setCart((prev) => prev.map((l) => (l.key === key ? { ...l, unitPrice: value } : l)));
 
     const removeLine = (key) => setCart((prev) => prev.filter((l) => l.key !== key));
-    const clearCart = () => { setCart([]); setCustomerName(""); setCustomerPhone(""); };
+    const clearCart = () => {
+        setCart([]);
+        setCustomerName("");
+        setCustomerPhone("");
+        setAppliedCoupon(null);
+        setCouponInput("");
+        setCouponError("");
+    };
 
     const completeSale = async () => {
         if (cart.length === 0) return;
@@ -185,6 +257,7 @@ export default function SellView({ mode, notify }) {
                 paymentMethod,
                 customerName: customerName.trim() || undefined,
                 customerPhone: customerPhone.trim() || undefined,
+                ...(couponsEnabled && appliedCoupon?.code ? { couponCode: appliedCoupon.code } : {}),
                 items: cart.map((l) => ({
                     productId: l.productId,
                     weightIndex: l.weightIndex,
@@ -207,6 +280,19 @@ export default function SellView({ mode, notify }) {
         } finally {
             setSubmitting(false);
         }
+    };
+
+    const coupon = {
+        enabled: couponsEnabled,
+        input: couponInput,
+        setInput: setCouponInput,
+        applied: appliedCoupon,
+        error: couponError,
+        loading: couponLoading,
+        apply: applyCoupon,
+        remove: removeCoupon,
+        discount: couponDiscount,
+        total,
     };
 
     return (
@@ -320,6 +406,7 @@ export default function SellView({ mode, notify }) {
                     setPaymentMethod={setPaymentMethod}
                     submitting={submitting}
                     completeSale={completeSale}
+                    coupon={coupon}
                 />
             </aside>
 
@@ -345,7 +432,7 @@ export default function SellView({ mode, notify }) {
                     className="lg:hidden fixed bottom-20 right-4 z-[65] flex items-center gap-2 px-5 py-3.5 rounded-full bg-teal-500 text-white font-semibold shadow-xl shadow-teal-500/30"
                 >
                     <FiShoppingCart className="w-5 h-5" />
-                    {cartCount} · {money(subtotal)}
+                    {cartCount} · {money(total)}
                 </button>
             )}
 
@@ -381,6 +468,7 @@ export default function SellView({ mode, notify }) {
                             setPaymentMethod={setPaymentMethod}
                             submitting={submitting}
                             completeSale={completeSale}
+                            coupon={coupon}
                             embedded
                         />
                     </div>
@@ -552,9 +640,13 @@ function CartPanel(props) {
     const {
         mode, cart, money, lineUnit, subtotal, cartCount, changeQty, removeLine, setUnitPrice,
         clearCart, customerName, setCustomerName, customerPhone, setCustomerPhone,
-        paymentMethod, setPaymentMethod, submitting, completeSale, embedded,
+        paymentMethod, setPaymentMethod, submitting, completeSale, coupon, embedded,
     } = props;
     const isWholesale = mode === "wholesale";
+    const couponEnabled = coupon?.enabled;
+    const couponApplied = coupon?.applied;
+    const couponDiscount = coupon?.discount || 0;
+    const grandTotal = couponEnabled ? (coupon?.total ?? subtotal) : subtotal;
 
     return (
         <>
@@ -659,9 +751,74 @@ function CartPanel(props) {
                     <PayBtn active={paymentMethod === "card"} onClick={() => setPaymentMethod("card")} icon={<FiCreditCard className="w-4 h-4" />} label="Card" />
                 </div>
 
-                <div className="flex items-center justify-between text-sm">
-                    <span className="text-slate-500">Total</span>
-                    <span className="text-xl font-bold text-slate-900">{money(subtotal)}</span>
+                {couponEnabled && cart.length > 0 && (
+                    <div className="space-y-1.5">
+                        {couponApplied ? (
+                            <div className="flex items-center justify-between gap-2 px-2.5 py-2 rounded-lg bg-emerald-50 border border-emerald-200">
+                                <span className="flex items-center gap-1.5 text-xs font-semibold text-emerald-700 min-w-0">
+                                    <FiTag className="w-3.5 h-3.5 shrink-0" />
+                                    <span className="truncate">{couponApplied.code}</span>
+                                    {couponApplied.type === "percent" && (
+                                        <span className="text-emerald-500 font-normal">({couponApplied.value}% off)</span>
+                                    )}
+                                </span>
+                                <button
+                                    onClick={coupon.remove}
+                                    className="text-emerald-500 hover:text-red-500 shrink-0"
+                                    title="Remove coupon"
+                                >
+                                    <FiX className="w-4 h-4" />
+                                </button>
+                            </div>
+                        ) : (
+                            <form
+                                onSubmit={(e) => { e.preventDefault(); coupon.apply(coupon.input); }}
+                                className="flex items-center gap-2"
+                            >
+                                <div className="relative flex-1">
+                                    <FiTag className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+                                    <input
+                                        value={coupon.input}
+                                        onChange={(e) => coupon.setInput(e.target.value.toUpperCase())}
+                                        placeholder="Coupon code"
+                                        autoCapitalize="characters"
+                                        autoComplete="off"
+                                        spellCheck={false}
+                                        className="w-full pl-8 pr-2 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-teal-400 uppercase"
+                                    />
+                                </div>
+                                <button
+                                    type="submit"
+                                    disabled={!coupon.input.trim() || coupon.loading}
+                                    className="shrink-0 px-3 py-2 rounded-lg bg-slate-800 text-white text-xs font-semibold hover:bg-slate-700 disabled:opacity-50"
+                                >
+                                    {coupon.loading ? "…" : "Apply"}
+                                </button>
+                            </form>
+                        )}
+                        {coupon.error && !couponApplied && (
+                            <p className="text-[11px] text-red-500">{coupon.error}</p>
+                        )}
+                    </div>
+                )}
+
+                <div className="space-y-1 text-sm">
+                    {couponEnabled && couponDiscount > 0 && (
+                        <>
+                            <div className="flex items-center justify-between text-slate-500">
+                                <span>Subtotal</span>
+                                <span>{money(subtotal)}</span>
+                            </div>
+                            <div className="flex items-center justify-between text-emerald-600">
+                                <span>Discount</span>
+                                <span>−{money(couponDiscount)}</span>
+                            </div>
+                        </>
+                    )}
+                    <div className="flex items-center justify-between">
+                        <span className="text-slate-500">Total</span>
+                        <span className="text-xl font-bold text-slate-900">{money(grandTotal)}</span>
+                    </div>
                 </div>
 
                 <button

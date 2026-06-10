@@ -99,6 +99,7 @@ export default function AdminLayout({ children }) {
                 { name: 'Honey & Sweets', path: '/admin/honey-sweets', icon: <FiPackage className="w-5 h-5" />, perms: ['product:read'] },
                 { name: 'Stock Management', path: '/admin/stock', icon: <FiTruck className="w-5 h-5" />, perms: ['inventory:read'] },
                 { name: 'Discounts', path: '/admin/discount', icon: <FiPercent className="w-5 h-5" />, perms: ['discount:read'] },
+                { name: 'Coupons', path: '/admin/coupons', icon: <FiTag className="w-5 h-5" />, perms: ['discount:read'] },
             ],
         },
         {

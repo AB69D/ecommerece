@@ -1,8 +1,9 @@
 "use client";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { FiArrowLeft, FiCheck } from "react-icons/fi";
+import { FiArrowLeft, FiCheck, FiTag, FiX } from "react-icons/fi";
 import { useCurrency } from "@/context/CurrencyContext.jsx";
+import { validateCouponPublic } from "@/services/coupons";
 
 export default function CheckoutPage() {
     const [cart, setCart] = useState(null);
@@ -10,6 +11,10 @@ export default function CheckoutPage() {
     const [placingOrder, setPlacingOrder] = useState(false);
     const [orderPlaced, setOrderPlaced] = useState(false);
     const [orderData, setOrderData] = useState(null);
+    const [couponInput, setCouponInput] = useState("");
+    const [appliedCoupon, setAppliedCoupon] = useState(null); // { code, discount, description }
+    const [couponError, setCouponError] = useState("");
+    const [couponLoading, setCouponLoading] = useState(false);
     const { symbol } = useCurrency();
     const router = useRouter();
 
@@ -94,6 +99,32 @@ export default function CheckoutPage() {
         setFormData({ ...formData, [e.target.name]: e.target.value });
     };
 
+    // Coupon base = the cart's after-item-discount total (matches the value the
+    // backend treats as the order subtotal when recomputing the discount).
+    const applyCoupon = async () => {
+        const code = couponInput.trim();
+        if (!code) return;
+        setCouponError("");
+        setCouponLoading(true);
+        try {
+            const base = cart?.totalAmount ?? 0;
+            const res = await validateCouponPublic(code, base, "ecommerce");
+            if (res?.success && res.data?.valid && res.data.coupon) {
+                setAppliedCoupon(res.data.coupon);
+                setCouponInput("");
+            } else {
+                setAppliedCoupon(null);
+                setCouponError(res?.data?.reason || res?.message || "Invalid coupon code");
+            }
+        } catch {
+            setCouponError("Could not validate coupon");
+        } finally {
+            setCouponLoading(false);
+        }
+    };
+
+    const removeCoupon = () => { setAppliedCoupon(null); setCouponError(""); };
+
     const handleSubmit = async (e) => {
         e.preventDefault();
         setPlacingOrder(true);
@@ -106,7 +137,7 @@ export default function CheckoutPage() {
                     'Content-Type': 'application/json',
                     'guest-id': guestId
                 },
-                body: JSON.stringify(formData)
+                body: JSON.stringify({ ...formData, couponCode: appliedCoupon?.code || "" })
             });
             const data = await res.json();
 
@@ -138,8 +169,9 @@ export default function CheckoutPage() {
     const subtotal = items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
     const totalDiscount = items.reduce((sum, item) => sum + getItemDiscount(item), 0);
     const afterDiscount = subtotal - totalDiscount;
-    
-    const totalAmount = afterDiscount + deliveryCharges[formData.deliveryArea];
+
+    const couponDiscount = Math.min(appliedCoupon?.discount || 0, afterDiscount);
+    const totalAmount = Math.max(0, afterDiscount - couponDiscount) + deliveryCharges[formData.deliveryArea];
 
     if (orderPlaced && orderData) {
         return (
@@ -316,6 +348,37 @@ export default function CheckoutPage() {
                                 </div>
                             ))}
                         </div>
+                        {/* Coupon code */}
+                        <div className="border-t mt-4 pt-4">
+                            {appliedCoupon ? (
+                                <div className="flex items-center justify-between bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2">
+                                    <div className="flex items-center gap-2 min-w-0">
+                                        <FiTag className="w-4 h-4 text-emerald-600 shrink-0" />
+                                        <span className="text-sm font-semibold text-emerald-700 font-mono truncate">{appliedCoupon.code}</span>
+                                    </div>
+                                    <button type="button" onClick={removeCoupon} className="text-emerald-700 hover:text-emerald-900 p-1" aria-label="Remove coupon">
+                                        <FiX className="w-4 h-4" />
+                                    </button>
+                                </div>
+                            ) : (
+                                <div>
+                                    <div className="flex gap-2">
+                                        <input
+                                            value={couponInput}
+                                            onChange={(e) => { setCouponInput(e.target.value.toUpperCase()); setCouponError(""); }}
+                                            onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); applyCoupon(); } }}
+                                            placeholder="Coupon code"
+                                            className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono uppercase outline-none focus:ring-2 focus:ring-emerald-500"
+                                        />
+                                        <button type="button" onClick={applyCoupon} disabled={couponLoading || !couponInput.trim()} className="px-4 py-2 rounded-lg bg-gray-800 text-white text-sm font-medium hover:bg-gray-900 disabled:opacity-50">
+                                            {couponLoading ? "…" : "Apply"}
+                                        </button>
+                                    </div>
+                                    {couponError && <p className="text-xs text-red-500 mt-1.5">{couponError}</p>}
+                                </div>
+                            )}
+                        </div>
+
                         <div className="border-t mt-4 pt-4 space-y-2">
                             <div className="flex justify-between text-gray-600">
                                 <span>Subtotal</span>
@@ -325,6 +388,12 @@ export default function CheckoutPage() {
                                 <div className="flex justify-between text-emerald-600">
                                     <span>Discount</span>
                                     <span>-{symbol}{totalDiscount.toFixed(0)}</span>
+                                </div>
+                            )}
+                            {couponDiscount > 0 && (
+                                <div className="flex justify-between text-emerald-600">
+                                    <span>Coupon ({appliedCoupon?.code})</span>
+                                    <span>-{symbol}{couponDiscount.toFixed(0)}</span>
                                 </div>
                             )}
                             <div className="flex justify-between text-gray-600">
