@@ -34,6 +34,7 @@ const FEATURE_FLAGS = [
     ["pwa", "Installable app (PWA)", "Allow installing the store / POS as an app."],
     ["whatsapp", "WhatsApp notifications", "Send order updates over WhatsApp."],
     ["analytics", "Web analytics", "Inject GA4 / Pixel / GTM tags into the storefront."],
+    ["productReviews", "Product reviews", "Let shoppers rate and review products."],
 ];
 
 function Field({ label, hint, children }) {

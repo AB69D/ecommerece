@@ -6,12 +6,14 @@ import { FaStar, FaStarHalfAlt, FaRegStar } from "react-icons/fa";
 import { PiWhatsappLogoBold } from "react-icons/pi";
 import { useCurrency } from "@/context/CurrencyContext.jsx";
 import { useWhatsApp } from "@/hooks/useWhatsApp";
+import { useFeature } from "@/hooks/useSiteSettings";
 
 function TrackOrderContent() {
     const searchParams = useSearchParams();
     const router = useRouter();
     const { symbol } = useCurrency();
     const wa = useWhatsApp();
+    const reviewsEnabled = useFeature("productReviews");
     const [orders, setOrders] = useState([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
@@ -310,8 +312,8 @@ function TrackOrderContent() {
                                 </div>
                             )}
 
-                            {/* Review Section - Only for delivered orders */}
-                            {selectedOrder.orderStatus === 'delivered' && (
+                            {/* Review Section - Only for delivered orders (and when reviews are enabled) */}
+                            {reviewsEnabled && selectedOrder.orderStatus === 'delivered' && (
                                 <div className="mt-6 p-5 bg-gradient-to-br from-emerald-50 to-white rounded-xl border border-emerald-200">
                                     {reviewSubmitted ? (
                                         <div className="text-center py-4">

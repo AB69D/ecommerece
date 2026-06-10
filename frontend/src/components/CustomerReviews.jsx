@@ -3,6 +3,7 @@ import React, { useState, useEffect, useCallback, useRef } from "react";
 import { FiArrowLeft, FiArrowRight } from "react-icons/fi";
 import { FaStar, FaStarHalfAlt, FaRegStar, FaQuoteLeft } from "react-icons/fa";
 import { getReviews } from "@/utils/review";
+import { useFeature } from "@/hooks/useSiteSettings";
 
 const renderStars = (rating) => {
     const stars = [];
@@ -22,6 +23,7 @@ const renderStars = (rating) => {
 };
 
 export default function CustomerReviews() {
+    const reviewsEnabled = useFeature("productReviews");
     const [reviews, setReviews] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
@@ -29,6 +31,10 @@ export default function CustomerReviews() {
     const sliderRef = useRef(null);
 
     useEffect(() => {
+        if (!reviewsEnabled) {
+            setLoading(false);
+            return;
+        }
         const fetchReviews = async () => {
             try {
                 const result = await getReviews();
@@ -45,7 +51,7 @@ export default function CustomerReviews() {
         };
 
         fetchReviews();
-    }, []);
+    }, [reviewsEnabled]);
 
     useEffect(() => {
         if (reviews.length <= 1) return;
@@ -66,6 +72,9 @@ export default function CustomerReviews() {
     const goPrev = useCallback(() => {
         setCurrent((prev) => (prev - 1 + reviews.length) % reviews.length);
     }, [reviews.length]);
+
+    // Admin turned reviews off — hide the testimonials carousel entirely.
+    if (!reviewsEnabled) return null;
 
     if (loading) {
         return (

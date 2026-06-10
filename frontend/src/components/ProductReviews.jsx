@@ -4,8 +4,10 @@ import { FiStar, FiImage, FiVideo, FiX, FiCheck } from "react-icons/fi";
 import { FaStar } from "react-icons/fa";
 import StarRating from "./StarRating.jsx";
 import { invalidateRating } from "@/lib/ratings.js";
+import { useFeature } from "@/hooks/useSiteSettings";
 
 export default function ProductReviews({ productId, productName }) {
+    const reviewsEnabled = useFeature("productReviews");
     const [data, setData] = useState(null);
     const [loading, setLoading] = useState(true);
     const [showForm, setShowForm] = useState(false);
@@ -100,6 +102,9 @@ export default function ProductReviews({ productId, productName }) {
     const count = data?.count || 0;
     const distribution = data?.distribution || { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
     const reviews = data?.reviews || [];
+
+    // Admin turned reviews off — hide the whole section.
+    if (!reviewsEnabled) return null;
 
     return (
         <section className="mt-10 sm:mt-14 border-t border-gray-200 pt-8">
