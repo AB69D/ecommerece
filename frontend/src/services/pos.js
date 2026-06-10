@@ -82,6 +82,24 @@ export const getPosSales = (params) => posFetch(`/pos/sales${qs(params)}`).then(
 
 export const getPosReport = () => posFetch(`/pos/report`).then(json);
 
+// ---- POS shift / cash-drawer ----
+
+// The caller's open shift (with live drawer figures) or { enabled, shift:null }.
+export const getCurrentShift = () => posFetch(`/pos/shift/current`).then(json);
+
+export const openShift = (payload) =>
+    posFetch(`/pos/shift/open`, { method: "POST", headers: jsonHeaders, body: JSON.stringify(payload) }).then(json);
+
+export const addShiftMovement = (payload) =>
+    posFetch(`/pos/shift/movement`, { method: "POST", headers: jsonHeaders, body: JSON.stringify(payload) }).then(json);
+
+export const closeShift = (payload) =>
+    posFetch(`/pos/shift/close`, { method: "POST", headers: jsonHeaders, body: JSON.stringify(payload) }).then(json);
+
+export const getShifts = (params) => posFetch(`/pos/shift${qs(params)}`).then(json);
+
+export const getShift = (id) => posFetch(`/pos/shift/${id}`).then(json);
+
 // Public site settings — drives receipt layout, tax, feature flags, etc.
 // Uses the unauthenticated client endpoint so any cashier can read it.
 export const getPosSettings = () => fetch(`/api/client/site-settings`).then(json);
