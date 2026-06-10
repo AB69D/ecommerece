@@ -5,7 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import {
     FiGrid, FiPackage, FiLayout, FiList, FiTruck, FiMenu, FiX, FiSettings,
     FiHome, FiPercent, FiStar, FiLogOut, FiUsers, FiShield, FiFileText, FiUser,
-    FiShoppingBag,
+    FiShoppingBag, FiTag,
 } from "react-icons/fi";
 import { isAuthenticated, logout, fetchMe } from "@/services/adminAuth";
 import { AdminAuthContext, buildCan } from "@/context/AdminAuthContext";
@@ -31,22 +31,21 @@ export default function AdminLayout({ children }) {
     }, []);
 
     useEffect(() => {
-        if (isLoginPage) {
-            setCheckedAuth(true);
-            return;
-        }
+        // The login page renders below without gating, so skip auth work there.
+        if (isLoginPage) return;
         if (!isAuthenticated()) {
             router.replace('/admin/login');
             return;
         }
-        loadMe().then((okMe) => {
+        (async () => {
+            const okMe = await loadMe();
             if (!okMe) {
                 logout();
                 router.replace('/admin/login');
             } else {
                 setCheckedAuth(true);
             }
-        });
+        })();
     }, [isLoginPage, router, loadMe]);
 
     useEffect(() => {
@@ -65,16 +64,16 @@ export default function AdminLayout({ children }) {
         return () => { document.body.style.overflow = 'unset'; };
     }, [sidebarOpen]);
 
+    if (isLoginPage) {
+        return <>{children}</>;
+    }
+
     if (!checkedAuth) {
         return (
             <div className="min-h-screen bg-gray-100 flex items-center justify-center">
                 <div className="w-10 h-10 border-4 border-gray-300 border-t-emerald-600 rounded-full animate-spin" />
             </div>
         );
-    }
-
-    if (isLoginPage) {
-        return <>{children}</>;
     }
 
     // perms: list of permissions; the item shows if the user has ANY of them.
@@ -95,6 +94,7 @@ export default function AdminLayout({ children }) {
                 { name: 'All Categories', path: '/admin/category/all-categories', icon: <FiList className="w-5 h-5" />, perms: ['category:read'] },
                 { name: 'Upload Product', path: '/admin/product', icon: <FiPackage className="w-5 h-5" />, perms: ['product:write'] },
                 { name: 'All Products', path: '/admin/product/all-products', icon: <FiPackage className="w-5 h-5" />, perms: ['product:read'] },
+                { name: 'Barcode Labels', path: '/admin/labels', icon: <FiTag className="w-5 h-5" />, perms: ['product:read'] },
                 { name: 'Ghee & Oil', path: '/admin/ghee-oil', icon: <FiPackage className="w-5 h-5" />, perms: ['product:read'] },
                 { name: 'Honey & Sweets', path: '/admin/honey-sweets', icon: <FiPackage className="w-5 h-5" />, perms: ['product:read'] },
                 { name: 'Stock Management', path: '/admin/stock', icon: <FiTruck className="w-5 h-5" />, perms: ['inventory:read'] },
