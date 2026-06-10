@@ -3,8 +3,11 @@ import { authFetch } from "@/services/api";
 import { listAdminUsers } from "@/services/adminUsers";
 import React, { useState, useEffect } from "react";
 import { FiSearch, FiEye, FiCheck, FiX, FiPackage, FiTruck, FiClock, FiChevronRight, FiDollarSign, FiCalendar, FiUser, FiMapPin, FiPhone, FiMail, FiShoppingBag, FiGlobe } from "react-icons/fi";
+import { PiWhatsappLogoBold } from "react-icons/pi";
+import { useWhatsApp } from "@/hooks/useWhatsApp";
 
 export default function AdminOrdersPage() {
+    const wa = useWhatsApp();
     const [orders, setOrders] = useState([]);
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState("");
@@ -508,10 +511,31 @@ export default function AdminOrdersPage() {
                                         <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center">
                                             <FiPhone className="w-5 h-5 text-gray-400" />
                                         </div>
-                                        <div>
+                                        <div className="flex-1">
                                             <p className="text-xs text-gray-500">Phone</p>
                                             <p className="font-medium text-gray-800">{selectedOrder.customerPhone}</p>
                                         </div>
+                                        {wa.featureEnabled && selectedOrder.customerPhone && (
+                                            <a
+                                                href={wa.linkTo(
+                                                    selectedOrder.customerPhone,
+                                                    wa.statusTemplate
+                                                        ? wa.fillTemplate(wa.statusTemplate, {
+                                                              name: selectedOrder.customerName,
+                                                              orderId: selectedOrder.orderId,
+                                                              status: selectedOrder.orderStatus,
+                                                          })
+                                                        : `Hi ${selectedOrder.customerName || ""}, regarding your order ${selectedOrder.orderId}.`
+                                                )}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#25D366] hover:bg-[#1ebe5d] text-white text-xs font-semibold shadow-sm transition-colors shrink-0"
+                                                title="Message customer on WhatsApp"
+                                            >
+                                                <PiWhatsappLogoBold className="w-4 h-4" />
+                                                WhatsApp
+                                            </a>
+                                        )}
                                     </div>
                                     <div className="flex items-center gap-3">
                                         <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center">

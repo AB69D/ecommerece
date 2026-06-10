@@ -4,8 +4,11 @@ import { useRouter } from "next/navigation";
 import { FiArrowLeft, FiCheck, FiTag, FiX } from "react-icons/fi";
 import { useCurrency } from "@/context/CurrencyContext.jsx";
 import { validateCouponPublic } from "@/services/coupons";
+import { useWhatsApp } from "@/hooks/useWhatsApp";
+import { PiWhatsappLogoBold } from "react-icons/pi";
 
 export default function CheckoutPage() {
+    const wa = useWhatsApp();
     const [cart, setCart] = useState(null);
     const [loading, setLoading] = useState(true);
     const [placingOrder, setPlacingOrder] = useState(false);
@@ -188,7 +191,7 @@ export default function CheckoutPage() {
                 <p className="text-sm text-gray-500 mb-6 text-center">
                     Track your order using your phone number: <strong>{orderData.customerPhone}</strong>
                 </p>
-                <div className="flex gap-4">
+                <div className="flex flex-wrap justify-center gap-4">
                     <button
                         onClick={() => router.push(`/track-order?phone=${orderData.customerPhone}`)}
                         className="bg-emerald-600 text-white px-6 py-3 rounded-lg hover:bg-emerald-700"
@@ -202,6 +205,25 @@ export default function CheckoutPage() {
                         Continue Shopping
                     </button>
                 </div>
+                {wa.enabled && (
+                    <a
+                        href={wa.chatUrl(
+                            wa.orderTemplate
+                                ? wa.fillTemplate(wa.orderTemplate, {
+                                      name: orderData.customerName,
+                                      orderId: orderData.orderId,
+                                      total: `${symbol}${orderData.totalAmount}`,
+                                  })
+                                : `Hi, I just placed order ${orderData.orderId}. I'd like to confirm it.`
+                        )}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="mt-4 inline-flex items-center gap-2 px-6 py-3 rounded-lg bg-[#25D366] hover:bg-[#1ebe5d] text-white font-semibold shadow-sm hover:shadow-md transition-all"
+                    >
+                        <PiWhatsappLogoBold className="w-5 h-5" />
+                        Confirm on WhatsApp
+                    </a>
+                )}
             </div>
         );
     }

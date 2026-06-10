@@ -8,8 +8,10 @@ import { addToCart } from "@/utils/cart";
 import { useCurrency } from "@/context/CurrencyContext.jsx";
 import ProductReviews from "@/components/ProductReviews.jsx";
 import WishlistButton from "@/components/WishlistButton.jsx";
+import { useWhatsApp } from "@/hooks/useWhatsApp";
 
 export default function ProductClient({ productId }) {
+    const wa = useWhatsApp();
     const [product, setProduct] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
@@ -392,26 +394,30 @@ export default function ProductClient({ productId }) {
                              >
                                  {adding ? 'Adding...' : added ? <><FiCheck className="w-5 h-5" /> Added</> : currentWeight?.stock > 0 ? 'Add to Cart' : 'Out of Stock'}
                              </button>
-                             <a
-                                 href={`https://wa.me/10000000000?text=${encodeURIComponent(`Hi, I'd like to know more about ${product?.firstName}.`)}`}
-                                 target="_blank"
-                                 rel="noopener noreferrer"
-                                 className="flex-1 bg-green-500 hover:bg-green-600 text-white text-sm sm:text-base font-medium py-3 sm:py-3.5 rounded-lg flex items-center justify-center gap-1.5 transition-colors whitespace-nowrap"
-                             >
-                                 <PiWhatsappLogoBold className="w-4 h-4 sm:w-5 sm:h-5 shrink-0" />
-                                 <span>Chat on WhatsApp</span>
-                             </a>
+                             {wa.enabled && (
+                                 <a
+                                     href={wa.chatUrl(`Hi, I'd like to know more about ${product?.firstName}.`)}
+                                     target="_blank"
+                                     rel="noopener noreferrer"
+                                     className="flex-1 bg-green-500 hover:bg-green-600 text-white text-sm sm:text-base font-medium py-3 sm:py-3.5 rounded-lg flex items-center justify-center gap-1.5 transition-colors whitespace-nowrap"
+                                 >
+                                     <PiWhatsappLogoBold className="w-4 h-4 sm:w-5 sm:h-5 shrink-0" />
+                                     <span>Chat on WhatsApp</span>
+                                 </a>
+                             )}
                          </div>
                          {product && <WishlistButton product={product} variant="detail" className="w-full" />}
                          <div className="flex gap-3">
-                             <a
-                                 href="tel:+10000000000"
-                                 className="flex-1 bg-emerald-700 hover:bg-emerald-800 text-white text-sm sm:text-base font-medium py-3 sm:py-3.5 rounded-lg flex items-center justify-center gap-1.5 transition-colors whitespace-nowrap shadow-sm hover:shadow-md"
-                                 aria-label="Call to order"
-                             >
-                                 <FiPhoneCall className="w-4 h-4 sm:w-5 sm:h-5 shrink-0" />
-                                 <span>Call to Order</span>
-                             </a>
+                             {wa.contactPhone && (
+                                 <a
+                                     href={`tel:${wa.contactPhone.replace(/\s/g, "")}`}
+                                     className="flex-1 bg-emerald-700 hover:bg-emerald-800 text-white text-sm sm:text-base font-medium py-3 sm:py-3.5 rounded-lg flex items-center justify-center gap-1.5 transition-colors whitespace-nowrap shadow-sm hover:shadow-md"
+                                     aria-label="Call to order"
+                                 >
+                                     <FiPhoneCall className="w-4 h-4 sm:w-5 sm:h-5 shrink-0" />
+                                     <span>Call to Order</span>
+                                 </a>
+                             )}
                              <a
                                  href={`https://m.me/ab9d-ecommerce?text=${encodeURIComponent(`Hi, I'd like to know more about ${product?.firstName}.`)}`}
                                  target="_blank"

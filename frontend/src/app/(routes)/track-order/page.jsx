@@ -3,12 +3,15 @@ import { useState, useEffect, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { FiPackage, FiCheck, FiTruck, FiClock, FiSearch, FiPhone, FiCalendar, FiAlertCircle, FiStar, FiImage, FiVideo, FiX } from "react-icons/fi";
 import { FaStar, FaStarHalfAlt, FaRegStar } from "react-icons/fa";
+import { PiWhatsappLogoBold } from "react-icons/pi";
 import { useCurrency } from "@/context/CurrencyContext.jsx";
+import { useWhatsApp } from "@/hooks/useWhatsApp";
 
 function TrackOrderContent() {
     const searchParams = useSearchParams();
     const router = useRouter();
     const { symbol } = useCurrency();
+    const wa = useWhatsApp();
     const [orders, setOrders] = useState([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
@@ -428,6 +431,17 @@ function TrackOrderContent() {
                                     </div>
                                 )}
                             </div>
+                            {wa.enabled && (
+                                <a
+                                    href={wa.chatUrl(`Hi, I'd like an update on my order ${selectedOrder.orderId}.`)}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="mt-4 inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-[#25D366] hover:bg-[#1ebe5d] text-white font-semibold text-sm shadow-sm hover:shadow-md transition-all"
+                                >
+                                    <PiWhatsappLogoBold className="w-5 h-5" />
+                                    Message us on WhatsApp
+                                </a>
+                            )}
                         </div>
 
                         {/* Order Items */}

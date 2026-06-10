@@ -15,6 +15,7 @@ import {
 } from "react-icons/fa";
 import { HiOutlineMail } from "react-icons/hi";
 import { fetchSiteSettings, fetchFooter } from "../lib/dynamicContent";
+import { useWhatsApp } from "@/hooks/useWhatsApp";
 
 // Map platform name (case-insensitive) → icon + brand color hover.
 const PLATFORM_META = {
@@ -82,6 +83,7 @@ const merge = (fallback, dynamic) => {
 
 export default function Footer() {
     const pathname = usePathname();
+    const wa = useWhatsApp();
     const [settings, setSettings] = useState(FALLBACK_SETTINGS);
     const [footer, setFooter] = useState(FALLBACK_FOOTER);
 
@@ -237,18 +239,33 @@ export default function Footer() {
                                         ))}
                                 </ul>
 
-                                {idx === 1 && settings.contactPhone && (
+                                {idx === 1 && (settings.contactPhone || wa.enabled) && (
                                     <div className="bg-white/5 backdrop-blur-sm rounded-xl p-4 ring-1 ring-white/10">
                                         <p className="text-xs font-semibold tracking-widest uppercase text-amber-300 mb-1">
                                             Need help with an order?
                                         </p>
-                                        <a
-                                            href={`tel:${settings.contactPhone.replace(/\s/g, "")}`}
-                                            className="inline-flex items-center gap-2 mt-2 px-4 py-2 rounded-lg bg-amber-400 hover:bg-amber-300 text-emerald-950 font-semibold text-sm shadow-md hover:shadow-lg transition-all hover:-translate-y-0.5"
-                                        >
-                                            <FiPhone className="w-4 h-4" />
-                                            Call to Order
-                                        </a>
+                                        <div className="flex flex-wrap gap-2 mt-2">
+                                            {settings.contactPhone && (
+                                                <a
+                                                    href={`tel:${settings.contactPhone.replace(/\s/g, "")}`}
+                                                    className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-amber-400 hover:bg-amber-300 text-emerald-950 font-semibold text-sm shadow-md hover:shadow-lg transition-all hover:-translate-y-0.5"
+                                                >
+                                                    <FiPhone className="w-4 h-4" />
+                                                    Call to Order
+                                                </a>
+                                            )}
+                                            {wa.enabled && (
+                                                <a
+                                                    href={wa.chatUrl("Hi, I'd like to place an order.")}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-[#25D366] hover:bg-[#1ebe5d] text-white font-semibold text-sm shadow-md hover:shadow-lg transition-all hover:-translate-y-0.5"
+                                                >
+                                                    <FaWhatsapp className="w-4 h-4" />
+                                                    Chat on WhatsApp
+                                                </a>
+                                            )}
+                                        </div>
                                     </div>
                                 )}
                             </div>

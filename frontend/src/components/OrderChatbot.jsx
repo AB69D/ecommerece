@@ -6,10 +6,10 @@ import {
 } from "react-icons/fi";
 import { PiWhatsappLogoBold } from "react-icons/pi";
 import { sendChatMessage } from "@/services/chatbot";
+import { useWhatsApp } from "@/hooks/useWhatsApp";
 
 const CTX_KEY = "gg_chat_ctx";
 const GUEST_KEY = "gg_chat_guest";
-const WHATSAPP_NUMBER = "10000000000";
 
 let _idSeq = 0;
 const uid = () => `m${Date.now()}_${_idSeq++}`;
@@ -75,6 +75,7 @@ function ProductCard({ card, onAdd, disabled }) {
 
 export default function OrderChatbot() {
     const pathname = usePathname();
+    const wa = useWhatsApp();
     const [open, setOpen] = useState(false);
     const [messages, setMessages] = useState([]);
     const [context, setContext] = useState(null);
@@ -184,7 +185,7 @@ export default function OrderChatbot() {
     const cartLineAction = (type, line) =>
         send({ action: { type, productId: line.productId, weightIndex: line.weightIndex } });
 
-    const whatsappLink = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent("Hi, I'd like to order a product.")}`;
+    const whatsappLink = wa.enabled ? wa.chatUrl("Hi, I'd like to order a product.") : "";
 
     return (
         <>
@@ -219,16 +220,18 @@ export default function OrderChatbot() {
                             </div>
                         </div>
                         <div className="flex items-center gap-1">
-                            <a
-                                href={whatsappLink}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="p-2 hover:bg-white/15 rounded-lg transition-colors"
-                                aria-label="Chat on WhatsApp"
-                                title="Chat on WhatsApp"
-                            >
-                                <PiWhatsappLogoBold className="w-5 h-5" />
-                            </a>
+                            {whatsappLink && (
+                                <a
+                                    href={whatsappLink}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="p-2 hover:bg-white/15 rounded-lg transition-colors"
+                                    aria-label="Chat on WhatsApp"
+                                    title="Chat on WhatsApp"
+                                >
+                                    <PiWhatsappLogoBold className="w-5 h-5" />
+                                </a>
+                            )}
                             <button
                                 onClick={() => setOpen(false)}
                                 className="p-2 hover:bg-white/15 rounded-lg transition-colors"
