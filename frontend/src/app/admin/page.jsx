@@ -117,6 +117,9 @@ export default function DashboardPage() {
         { label: "POS", value: posChannel.pos.orders, color: "#8b5cf6" },
     ].filter((d) => d.value > 0);
 
+    // --- Profitability (null when the profitReporting feature is off) ----
+    const profit = overview?.profit || null;
+
     return (
         <div className="space-y-6">
             <div className="flex flex-wrap items-center justify-between gap-3">
@@ -200,6 +203,64 @@ export default function DashboardPage() {
                             />
                         </div>
                     </div>
+
+                    {/* Profitability — revenue vs cost of goods (cost snapshot at sale time) */}
+                    {profit && (
+                        <div className="space-y-4">
+                            <div className="flex items-center gap-2 pt-1">
+                                <span className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                                    <FiTrendingUp className="w-5 h-5" />
+                                </span>
+                                <div>
+                                    <h2 className="text-lg font-bold text-gray-800">Profitability</h2>
+                                    <p className="text-xs text-gray-400">Revenue minus product cost captured at sale time · all time</p>
+                                </div>
+                                <Link href="/admin/profit" className="ml-auto text-sm text-indigo-600 hover:text-indigo-700 font-medium flex items-center gap-1">
+                                    Full report <FiArrowRight className="w-4 h-4" />
+                                </Link>
+                            </div>
+
+                            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+                                <StatCard icon={<FiPackage className="w-5 h-5" />} label="Cost of goods" value={money(profit.cost)} accent="#f97316" />
+                                <StatCard icon={<FiTrendingUp className="w-5 h-5" />} label="Gross profit" value={money(profit.grossProfit)} accent="#10b981" />
+                                <StatCard icon={<FiDollarSign className="w-5 h-5" />} label="Net profit" value={money(profit.netProfit)} accent="#6366f1" />
+                                <StatCard icon={<FiStar className="w-5 h-5" />} label="Gross margin" value={`${profit.margin}%`} accent="#8b5cf6" />
+                            </div>
+
+                            {/* Per-channel profit comparison */}
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                                {[
+                                    { key: "ecommerce", label: "E-commerce", icon: <FiGlobe className="w-4 h-4" />, accent: "#0ea5e9" },
+                                    { key: "pos", label: "POS", icon: <FiShoppingBag className="w-4 h-4" />, accent: "#8b5cf6" },
+                                ].map((c) => {
+                                    const ch = profit.channels?.[c.key] || { revenue: 0, cost: 0, profit: 0, margin: 0 };
+                                    return (
+                                        <div key={c.key} className="bg-white border border-gray-200 rounded-2xl p-4 sm:p-5">
+                                            <div className="flex items-center justify-between mb-3">
+                                                <p className="font-semibold text-gray-800">{c.label} profit</p>
+                                                <span className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: `${c.accent}1a`, color: c.accent }}>{c.icon}</span>
+                                            </div>
+                                            <div className="grid grid-cols-3 gap-2 text-center">
+                                                <div>
+                                                    <p className="text-[11px] text-gray-400">Revenue</p>
+                                                    <p className="font-bold text-gray-800 text-sm mt-0.5">{money(ch.revenue)}</p>
+                                                </div>
+                                                <div>
+                                                    <p className="text-[11px] text-gray-400">Cost</p>
+                                                    <p className="font-bold text-orange-600 text-sm mt-0.5">{money(ch.cost)}</p>
+                                                </div>
+                                                <div>
+                                                    <p className="text-[11px] text-gray-400">Profit</p>
+                                                    <p className="font-bold text-emerald-600 text-sm mt-0.5">{money(ch.profit)}</p>
+                                                </div>
+                                            </div>
+                                            <p className="text-xs text-gray-400 mt-3">Gross margin <span className="font-semibold text-gray-600">{ch.margin}%</span></p>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    )}
 
                     {/* POS analytics */}
                     <div className="space-y-4">

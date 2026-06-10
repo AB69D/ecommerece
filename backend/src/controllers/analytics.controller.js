@@ -191,6 +191,68 @@ export const getDashboardOverview = asyncHandler(async (req, res) => {
             orders: s.orders || 0,
         }));
 
+    // --- Cost / profit / margin (gated by the profitReporting feature) -------
+    // Computed from the per-line cost snapshot (items.costPrice) captured at sale
+    // time, so it's consistent with the dedicated Profit report. Covers the same
+    // all-time revenue scope as the headline cards. `null` when the feature is off
+    // so the frontend simply omits the profit widgets.
+    let profit = null;
+    if (await isFeatureEnabled('profitReporting', true)) {
+        const round2 = (n) => Math.round((n || 0) * 100) / 100;
+        const pct = (num, den) => (den > 0 ? Math.round((num / den) * 1000) / 10 : 0);
+        const costExpr = { $multiply: ['$items.quantity', { $ifNull: ['$items.costPrice', 0] }] };
+
+        const [profitAgg, profitChannelAgg, discountAgg] = await Promise.all([
+            OrderModel.aggregate([
+                { $match: REVENUE_STATUSES },
+                { $unwind: '$items' },
+                { $group: { _id: null, revenue: { $sum: '$items.totalPrice' }, cost: { $sum: costExpr } } },
+            ]),
+            OrderModel.aggregate([
+                { $match: REVENUE_STATUSES },
+                { $unwind: '$items' },
+                {
+                    $group: {
+                        _id: { $cond: [{ $eq: ['$source', 'pos'] }, 'pos', 'ecommerce'] },
+                        revenue: { $sum: '$items.totalPrice' },
+                        cost: { $sum: costExpr },
+                    },
+                },
+            ]),
+            OrderModel.aggregate([
+                { $match: REVENUE_STATUSES },
+                { $group: { _id: null, discounts: { $sum: '$discount' } } },
+            ]),
+        ]);
+
+        const pRevenue = round2(profitAgg[0]?.revenue);
+        const pCost = round2(profitAgg[0]?.cost);
+        const grossProfit = round2(pRevenue - pCost);
+        const discounts = round2(discountAgg[0]?.discounts);
+        const netProfit = round2(grossProfit - discounts);
+
+        const profitChannels = {
+            ecommerce: { revenue: 0, cost: 0, profit: 0, margin: 0 },
+            pos: { revenue: 0, cost: 0, profit: 0, margin: 0 },
+        };
+        for (const row of profitChannelAgg) {
+            const key = row._id === 'pos' ? 'pos' : 'ecommerce';
+            const r = round2(row.revenue);
+            const c = round2(row.cost);
+            profitChannels[key] = { revenue: r, cost: c, profit: round2(r - c), margin: pct(r - c, r) };
+        }
+
+        profit = {
+            revenue: pRevenue,
+            cost: pCost,
+            grossProfit,
+            discounts,
+            netProfit,
+            margin: pct(grossProfit, pRevenue),
+            channels: profitChannels,
+        };
+    }
+
     return ok(res, {
         summary: {
             totalOrders,
@@ -218,6 +280,7 @@ export const getDashboardOverview = asyncHandler(async (req, res) => {
             series: posSeries,
             sellers,
         },
+        profit,
     });
 });
 
