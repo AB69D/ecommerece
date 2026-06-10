@@ -38,6 +38,36 @@ const FEATURE_FLAGS = [
     ["productReviews", "Product reviews", "Let shoppers rate and review products."],
 ];
 
+// Common currencies for the settings dropdown. Picking one auto-fills BOTH the
+// ISO code and the display symbol; "Custom" reveals the manual code/symbol
+// fields for anything not listed here. The symbol is what shows before prices.
+const CURRENCIES = [
+    { code: "USD", symbol: "$", name: "US Dollar" },
+    { code: "EUR", symbol: "€", name: "Euro" },
+    { code: "GBP", symbol: "£", name: "British Pound" },
+    { code: "BDT", symbol: "৳", name: "Bangladeshi Taka" },
+    { code: "INR", symbol: "₹", name: "Indian Rupee" },
+    { code: "PKR", symbol: "₨", name: "Pakistani Rupee" },
+    { code: "AED", symbol: "د.إ", name: "UAE Dirham" },
+    { code: "SAR", symbol: "﷼", name: "Saudi Riyal" },
+    { code: "JPY", symbol: "¥", name: "Japanese Yen" },
+    { code: "CNY", symbol: "¥", name: "Chinese Yuan" },
+    { code: "CAD", symbol: "$", name: "Canadian Dollar" },
+    { code: "AUD", symbol: "$", name: "Australian Dollar" },
+    { code: "SGD", symbol: "$", name: "Singapore Dollar" },
+    { code: "MYR", symbol: "RM", name: "Malaysian Ringgit" },
+    { code: "IDR", symbol: "Rp", name: "Indonesian Rupiah" },
+    { code: "THB", symbol: "฿", name: "Thai Baht" },
+    { code: "TRY", symbol: "₺", name: "Turkish Lira" },
+    { code: "ZAR", symbol: "R", name: "South African Rand" },
+    { code: "NGN", symbol: "₦", name: "Nigerian Naira" },
+    { code: "BRL", symbol: "R$", name: "Brazilian Real" },
+    { code: "RUB", symbol: "₽", name: "Russian Ruble" },
+    { code: "KRW", symbol: "₩", name: "South Korean Won" },
+    { code: "LKR", symbol: "Rs", name: "Sri Lankan Rupee" },
+    { code: "NPR", symbol: "Rs", name: "Nepalese Rupee" },
+];
+
 function Field({ label, hint, children }) {
     return (
         <label className="block">
@@ -142,6 +172,8 @@ export default function SettingsPage() {
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [msg, setMsg] = useState({ type: "", text: "" });
+    // When true the manual code/symbol fields stay open (user picked "Custom").
+    const [customCurrency, setCustomCurrency] = useState(false);
 
     const load = useCallback(async () => {
         setLoading(true);
@@ -261,6 +293,13 @@ export default function SettingsPage() {
         );
     }
 
+    // Match the saved currency to a preset (by code + symbol). No match — or an
+    // explicit "Custom" pick — reveals the manual code/symbol inputs.
+    const knownCurrency = CURRENCIES.find(
+        (c) => c.code === (settings.currencyCode || "").toUpperCase() && c.symbol === settings.currencySymbol,
+    );
+    const showCustomCurrency = customCurrency || !knownCurrency;
+
     return (
         <div className="max-w-3xl">
             <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
@@ -363,14 +402,37 @@ export default function SettingsPage() {
                             <input className={inputCls} value={settings.seo?.defaultKeywords || ""} onChange={(e) => setSeo({ defaultKeywords: e.target.value })} />
                         </Field>
                         <ImageUpload label="Social share image (OG image)" value={settings.seo?.ogImage} onChange={(url) => setSeo({ ogImage: url })} />
-                        <div className="grid grid-cols-2 gap-3">
-                            <Field label="Currency code" hint="3 letters, e.g. USD">
-                                <input maxLength={3} className={`${inputCls} uppercase`} value={settings.currencyCode || ""} onChange={(e) => setS({ currencyCode: e.target.value.toUpperCase() })} />
-                            </Field>
-                            <Field label="Currency symbol">
-                                <input maxLength={5} className={inputCls} value={settings.currencySymbol || ""} onChange={(e) => setS({ currencySymbol: e.target.value })} />
-                            </Field>
-                        </div>
+                        <Field label="Currency" hint="Applies to every price across the storefront, POS and receipts.">
+                            <select
+                                className={inputCls}
+                                value={showCustomCurrency ? "__custom__" : knownCurrency.code}
+                                onChange={(e) => {
+                                    const val = e.target.value;
+                                    if (val === "__custom__") { setCustomCurrency(true); return; }
+                                    const c = CURRENCIES.find((x) => x.code === val);
+                                    if (c) { setCustomCurrency(false); setS({ currencyCode: c.code, currencySymbol: c.symbol }); }
+                                }}
+                            >
+                                {CURRENCIES.map((c) => (
+                                    <option key={c.code} value={c.code}>{c.name} — {c.code} ({c.symbol})</option>
+                                ))}
+                                <option value="__custom__">Custom…</option>
+                            </select>
+                        </Field>
+                        {showCustomCurrency && (
+                            <div className="grid grid-cols-2 gap-3">
+                                <Field label="Currency code" hint="3 letters, e.g. USD">
+                                    <input maxLength={3} className={`${inputCls} uppercase`} value={settings.currencyCode || ""} onChange={(e) => setS({ currencyCode: e.target.value.toUpperCase() })} />
+                                </Field>
+                                <Field label="Currency symbol" hint="Shown before every price, e.g. $ or ৳.">
+                                    <input maxLength={5} className={inputCls} value={settings.currencySymbol || ""} onChange={(e) => setS({ currencySymbol: e.target.value })} />
+                                </Field>
+                            </div>
+                        )}
+                        <p className="text-xs text-gray-500 -mt-2">
+                            Preview: <span className="font-semibold text-gray-700">{settings.currencySymbol || "$"}1,250.00</span>
+                            <span className="text-gray-400"> · {(settings.currencyCode || "USD").toUpperCase()}</span>
+                        </p>
                         <div className="bg-gray-50 border border-gray-100 rounded-xl p-4">
                             <Toggle label="Maintenance mode" hint="Show a maintenance notice to visitors." checked={!!settings.maintenanceMode} onChange={(v) => setS({ maintenanceMode: v })} />
                         </div>
