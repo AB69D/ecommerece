@@ -4,6 +4,7 @@ import Navbar from "@/components/Navbar.jsx";
 import HeaderTop from "@/components/Header-top.jsx";
 import Footer from "@/components/Footer.jsx";
 import OrderChatbot from "@/components/OrderChatbot.jsx";
+import PwaRegister from "@/components/PwaRegister.jsx";
 import { CurrencyProvider } from "@/context/CurrencyContext.jsx";
 import { fetchSiteSettings } from "@/lib/dynamicContent.js";
 
@@ -50,12 +51,21 @@ export const metadata = {
       'max-snippet': -1,
     },
   },
+  icons: {
+    icon: "/icons/icon-192.png",
+    apple: "/icons/apple-touch-icon.png",
+  },
+};
+
+export const viewport = {
+  themeColor: "#0f766e",
 };
 
 export default async function RootLayout({ children }) {
   const settings = await fetchSiteSettings();
   const currencySymbol = settings?.currencySymbol || "$";
   const currencyCode = settings?.currencyCode || "USD";
+  const pwaEnabled = settings?.features?.pwa !== false;
   return (
     <html
       lang="en"
@@ -70,6 +80,7 @@ export default async function RootLayout({ children }) {
           </main>
           <Footer />
           <OrderChatbot />
+          <PwaRegister enabled={pwaEnabled} />
         </CurrencyProvider>
       </body>
     </html>

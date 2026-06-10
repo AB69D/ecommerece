@@ -4,10 +4,12 @@ import Image from "next/image";
 import {
     FiSearch, FiPlus, FiMinus, FiTrash2, FiShoppingCart, FiX, FiPackage,
     FiCreditCard, FiDollarSign, FiUser, FiPhone, FiCheckCircle, FiCamera, FiTag,
+    FiWifiOff, FiRefreshCw,
 } from "react-icons/fi";
 import { useCurrency } from "@/context/CurrencyContext.jsx";
 import { getPosProducts, createPosSale, lookupPosProductByCode, getPosSettings } from "@/services/pos";
 import { validateCouponAdmin } from "@/services/coupons";
+import { enqueueSale, countQueued, flushQueue } from "@/lib/posQueue";
 import ReceiptModal from "./Receipt.jsx";
 
 // Small inline barcode glyph (no extra icon dependency).
@@ -57,11 +59,58 @@ export default function SellView({ mode, notify }) {
     const [receiptOrder, setReceiptOrder] = useState(null);
     const barcodeEnabled = settings?.features?.barcode !== false;
     const receiptEnabled = settings?.features?.receiptPrinting !== false;
+    const pwaEnabled = settings?.features?.pwa !== false;
+
+    // Offline sales queue (only meaningful when the PWA feature is on).
+    const [online, setOnline] = useState(true);
+    const [queuedCount, setQueuedCount] = useState(0);
+    const [syncing, setSyncing] = useState(false);
 
     useEffect(() => {
         setCameraSupported(typeof window !== "undefined" && "BarcodeDetector" in window);
         getPosSettings().then((res) => { if (res?.success) setSettings(res.data); }).catch(() => {});
     }, []);
+
+    const refreshQueue = useCallback(async () => {
+        setQueuedCount(await countQueued());
+    }, []);
+
+    // Push any queued offline sales back to the server, one at a time.
+    const syncQueue = useCallback(async (silent = false) => {
+        if (syncing) return;
+        const pending = await countQueued();
+        if (pending === 0) { setQueuedCount(0); return; }
+        setSyncing(true);
+        try {
+            const { synced, failed } = await flushQueue(createPosSale);
+            if (synced > 0) notify("success", `${synced} offline sale${synced > 1 ? "s" : ""} synced`);
+            if (failed > 0) notify("error", `${failed} offline sale${failed > 1 ? "s" : ""} could not be synced`);
+            await refreshQueue();
+            if (synced > 0) load();
+        } catch {
+            if (!silent) notify("error", "Could not sync offline sales");
+        } finally {
+            setSyncing(false);
+        }
+        // load is stable enough; intentionally not a dep to avoid resync loops.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [syncing, notify, refreshQueue]);
+
+    // Track connectivity and auto-sync when the connection returns.
+    useEffect(() => {
+        if (!pwaEnabled) return;
+        const update = () => setOnline(navigator.onLine);
+        update();
+        refreshQueue();
+        const onOnline = () => { setOnline(true); syncQueue(true); };
+        const onOffline = () => setOnline(false);
+        window.addEventListener("online", onOnline);
+        window.addEventListener("offline", onOffline);
+        return () => {
+            window.removeEventListener("online", onOnline);
+            window.removeEventListener("offline", onOffline);
+        };
+    }, [pwaEnabled, refreshQueue, syncQueue]);
 
     useEffect(() => {
         const t = setTimeout(() => setDebounced(search.trim()), 300);
@@ -251,20 +300,38 @@ export default function SellView({ mode, notify }) {
             return;
         }
         setSubmitting(true);
+        const payload = {
+            saleType: mode,
+            paymentMethod,
+            customerName: customerName.trim() || undefined,
+            customerPhone: customerPhone.trim() || undefined,
+            ...(couponsEnabled && appliedCoupon?.code ? { couponCode: appliedCoupon.code } : {}),
+            items: cart.map((l) => ({
+                productId: l.productId,
+                weightIndex: l.weightIndex,
+                quantity: l.quantity,
+                ...(isWholesale ? { unitPrice: Number(l.unitPrice) } : {}),
+            })),
+        };
+
+        // Save the sale locally and finish the transaction without waiting for
+        // the server. It will be replayed when the connection returns.
+        const queueOffline = async (msg) => {
+            await enqueueSale(payload);
+            await refreshQueue();
+            notify("info", msg);
+            clearCart();
+            setCartOpen(false);
+        };
+
+        // Known-offline: don't even attempt the network round-trip.
+        if (pwaEnabled && typeof navigator !== "undefined" && navigator.onLine === false) {
+            await queueOffline("Offline — sale saved, will sync when back online");
+            setSubmitting(false);
+            return;
+        }
+
         try {
-            const payload = {
-                saleType: mode,
-                paymentMethod,
-                customerName: customerName.trim() || undefined,
-                customerPhone: customerPhone.trim() || undefined,
-                ...(couponsEnabled && appliedCoupon?.code ? { couponCode: appliedCoupon.code } : {}),
-                items: cart.map((l) => ({
-                    productId: l.productId,
-                    weightIndex: l.weightIndex,
-                    quantity: l.quantity,
-                    ...(isWholesale ? { unitPrice: Number(l.unitPrice) } : {}),
-                })),
-            };
             const res = await createPosSale(payload);
             if (res?.success) {
                 notify("success", `Sale ${res.data?.orderId} completed · ${money(res.data?.totalAmount)}`);
@@ -276,7 +343,13 @@ export default function SellView({ mode, notify }) {
                 notify("error", res?.message || "Could not complete sale");
             }
         } catch {
-            notify("error", "Network error completing sale");
+            // The request itself failed (likely offline). Queue rather than lose
+            // the sale when the PWA feature is on; otherwise surface the error.
+            if (pwaEnabled) {
+                await queueOffline("Network issue — sale queued for sync");
+            } else {
+                notify("error", "Network error completing sale");
+            }
         } finally {
             setSubmitting(false);
         }
@@ -300,6 +373,35 @@ export default function SellView({ mode, notify }) {
             {/* Catalog */}
             <section className="flex-1 min-w-0 flex flex-col h-full">
                 <div className="p-3 sm:p-4 bg-white border-b border-slate-200 space-y-3">
+                    {/* Offline / pending-sync banner. */}
+                    {pwaEnabled && (!online || queuedCount > 0) && (
+                        <div className={`flex items-center justify-between gap-2 px-3 py-2 rounded-xl text-sm ${
+                            online ? "bg-amber-50 text-amber-700 border border-amber-200" : "bg-slate-800 text-slate-100"
+                        }`}>
+                            <span className="flex items-center gap-2 min-w-0">
+                                <FiWifiOff className="w-4 h-4 shrink-0" />
+                                <span className="truncate">
+                                    {online
+                                        ? `${queuedCount} sale${queuedCount > 1 ? "s" : ""} waiting to sync`
+                                        : queuedCount > 0
+                                            ? `Offline · ${queuedCount} sale${queuedCount > 1 ? "s" : ""} saved locally`
+                                            : "Offline · sales will be saved on this device"}
+                                </span>
+                            </span>
+                            {online && queuedCount > 0 && (
+                                <button
+                                    type="button"
+                                    onClick={() => syncQueue(false)}
+                                    disabled={syncing}
+                                    className="shrink-0 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-500 text-white text-xs font-semibold hover:bg-amber-400 disabled:opacity-50"
+                                >
+                                    <FiRefreshCw className={`w-3.5 h-3.5 ${syncing ? "animate-spin" : ""}`} />
+                                    {syncing ? "Syncing…" : "Sync now"}
+                                </button>
+                            )}
+                        </div>
+                    )}
+
                     {/* Barcode / SKU scanner — works with USB scanners, manual typing,
                         and (where supported) the device camera. */}
                     {barcodeEnabled && (
