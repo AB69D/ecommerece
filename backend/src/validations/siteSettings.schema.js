@@ -6,6 +6,74 @@ const socialLink = z.object({
     icon: z.string().optional(),
 });
 
+// Feature master switches. Every key is an optional boolean so the admin can
+// toggle one flag at a time without resending the whole block.
+const features = z
+    .object({
+        barcode: z.boolean(),
+        coupons: z.boolean(),
+        wishlist: z.boolean(),
+        receiptPrinting: z.boolean(),
+        labelPrinting: z.boolean(),
+        posShift: z.boolean(),
+        profitReporting: z.boolean(),
+        stockLedger: z.boolean(),
+        pwa: z.boolean(),
+        whatsapp: z.boolean(),
+        analytics: z.boolean(),
+    })
+    .partial();
+
+const receipt = z
+    .object({
+        header: z.string().max(200),
+        footerNote: z.string().max(300),
+        showLogo: z.boolean(),
+        paperWidth: z.enum(['58', '80']),
+        showTax: z.boolean(),
+        returnPolicy: z.string().max(500),
+    })
+    .partial();
+
+const barcode = z
+    .object({
+        symbology: z.enum(['CODE128', 'EAN13']),
+        prefix: z.string().max(20),
+        labelWidthMm: z.number().min(10).max(200),
+        labelHeightMm: z.number().min(10).max(200),
+        showPrice: z.boolean(),
+        showName: z.boolean(),
+    })
+    .partial();
+
+const pos = z
+    .object({
+        lowStockThreshold: z.number().min(0).max(100000),
+        taxPercent: z.number().min(0).max(100),
+        taxLabel: z.string().max(20),
+        requireShift: z.boolean(),
+        allowNegativeStock: z.boolean(),
+    })
+    .partial();
+
+const analytics = z
+    .object({
+        ga4Id: z.string().max(40),
+        metaPixelId: z.string().max(40),
+        gtmId: z.string().max(40),
+    })
+    .partial();
+
+const whatsapp = z
+    .object({
+        businessNumber: z.string().max(20),
+        notifyOnOrder: z.boolean(),
+        notifyOnStatusChange: z.boolean(),
+        orderTemplate: z.string().max(500),
+        statusTemplate: z.string().max(500),
+    })
+    .partial();
+
 export const updateSiteSettingsSchema = z.object({
     siteName: z.string().min(1).max(100).optional(),
     tagline: z.string().max(200).optional(),
@@ -27,5 +95,11 @@ export const updateSiteSettingsSchema = z.object({
         })
         .partial()
         .optional(),
+    features: features.optional(),
+    receipt: receipt.optional(),
+    barcode: barcode.optional(),
+    pos: pos.optional(),
+    analytics: analytics.optional(),
+    whatsapp: whatsapp.optional(),
     maintenanceMode: z.boolean().optional(),
 });

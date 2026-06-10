@@ -6,7 +6,8 @@ import {
     FiCreditCard, FiDollarSign, FiUser, FiPhone, FiCheckCircle, FiCamera,
 } from "react-icons/fi";
 import { useCurrency } from "@/context/CurrencyContext.jsx";
-import { getPosProducts, createPosSale, lookupPosProductByCode } from "@/services/pos";
+import { getPosProducts, createPosSale, lookupPosProductByCode, getPosSettings } from "@/services/pos";
+import ReceiptModal from "./Receipt.jsx";
 
 // Small inline barcode glyph (no extra icon dependency).
 function BarcodeGlyph({ className = "" }) {
@@ -44,8 +45,15 @@ export default function SellView({ mode, notify }) {
     const [cameraSupported, setCameraSupported] = useState(false);
     const lastScanRef = useRef({ code: "", at: 0 });
 
+    // Admin-configurable site settings (receipt layout, feature flags, tax…).
+    const [settings, setSettings] = useState(null);
+    const [receiptOrder, setReceiptOrder] = useState(null);
+    const barcodeEnabled = settings?.features?.barcode !== false;
+    const receiptEnabled = settings?.features?.receiptPrinting !== false;
+
     useEffect(() => {
         setCameraSupported(typeof window !== "undefined" && "BarcodeDetector" in window);
+        getPosSettings().then((res) => { if (res?.success) setSettings(res.data); }).catch(() => {});
     }, []);
 
     useEffect(() => {
@@ -189,6 +197,7 @@ export default function SellView({ mode, notify }) {
                 notify("success", `Sale ${res.data?.orderId} completed · ${money(res.data?.totalAmount)}`);
                 clearCart();
                 setCartOpen(false);
+                if (receiptEnabled && res.data) setReceiptOrder(res.data);
                 load();
             } else {
                 notify("error", res?.message || "Could not complete sale");
@@ -207,6 +216,7 @@ export default function SellView({ mode, notify }) {
                 <div className="p-3 sm:p-4 bg-white border-b border-slate-200 space-y-3">
                     {/* Barcode / SKU scanner — works with USB scanners, manual typing,
                         and (where supported) the device camera. */}
+                    {barcodeEnabled && (
                     <form onSubmit={onScanSubmit} className="flex items-center gap-2">
                         <div className="relative flex-1">
                             <BarcodeGlyph className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-teal-500" />
@@ -241,6 +251,7 @@ export default function SellView({ mode, notify }) {
                             </button>
                         )}
                     </form>
+                    )}
 
                     <div className="flex items-center gap-2">
                         <div className="relative flex-1">
@@ -315,6 +326,16 @@ export default function SellView({ mode, notify }) {
             {/* Camera barcode scanner */}
             {cameraOpen && (
                 <CameraScanModal onClose={() => setCameraOpen(false)} onDetect={handleScan} />
+            )}
+
+            {/* Post-sale receipt */}
+            {receiptOrder && (
+                <ReceiptModal
+                    order={receiptOrder}
+                    settings={settings}
+                    symbol={symbol}
+                    onClose={() => setReceiptOrder(null)}
+                />
             )}
 
             {/* Cart — mobile floating button */}

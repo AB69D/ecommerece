@@ -81,3 +81,7 @@ export const returnPosSale = (orderId) =>
 export const getPosSales = (params) => posFetch(`/pos/sales${qs(params)}`).then(json);
 
 export const getPosReport = () => posFetch(`/pos/report`).then(json);
+
+// Public site settings — drives receipt layout, tax, feature flags, etc.
+// Uses the unauthenticated client endpoint so any cashier can read it.
+export const getPosSettings = () => fetch(`/api/client/site-settings`).then(json);

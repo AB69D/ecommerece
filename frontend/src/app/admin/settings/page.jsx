@@ -4,6 +4,7 @@ import Image from "next/image";
 import {
     FiSettings, FiImage, FiUpload, FiTrash2, FiPlus, FiCheck, FiAlertCircle,
     FiType, FiPhone, FiShare2, FiSearch, FiLayout, FiSave, FiX,
+    FiToggleRight, FiPrinter, FiTag, FiActivity,
 } from "react-icons/fi";
 import { getSiteSettings, updateSiteSettings, uploadSiteImage } from "@/services/siteSettings";
 import { getFooterSettings, updateFooterSettings } from "@/services/footer";
@@ -13,7 +14,26 @@ const TABS = [
     { id: "branding", label: "Branding", icon: <FiType className="w-4 h-4" /> },
     { id: "contact", label: "Contact & Social", icon: <FiPhone className="w-4 h-4" /> },
     { id: "seo", label: "SEO & Currency", icon: <FiSearch className="w-4 h-4" /> },
+    { id: "features", label: "Features", icon: <FiToggleRight className="w-4 h-4" /> },
+    { id: "pos", label: "POS & Receipt", icon: <FiPrinter className="w-4 h-4" /> },
+    { id: "barcode", label: "Barcode & Labels", icon: <FiTag className="w-4 h-4" /> },
+    { id: "integrations", label: "Analytics & WhatsApp", icon: <FiActivity className="w-4 h-4" /> },
     { id: "footer", label: "Footer", icon: <FiLayout className="w-4 h-4" /> },
+];
+
+// Master feature switches rendered on the Features tab.
+const FEATURE_FLAGS = [
+    ["barcode", "Barcode & SKU scanning", "Scan products at the POS and print labels."],
+    ["coupons", "Coupons & discount codes", "Let customers and cashiers apply promo codes."],
+    ["wishlist", "Wishlist", "Shoppers can save products to a wishlist."],
+    ["receiptPrinting", "Receipt printing", "Print / share a receipt after every POS sale."],
+    ["labelPrinting", "Label printing", "Generate barcode label sheets from the catalogue."],
+    ["posShift", "POS shifts & cash drawer", "Open/close cash shifts with an end-of-day report."],
+    ["profitReporting", "Profit & cost reporting", "Track margin using each variant's cost price."],
+    ["stockLedger", "Stock ledger", "Record every stock movement for an audit trail."],
+    ["pwa", "Installable app (PWA)", "Allow installing the store / POS as an app."],
+    ["whatsapp", "WhatsApp notifications", "Send order updates over WhatsApp."],
+    ["analytics", "Web analytics", "Inject GA4 / Pixel / GTM tags into the storefront."],
 ];
 
 function Field({ label, hint, children }) {
@@ -107,6 +127,12 @@ export default function SettingsPage() {
     const setS = (patch) => setSettings((p) => ({ ...p, ...patch }));
     const setSeo = (patch) => setSettings((p) => ({ ...p, seo: { ...(p.seo || {}), ...patch } }));
     const setF = (patch) => setFooter((p) => ({ ...p, ...patch }));
+    const setFeature = (key, val) => setSettings((p) => ({ ...p, features: { ...(p.features || {}), [key]: val } }));
+    const setReceipt = (patch) => setSettings((p) => ({ ...p, receipt: { ...(p.receipt || {}), ...patch } }));
+    const setBarcodeCfg = (patch) => setSettings((p) => ({ ...p, barcode: { ...(p.barcode || {}), ...patch } }));
+    const setPos = (patch) => setSettings((p) => ({ ...p, pos: { ...(p.pos || {}), ...patch } }));
+    const setAnalytics = (patch) => setSettings((p) => ({ ...p, analytics: { ...(p.analytics || {}), ...patch } }));
+    const setWhatsapp = (patch) => setSettings((p) => ({ ...p, whatsapp: { ...(p.whatsapp || {}), ...patch } }));
 
     const save = async () => {
         setSaving(true); setMsg({ type: "", text: "" });
@@ -128,6 +154,42 @@ export default function SettingsPage() {
                     defaultDescription: settings.seo?.defaultDescription || "",
                     defaultKeywords: settings.seo?.defaultKeywords || "",
                     ogImage: settings.seo?.ogImage || "",
+                },
+                features: { ...(settings.features || {}) },
+                receipt: {
+                    header: settings.receipt?.header || "",
+                    footerNote: settings.receipt?.footerNote ?? "",
+                    showLogo: settings.receipt?.showLogo !== false,
+                    paperWidth: settings.receipt?.paperWidth === "58" ? "58" : "80",
+                    showTax: !!settings.receipt?.showTax,
+                    returnPolicy: settings.receipt?.returnPolicy || "",
+                },
+                barcode: {
+                    symbology: settings.barcode?.symbology === "EAN13" ? "EAN13" : "CODE128",
+                    prefix: settings.barcode?.prefix || "",
+                    labelWidthMm: Number(settings.barcode?.labelWidthMm) || 40,
+                    labelHeightMm: Number(settings.barcode?.labelHeightMm) || 30,
+                    showPrice: settings.barcode?.showPrice !== false,
+                    showName: settings.barcode?.showName !== false,
+                },
+                pos: {
+                    lowStockThreshold: Number(settings.pos?.lowStockThreshold) || 0,
+                    taxPercent: Number(settings.pos?.taxPercent) || 0,
+                    taxLabel: settings.pos?.taxLabel || "VAT",
+                    requireShift: !!settings.pos?.requireShift,
+                    allowNegativeStock: !!settings.pos?.allowNegativeStock,
+                },
+                analytics: {
+                    ga4Id: settings.analytics?.ga4Id || "",
+                    metaPixelId: settings.analytics?.metaPixelId || "",
+                    gtmId: settings.analytics?.gtmId || "",
+                },
+                whatsapp: {
+                    businessNumber: settings.whatsapp?.businessNumber || "",
+                    notifyOnOrder: settings.whatsapp?.notifyOnOrder !== false,
+                    notifyOnStatusChange: settings.whatsapp?.notifyOnStatusChange !== false,
+                    orderTemplate: settings.whatsapp?.orderTemplate || "",
+                    statusTemplate: settings.whatsapp?.statusTemplate || "",
                 },
                 maintenanceMode: !!settings.maintenanceMode,
             };
@@ -282,6 +344,125 @@ export default function SettingsPage() {
                         </div>
                         <div className="bg-gray-50 border border-gray-100 rounded-xl p-4">
                             <Toggle label="Maintenance mode" hint="Show a maintenance notice to visitors." checked={!!settings.maintenanceMode} onChange={(v) => setS({ maintenanceMode: v })} />
+                        </div>
+                    </>
+                )}
+
+                {tab === "features" && (
+                    <div className="bg-gray-50 border border-gray-100 rounded-xl p-4 divide-y divide-gray-100">
+                        <p className="text-xs text-gray-400 pb-3">
+                            Master switches for every advanced feature. Turning one off hides it across the storefront, admin and POS.
+                        </p>
+                        {FEATURE_FLAGS.map(([key, label, hint]) => (
+                            <div key={key} className="py-1.5">
+                                <Toggle
+                                    label={label}
+                                    hint={hint}
+                                    checked={settings.features?.[key] !== false}
+                                    onChange={(v) => setFeature(key, v)}
+                                />
+                            </div>
+                        ))}
+                    </div>
+                )}
+
+                {tab === "pos" && (
+                    <>
+                        <div className="bg-gray-50 border border-gray-100 rounded-xl p-4 space-y-3">
+                            <h3 className="text-sm font-semibold text-gray-700">Receipt</h3>
+                            <Field label="Receipt header" hint="Extra line under the store name (e.g. branch or VAT no.).">
+                                <input className={inputCls} value={settings.receipt?.header || ""} onChange={(e) => setReceipt({ header: e.target.value })} />
+                            </Field>
+                            <Field label="Footer note" hint="Thank-you line at the bottom of the receipt.">
+                                <input className={inputCls} value={settings.receipt?.footerNote ?? ""} onChange={(e) => setReceipt({ footerNote: e.target.value })} />
+                            </Field>
+                            <Field label="Return policy" hint="Optional small print under the footer note.">
+                                <textarea rows={2} className={inputCls} value={settings.receipt?.returnPolicy || ""} onChange={(e) => setReceipt({ returnPolicy: e.target.value })} />
+                            </Field>
+                            <div className="grid grid-cols-2 gap-3">
+                                <Field label="Paper width">
+                                    <select className={inputCls} value={settings.receipt?.paperWidth === "58" ? "58" : "80"} onChange={(e) => setReceipt({ paperWidth: e.target.value })}>
+                                        <option value="80">80 mm</option>
+                                        <option value="58">58 mm</option>
+                                    </select>
+                                </Field>
+                            </div>
+                            <Toggle label="Show logo on receipt" checked={settings.receipt?.showLogo !== false} onChange={(v) => setReceipt({ showLogo: v })} />
+                            <Toggle label="Show tax line on receipt" checked={!!settings.receipt?.showTax} onChange={(v) => setReceipt({ showTax: v })} />
+                        </div>
+
+                        <div className="bg-gray-50 border border-gray-100 rounded-xl p-4 space-y-3">
+                            <h3 className="text-sm font-semibold text-gray-700">POS behaviour</h3>
+                            <div className="grid grid-cols-2 gap-3">
+                                <Field label="Low-stock threshold" hint="Warn when stock drops to this level.">
+                                    <input type="number" min="0" className={inputCls} value={settings.pos?.lowStockThreshold ?? 5} onChange={(e) => setPos({ lowStockThreshold: e.target.value })} />
+                                </Field>
+                                <Field label="Tax %" hint="Applied at the POS when tax is enabled.">
+                                    <input type="number" min="0" max="100" step="0.01" className={inputCls} value={settings.pos?.taxPercent ?? 0} onChange={(e) => setPos({ taxPercent: e.target.value })} />
+                                </Field>
+                            </div>
+                            <Field label="Tax label" hint="e.g. VAT, GST, Sales Tax.">
+                                <input className={inputCls} value={settings.pos?.taxLabel || ""} onChange={(e) => setPos({ taxLabel: e.target.value })} />
+                            </Field>
+                            <Toggle label="Require an open shift before selling" checked={!!settings.pos?.requireShift} onChange={(v) => setPos({ requireShift: v })} />
+                            <Toggle label="Allow selling into negative stock" checked={!!settings.pos?.allowNegativeStock} onChange={(v) => setPos({ allowNegativeStock: v })} />
+                        </div>
+                    </>
+                )}
+
+                {tab === "barcode" && (
+                    <div className="bg-gray-50 border border-gray-100 rounded-xl p-4 space-y-3">
+                        <div className="grid grid-cols-2 gap-3">
+                            <Field label="Symbology" hint="Barcode format used on labels.">
+                                <select className={inputCls} value={settings.barcode?.symbology === "EAN13" ? "EAN13" : "CODE128"} onChange={(e) => setBarcodeCfg({ symbology: e.target.value })}>
+                                    <option value="CODE128">CODE128</option>
+                                    <option value="EAN13">EAN-13</option>
+                                </select>
+                            </Field>
+                            <Field label="Code prefix" hint="Optional prefix added to generated codes.">
+                                <input className={inputCls} value={settings.barcode?.prefix || ""} onChange={(e) => setBarcodeCfg({ prefix: e.target.value })} />
+                            </Field>
+                        </div>
+                        <div className="grid grid-cols-2 gap-3">
+                            <Field label="Label width (mm)">
+                                <input type="number" min="10" max="200" className={inputCls} value={settings.barcode?.labelWidthMm ?? 40} onChange={(e) => setBarcodeCfg({ labelWidthMm: e.target.value })} />
+                            </Field>
+                            <Field label="Label height (mm)">
+                                <input type="number" min="10" max="200" className={inputCls} value={settings.barcode?.labelHeightMm ?? 30} onChange={(e) => setBarcodeCfg({ labelHeightMm: e.target.value })} />
+                            </Field>
+                        </div>
+                        <Toggle label="Show product name on label" checked={settings.barcode?.showName !== false} onChange={(v) => setBarcodeCfg({ showName: v })} />
+                        <Toggle label="Show price on label" checked={settings.barcode?.showPrice !== false} onChange={(v) => setBarcodeCfg({ showPrice: v })} />
+                    </div>
+                )}
+
+                {tab === "integrations" && (
+                    <>
+                        <div className="bg-gray-50 border border-gray-100 rounded-xl p-4 space-y-3">
+                            <h3 className="text-sm font-semibold text-gray-700">Web analytics</h3>
+                            <Field label="Google Analytics 4 ID" hint="e.g. G-XXXXXXXXXX">
+                                <input className={inputCls} value={settings.analytics?.ga4Id || ""} onChange={(e) => setAnalytics({ ga4Id: e.target.value })} />
+                            </Field>
+                            <Field label="Meta Pixel ID">
+                                <input className={inputCls} value={settings.analytics?.metaPixelId || ""} onChange={(e) => setAnalytics({ metaPixelId: e.target.value })} />
+                            </Field>
+                            <Field label="Google Tag Manager ID" hint="e.g. GTM-XXXXXXX">
+                                <input className={inputCls} value={settings.analytics?.gtmId || ""} onChange={(e) => setAnalytics({ gtmId: e.target.value })} />
+                            </Field>
+                        </div>
+                        <div className="bg-gray-50 border border-gray-100 rounded-xl p-4 space-y-3">
+                            <h3 className="text-sm font-semibold text-gray-700">WhatsApp notifications</h3>
+                            <Field label="Business number" hint="E.164 without '+', e.g. 8801XXXXXXXXX.">
+                                <input className={inputCls} value={settings.whatsapp?.businessNumber || ""} onChange={(e) => setWhatsapp({ businessNumber: e.target.value })} />
+                            </Field>
+                            <Toggle label="Notify on new order" checked={settings.whatsapp?.notifyOnOrder !== false} onChange={(v) => setWhatsapp({ notifyOnOrder: v })} />
+                            <Toggle label="Notify on status change" checked={settings.whatsapp?.notifyOnStatusChange !== false} onChange={(v) => setWhatsapp({ notifyOnStatusChange: v })} />
+                            <Field label="Order message template" hint="Placeholders: {{name}} {{orderId}} {{total}}.">
+                                <textarea rows={2} className={inputCls} value={settings.whatsapp?.orderTemplate || ""} onChange={(e) => setWhatsapp({ orderTemplate: e.target.value })} />
+                            </Field>
+                            <Field label="Status message template" hint="Placeholders: {{name}} {{orderId}} {{status}}.">
+                                <textarea rows={2} className={inputCls} value={settings.whatsapp?.statusTemplate || ""} onChange={(e) => setWhatsapp({ statusTemplate: e.target.value })} />
+                            </Field>
                         </div>
                     </>
                 )}
