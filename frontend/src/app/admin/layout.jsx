@@ -95,8 +95,6 @@ export default function AdminLayout({ children }) {
                 { name: 'Upload Product', path: '/admin/product', icon: <FiPackage className="w-5 h-5" />, perms: ['product:write'] },
                 { name: 'All Products', path: '/admin/product/all-products', icon: <FiPackage className="w-5 h-5" />, perms: ['product:read'] },
                 { name: 'Barcode Labels', path: '/admin/labels', icon: <FiTag className="w-5 h-5" />, perms: ['product:read'] },
-                { name: 'Ghee & Oil', path: '/admin/ghee-oil', icon: <FiPackage className="w-5 h-5" />, perms: ['product:read'] },
-                { name: 'Honey & Sweets', path: '/admin/honey-sweets', icon: <FiPackage className="w-5 h-5" />, perms: ['product:read'] },
                 { name: 'Stock Management', path: '/admin/stock', icon: <FiTruck className="w-5 h-5" />, perms: ['inventory:read'] },
                 { name: 'Stock Ledger', path: '/admin/stock-ledger', icon: <FiList className="w-5 h-5" />, perms: ['inventory:read'] },
                 { name: 'Discounts', path: '/admin/discount', icon: <FiPercent className="w-5 h-5" />, perms: ['discount:read'] },

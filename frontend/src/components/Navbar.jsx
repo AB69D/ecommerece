@@ -16,7 +16,6 @@ import {
     FiPhone,
     FiChevronRight,
 } from "react-icons/fi";
-import { GiHoneypot, GiOlive } from "react-icons/gi";
 import { getWishlist, setWishlistEnabled } from "@/services/wishlist";
 
 function Navbar() {
@@ -140,14 +139,10 @@ function Navbar() {
 
     const desktopNavLinks = [
         { href: "/", label: "Home" },
-        { href: "/ghee-oil-new", label: "Ghee & Oil" },
-        { href: "/honey-sweets-new", label: "Honey & Sweets" },
     ];
 
     const mobilePrimaryLinks = [
         { href: "/", label: "Home", Icon: FiHome },
-        { href: "/ghee-oil-new", label: "Ghee & Oil", Icon: GiOlive },
-        { href: "/honey-sweets-new", label: "Honey & Sweets", Icon: GiHoneypot },
         { href: "/track-order", label: "Track Order", Icon: FiTruck },
     ];
 
