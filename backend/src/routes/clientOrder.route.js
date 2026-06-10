@@ -61,6 +61,19 @@ clientOrderRouter.post('/create', async (req, res) => {
             });
         }
 
+        // Snapshot each variant's cost price (for profit reporting) by loading the
+        // referenced products once — the cart only stores the sell price.
+        const cartProductIds = [...new Set(cart.items.map((it) => it.productId).filter(Boolean))];
+        const cartProducts = await ProductModel.find({ _id: { $in: cartProductIds } })
+            .select('weights')
+            .lean();
+        const weightsByProductId = new Map(cartProducts.map((p) => [String(p._id), p.weights || []]));
+        const costFor = (productId, weightIndex) => {
+            const weights = weightsByProductId.get(String(productId));
+            const w = weights?.[weightIndex || 0];
+            return Math.round((Number(w?.costPrice) || 0) * 100) / 100;
+        };
+
         // Use stored product info directly
         const orderItems = cart.items.map(item => ({
             productId: item.productId,
@@ -70,7 +83,8 @@ clientOrderRouter.post('/create', async (req, res) => {
             weight: item.weight,
             weightIndex: item.weightIndex || 0,
             price: item.price,
-            totalPrice: item.price * item.quantity
+            totalPrice: item.price * item.quantity,
+            costPrice: costFor(item.productId, item.weightIndex || 0)
         }));
 
         const subtotal = cart.totalAmount;

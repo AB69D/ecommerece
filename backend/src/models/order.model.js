@@ -30,6 +30,13 @@ const orderItemSchema = new Schema({
         type: Number,
         required: true
     },
+    // Unit cost of this variant captured at sale time, so profit/margin
+    // reports reflect the cost as it was when sold (not today's cost).
+    // Defaults to 0 so historical orders and cost-less products are valid.
+    costPrice: {
+        type: Number,
+        default: 0
+    },
     weightIndex: {
         type: Number,
         default: 0

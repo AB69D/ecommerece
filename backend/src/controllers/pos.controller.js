@@ -225,6 +225,7 @@ export const createPosSale = asyncHandler(async (req, res) => {
             weightIndex: idx,
             price: unitPrice,
             totalPrice: Math.round(unitPrice * quantity * 100) / 100,
+            costPrice: Math.round((Number(w.costPrice) || 0) * 100) / 100,
         });
     }
 

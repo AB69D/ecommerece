@@ -3,6 +3,8 @@ import ProductModel from '../models/product.model.js';
 import CategoryModel from '../models/category.model.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { ok } from '../lib/ApiResponse.js';
+import { ApiError } from '../lib/ApiError.js';
+import { isFeatureEnabled } from '../lib/siteSettings.js';
 
 const REVENUE_STATUSES = { orderStatus: { $nin: ['cancelled', 'failed', 'returned'] } };
 const LOW_STOCK_THRESHOLD = 5;
@@ -217,4 +219,150 @@ export const getDashboardOverview = asyncHandler(async (req, res) => {
             sellers,
         },
     });
+});
+
+// GET /api/admin/analytics/profit?days=30&channel=all|pos|ecommerce
+// Cost / profit / margin reporting. Profit is computed from the per-line cost
+// snapshot captured at sale time (order.items.costPrice) vs the line revenue.
+// Gated by the admin-toggleable `profitReporting` feature flag.
+export const getProfitReport = asyncHandler(async (req, res) => {
+    const enabled = await isFeatureEnabled('profitReporting', true);
+    if (!enabled) throw ApiError.forbidden('Profit reporting is disabled in site settings');
+
+    const days = Math.min(Math.max(parseInt(req.query.days, 10) || 30, 7), 365);
+    const channel = ['pos', 'ecommerce'].includes(req.query.channel) ? req.query.channel : 'all';
+
+    const now = new Date();
+    const since = startOfDay(new Date(now.getTime() - (days - 1) * 86400000));
+
+    // Exclude cancelled/failed/returned; optionally scope to one channel.
+    const baseMatch = { ...REVENUE_STATUSES, createdAt: { $gte: since } };
+    if (channel === 'pos') baseMatch.source = 'pos';
+    else if (channel === 'ecommerce') baseMatch.source = { $ne: 'pos' };
+
+    // COGS = quantity × per-line cost snapshot (0 when no cost recorded).
+    const costExpr = { $multiply: ['$items.quantity', { $ifNull: ['$items.costPrice', 0] }] };
+
+    const [itemAgg, dailyAgg, productAgg, channelAgg, orderAgg] = await Promise.all([
+        OrderModel.aggregate([
+            { $match: baseMatch },
+            { $unwind: '$items' },
+            {
+                $group: {
+                    _id: null,
+                    revenue: { $sum: '$items.totalPrice' },
+                    cost: { $sum: costExpr },
+                    units: { $sum: '$items.quantity' },
+                },
+            },
+        ]),
+        OrderModel.aggregate([
+            { $match: baseMatch },
+            { $unwind: '$items' },
+            {
+                $group: {
+                    _id: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } },
+                    revenue: { $sum: '$items.totalPrice' },
+                    cost: { $sum: costExpr },
+                },
+            },
+        ]),
+        OrderModel.aggregate([
+            { $match: baseMatch },
+            { $unwind: '$items' },
+            {
+                $group: {
+                    _id: '$items.productName',
+                    revenue: { $sum: '$items.totalPrice' },
+                    cost: { $sum: costExpr },
+                    qty: { $sum: '$items.quantity' },
+                    image: { $first: '$items.productImage' },
+                },
+            },
+        ]),
+        OrderModel.aggregate([
+            { $match: baseMatch },
+            { $unwind: '$items' },
+            {
+                $group: {
+                    _id: { $cond: [{ $eq: ['$source', 'pos'] }, 'pos', 'ecommerce'] },
+                    revenue: { $sum: '$items.totalPrice' },
+                    cost: { $sum: costExpr },
+                },
+            },
+        ]),
+        // Order-level totals (not unwound) for counts + coupon discounts.
+        OrderModel.aggregate([
+            { $match: baseMatch },
+            { $group: { _id: null, orders: { $sum: 1 }, discounts: { $sum: '$discount' } } },
+        ]),
+    ]);
+
+    const round2 = (n) => Math.round((n || 0) * 100) / 100;
+    const pct = (num, den) => (den > 0 ? Math.round((num / den) * 1000) / 10 : 0);
+
+    const revenue = round2(itemAgg[0]?.revenue);
+    const cost = round2(itemAgg[0]?.cost);
+    const grossProfit = round2(revenue - cost);
+    const units = itemAgg[0]?.units || 0;
+    const orders = orderAgg[0]?.orders || 0;
+    const discounts = round2(orderAgg[0]?.discounts);
+    const netProfit = round2(grossProfit - discounts);
+
+    // Zero-fill the daily series so the chart line is continuous.
+    const byDay = Object.fromEntries(dailyAgg.map((d) => [d._id, d]));
+    const series = [];
+    for (let i = 0; i < days; i += 1) {
+        const date = ymd(new Date(since.getTime() + i * 86400000));
+        const hit = byDay[date];
+        const r = round2(hit?.revenue);
+        const c = round2(hit?.cost);
+        series.push({ date, revenue: r, cost: c, profit: round2(r - c) });
+    }
+
+    const topProducts = productAgg
+        .map((p) => {
+            const r = round2(p.revenue);
+            const c = round2(p.cost);
+            return {
+                name: p._id || 'Unknown',
+                qty: p.qty,
+                revenue: r,
+                cost: c,
+                profit: round2(r - c),
+                margin: pct(r - c, r),
+                image: p.image || '',
+            };
+        })
+        .sort((a, b) => b.profit - a.profit)
+        .slice(0, 10);
+
+    const channels = {
+        ecommerce: { revenue: 0, cost: 0, profit: 0 },
+        pos: { revenue: 0, cost: 0, profit: 0 },
+    };
+    for (const row of channelAgg) {
+        const key = row._id === 'pos' ? 'pos' : 'ecommerce';
+        const r = round2(row.revenue);
+        const c = round2(row.cost);
+        channels[key] = { revenue: r, cost: c, profit: round2(r - c) };
+    }
+
+    return ok(res, {
+        days,
+        channel,
+        summary: {
+            revenue,
+            cost,
+            grossProfit,
+            margin: pct(grossProfit, revenue),
+            discounts,
+            netProfit,
+            orders,
+            units,
+        },
+        series,
+        topProducts,
+        channels,
+    }, 'Profit report');
 });
