@@ -3,8 +3,13 @@ import { authFetch } from "@/services/api";
 import React, { useState, useEffect } from "react";
 import Image from "next/image";
 import { FiEdit2, FiTrash2, FiX } from "react-icons/fi";
+import { useAdminAuth } from "@/context/AdminAuthContext";
 
 export default function AllCategoriesPage() {
+    const { can } = useAdminAuth();
+    const canWrite = can("category:write");
+    const canDelete = can("category:delete");
+
     const [categories, setCategories] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
@@ -112,19 +117,26 @@ export default function AllCategoriesPage() {
                             <div className="p-3 sm:p-4 border-t border-gray-100 flex-1 flex flex-col justify-between">
                                 <h4 className="font-semibold text-sm sm:text-base lg:text-lg mb-3 sm:mb-4">{category.category_name}</h4>
                                 <div className="flex items-center gap-2 mt-auto">
-                                    <button
-                                        onClick={() => setEditingCategory(category)}
-                                        className="flex-1 flex items-center justify-center gap-1 sm:gap-2 py-1.5 sm:py-2 bg-blue-50 text-blue-600 rounded hover:bg-blue-100 transition text-xs sm:text-sm font-medium"
-                                    >
-                                        <FiEdit2 className="w-3 h-3 sm:w-4 sm:h-4" /> Edit
-                                    </button>
-                                    <button
-                                        onClick={() => handleDelete(category._id)}
-                                        disabled={actionLoading}
-                                        className="flex-1 flex items-center justify-center gap-1 sm:gap-2 py-1.5 sm:py-2 bg-red-50 text-red-600 rounded hover:bg-red-100 transition text-xs sm:text-sm font-medium disabled:opacity-50"
-                                    >
-                                        <FiTrash2 className="w-3 h-3 sm:w-4 sm:h-4" /> Delete
-                                    </button>
+                                    {canWrite && (
+                                        <button
+                                            onClick={() => setEditingCategory(category)}
+                                            className="flex-1 flex items-center justify-center gap-1 sm:gap-2 py-1.5 sm:py-2 bg-blue-50 text-blue-600 rounded hover:bg-blue-100 transition text-xs sm:text-sm font-medium"
+                                        >
+                                            <FiEdit2 className="w-3 h-3 sm:w-4 sm:h-4" /> Edit
+                                        </button>
+                                    )}
+                                    {canDelete && (
+                                        <button
+                                            onClick={() => handleDelete(category._id)}
+                                            disabled={actionLoading}
+                                            className="flex-1 flex items-center justify-center gap-1 sm:gap-2 py-1.5 sm:py-2 bg-red-50 text-red-600 rounded hover:bg-red-100 transition text-xs sm:text-sm font-medium disabled:opacity-50"
+                                        >
+                                            <FiTrash2 className="w-3 h-3 sm:w-4 sm:h-4" /> Delete
+                                        </button>
+                                    )}
+                                    {!canWrite && !canDelete && (
+                                        <span className="text-xs text-gray-400 py-1.5">View only</span>
+                                    )}
                                 </div>
                             </div>
                         </div>

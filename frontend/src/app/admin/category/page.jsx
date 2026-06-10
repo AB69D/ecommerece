@@ -1,9 +1,13 @@
 "use client";
 import { authFetch } from "@/services/api";
 import React, { useState } from "react";
-import { FiUploadCloud } from "react-icons/fi";
+import { FiUploadCloud, FiLock } from "react-icons/fi";
+import { useAdminAuth } from "@/context/AdminAuthContext";
 
 export default function CreateCategoryPage() {
+    const { can } = useAdminAuth();
+    const canWrite = can("category:write");
+
     const [loading, setLoading] = useState(false);
     const [message, setMessage] = useState("");
 
@@ -35,10 +39,22 @@ export default function CreateCategoryPage() {
         }
     };
 
+    if (!canWrite) {
+        return (
+            <div className="max-w-md mx-auto text-center py-16">
+                <div className="w-14 h-14 mx-auto rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center mb-4">
+                    <FiLock className="w-7 h-7" />
+                </div>
+                <h3 className="text-xl font-bold text-gray-800 mb-1">View-only access</h3>
+                <p className="text-gray-500">You don&apos;t have permission to create categories. Ask an admin to grant you the <strong>Categories: write</strong> permission.</p>
+            </div>
+        );
+    }
+
     return (
         <div>
             <h3 className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-800 mb-4 sm:mb-6">Create Category</h3>
-            
+
             {message && (
                 <div className={`p-3 sm:p-4 mb-4 sm:mb-6 rounded-lg font-medium text-xs sm:text-sm border ${
                     message.startsWith("Success") ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-red-50 text-red-700 border-red-200"

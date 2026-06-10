@@ -1,7 +1,8 @@
 "use client";
 import { authFetch } from "@/services/api";
 import React, { useState, useEffect } from "react";
-import { FiUploadCloud, FiPlus, FiTrash2, FiChevronDown, FiChevronUp } from "react-icons/fi";
+import { FiUploadCloud, FiPlus, FiTrash2, FiChevronDown, FiChevronUp, FiLock } from "react-icons/fi";
+import { useAdminAuth } from "@/context/AdminAuthContext";
 
 // Mirror of the backend GS1 "internal use" (prefix 2) barcode so the admin can
 // preview/lock a code in the form. The server fills any blank code on save.
@@ -13,6 +14,9 @@ const genBarcodePreview = (index = 0) => {
 };
 
 export default function CreateProductPage() {
+    const { can } = useAdminAuth();
+    const canWrite = can("product:write");
+
     const [loading, setLoading] = useState(false);
     const [message, setMessage] = useState("");
     const [categories, setCategories] = useState([]);
@@ -140,10 +144,22 @@ export default function CreateProductPage() {
         }
     };
 
+    if (!canWrite) {
+        return (
+            <div className="max-w-md mx-auto text-center py-16">
+                <div className="w-14 h-14 mx-auto rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center mb-4">
+                    <FiLock className="w-7 h-7" />
+                </div>
+                <h3 className="text-xl font-bold text-gray-800 mb-1">View-only access</h3>
+                <p className="text-gray-500">You don&apos;t have permission to create or edit products. Ask an admin to grant you the <strong>Products: write</strong> permission.</p>
+            </div>
+        );
+    }
+
     return (
         <div>
             <h3 className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-800 mb-4 sm:mb-6">Create Product</h3>
-            
+
             {message && (
                 <div className={`p-3 sm:p-4 mb-4 sm:mb-6 rounded-lg font-medium text-xs sm:text-sm border ${
                     message.startsWith("Success") ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-red-50 text-red-700 border-red-200"

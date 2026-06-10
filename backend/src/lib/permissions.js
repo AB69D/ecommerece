@@ -39,7 +39,7 @@ export const PERMISSION_GROUPS = Object.freeze([
         key: 'sales',
         label: 'Sales & Operations',
         resources: [
-            { key: 'order', label: 'Orders', actions: ['read', 'write', 'delete'] },
+            { key: 'order', label: 'Orders', actions: ['read', 'write', 'status', 'delete'] },
             { key: 'fulfillment', label: 'Fulfillment / Shipments', actions: ['read', 'write'] },
             { key: 'inventory', label: 'Inventory / Stock', actions: ['read', 'write'] },
             { key: 'vendor', label: 'Vendors', actions: ['read', 'write', 'delete'] },
@@ -114,13 +114,16 @@ export const isValidPermission = (perm) =>
 export const ROLES = Object.freeze([
     'super-admin',
     'admin',
-    'manager',
-    'support',
-    'viewer',
-    'pos-seller',
+    'moderator',
+    'salesman',
 ]);
 
 const readEverything = ALL_PERMISSIONS.filter((p) => p.endsWith(':read'));
+
+// Resources a moderator must NOT see at all (admin-only areas + POS).
+const MODERATOR_HIDDEN_RESOURCES = new Set([
+    'user', 'role', 'audit', 'integration', 'compliance', 'settings', 'pos',
+]);
 
 export const ROLE_PERMISSIONS = Object.freeze({
     // Full access — bypasses the matrix entirely.
@@ -131,49 +134,25 @@ export const ROLE_PERMISSIONS = Object.freeze({
         (p) => !p.startsWith('role:') && p !== 'integration:manage' && p !== 'settings:manage',
     ),
 
-    // Day-to-day commerce operations: catalog, orders, inventory, customers.
-    manager: [
-        'product:read', 'product:write', 'product:delete',
-        'category:read', 'category:write', 'category:delete',
-        'brand:read', 'brand:write', 'brand:delete',
-        'review:read', 'review:write', 'review:delete',
-        'discount:read', 'discount:write', 'discount:delete',
-        'order:read', 'order:write',
-        'fulfillment:read', 'fulfillment:write',
-        'inventory:read', 'inventory:write',
-        'vendor:read', 'vendor:write',
-        'customer:read', 'customer:write',
-        'company:read', 'company:write',
-        'pricelist:read', 'pricelist:write',
-        'quote:read', 'quote:write',
-        'content:read', 'content:write',
-        'header:read', 'header:write', 'header:delete',
-        'analytics:read',
-        'pos:read', 'pos:sell', 'pos:manage',
-    ],
-
-    // Customer support: read most, act on orders / reviews / customers.
-    support: [
-        ...readEverything.filter((p) => !p.startsWith('audit:') && !p.startsWith('integration:')),
-        'order:write',
-        'review:write',
-        'customer:write',
-        'quote:write',
-    ],
-
-    // Read-only.
-    viewer: readEverything.filter(
-        (p) => !p.startsWith('audit:') && !p.startsWith('integration:') && !p.startsWith('role:'),
+    // Read-only across the storefront/operations data by default. They cannot
+    // see the admin-only areas (users, roles, audit, settings) or the POS.
+    // Write access (e.g. product:write, order:status) is granted per-user via
+    // the tick-mark permission matrix on top of these defaults.
+    moderator: readEverything.filter(
+        (p) => !MODERATOR_HIDDEN_RESOURCES.has(p.split(':')[0]),
     ),
 
-    // POS cashier: ring up sales/returns at the in-store terminal and read
-    // the catalog + their own reports. No access to the main admin panel.
-    'pos-seller': [
+    // In-store seller / cashier: ring up sales & returns at the POS terminal,
+    // read the catalog, and view the order list with the ability to advance an
+    // order's status only (no edit / delete / create from the admin panel).
+    salesman: [
         'pos:sell',
         'pos:read',
         'product:read',
         'category:read',
         'inventory:read',
+        'order:read',
+        'order:status',
     ],
 });
 

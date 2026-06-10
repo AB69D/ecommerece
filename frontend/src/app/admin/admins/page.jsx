@@ -214,7 +214,7 @@ export default function UsersRolesPage() {
                                         <div className="text-xs text-gray-400">@{u.username}{u.email ? ` · ${u.email}` : ""}{isMe ? " · you" : ""}</div>
                                     </td>
                                     <td className="px-4 py-3">
-                                        <span className={`inline-block text-xs font-medium px-2.5 py-1 rounded-full border ${ROLE_BADGE[u.role] || ROLE_BADGE.viewer}`}>
+                                        <span className={`inline-block text-xs font-medium px-2.5 py-1 rounded-full border ${ROLE_BADGE[u.role] || "bg-gray-100 text-gray-600 border-gray-200"}`}>
                                             {ROLE_LABELS[u.role] || u.role}
                                         </span>
                                         {u.permissions?.length > 0 && (

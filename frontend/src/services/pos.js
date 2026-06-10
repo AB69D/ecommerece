@@ -82,6 +82,17 @@ export const getPosSales = (params) => posFetch(`/pos/sales${qs(params)}`).then(
 
 export const getPosReport = () => posFetch(`/pos/report`).then(json);
 
+// ---- Orders (salesman: view the order list + advance status only) ----
+
+// Uses the shared admin order endpoints, gated server-side by order:read /
+// order:status so a salesman can list orders and change their status but not
+// edit, create, or delete them.
+export const getPosOrders = (body) =>
+    posFetch(`/order/get-all`, { method: "POST", headers: jsonHeaders, body: JSON.stringify(body || {}) }).then(json);
+
+export const updatePosOrderStatus = (orderId, orderStatus) =>
+    posFetch(`/order/update-status`, { method: "PUT", headers: jsonHeaders, body: JSON.stringify({ orderId, orderStatus }) }).then(json);
+
 // ---- POS shift / cash-drawer ----
 
 // The caller's open shift (with live drawer figures) or { enabled, shift:null }.

@@ -2,8 +2,12 @@
 import { authFetch } from "@/services/api";
 import React, { useState, useEffect } from "react";
 import { FiSearch, FiPlus, FiMinus, FiAlertCircle, FiTrendingUp, FiPackage } from "react-icons/fi";
+import { useAdminAuth } from "@/context/AdminAuthContext";
 
 export default function StockManagementPage() {
+    const { can } = useAdminAuth();
+    const canWrite = can("inventory:write");
+
     const [stockData, setStockData] = useState([]);
     const [summary, setSummary] = useState({ totalProducts: 0, totalItemsInStock: 0, totalInventoryValue: 0 });
     const [loading, setLoading] = useState(true);
@@ -188,12 +192,14 @@ export default function StockManagementPage() {
                                                 }`}>
                                                     Stock: {weight.stock}
                                                 </span>
-                                                <button
-                                                    onClick={() => setAdjustModal({ show: true, product, weightIndex: index })}
-                                                    className="text-sm text-emerald-600 hover:text-emerald-700 font-medium"
-                                                >
-                                                    Adjust
-                                                </button>
+                                                {canWrite && (
+                                                    <button
+                                                        onClick={() => setAdjustModal({ show: true, product, weightIndex: index })}
+                                                        className="text-sm text-emerald-600 hover:text-emerald-700 font-medium"
+                                                    >
+                                                        Adjust
+                                                    </button>
+                                                )}
                                             </div>
                                         </div>
                                     ))}

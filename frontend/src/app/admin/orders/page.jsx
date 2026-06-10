@@ -5,9 +5,13 @@ import React, { useState, useEffect } from "react";
 import { FiSearch, FiEye, FiCheck, FiX, FiPackage, FiTruck, FiClock, FiChevronRight, FiDollarSign, FiCalendar, FiUser, FiMapPin, FiPhone, FiMail, FiShoppingBag, FiGlobe } from "react-icons/fi";
 import { PiWhatsappLogoBold } from "react-icons/pi";
 import { useWhatsApp } from "@/hooks/useWhatsApp";
+import { useAdminAuth } from "@/context/AdminAuthContext";
 
 export default function AdminOrdersPage() {
     const wa = useWhatsApp();
+    const { can } = useAdminAuth();
+    const canWrite = can("order:write");
+    const canChangeStatus = canWrite || can("order:status");
     const [orders, setOrders] = useState([]);
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState("");
@@ -33,7 +37,7 @@ export default function AdminOrdersPage() {
             try {
                 const res = await listAdminUsers();
                 if (res?.success && Array.isArray(res.data)) {
-                    setSellers(res.data.filter((u) => u.role === "pos-seller"));
+                    setSellers(res.data.filter((u) => u.role === "salesman"));
                 }
             } catch {
                 /* ignore — viewer may not have user:read */
@@ -639,13 +643,13 @@ export default function AdminOrdersPage() {
                             )}
 
                             {/* Action Buttons */}
-                            {selectedOrder.orderStatus === 'pending' && (
+                            {canWrite && selectedOrder.orderStatus === 'pending' && (
                                 <button
-                                    onClick={() => setConfirmModal({ 
-                                        show: true, 
-                                        order: selectedOrder, 
-                                        deliveryDate: "", 
-                                        adminNotes: "" 
+                                    onClick={() => setConfirmModal({
+                                        show: true,
+                                        order: selectedOrder,
+                                        deliveryDate: "",
+                                        adminNotes: ""
                                     })}
                                     className="w-full bg-emerald-600 text-white px-4 py-3 rounded-xl hover:bg-emerald-700 flex items-center justify-center gap-2 font-medium"
                                 >
@@ -654,7 +658,7 @@ export default function AdminOrdersPage() {
                                 </button>
                             )}
 
-                            {selectedOrder.orderStatus !== 'pending' && selectedOrder.orderStatus !== 'cancelled' && selectedOrder.orderStatus !== 'delivered' && (
+                            {canChangeStatus && selectedOrder.orderStatus !== 'pending' && selectedOrder.orderStatus !== 'cancelled' && selectedOrder.orderStatus !== 'delivered' && (
                                 <div className="flex gap-3">
                                     {getNextStatuses(selectedOrder.orderStatus).map((action) => (
                                         <button
@@ -668,13 +672,17 @@ export default function AdminOrdersPage() {
                                 </div>
                             )}
 
-                            {selectedOrder.orderStatus !== 'cancelled' && selectedOrder.orderStatus !== 'delivered' && (
+                            {canChangeStatus && selectedOrder.orderStatus !== 'cancelled' && selectedOrder.orderStatus !== 'delivered' && (
                                 <button
                                     onClick={() => handleUpdateStatus(selectedOrder.orderId, 'cancelled')}
                                     className="w-full border border-red-200 text-red-600 px-4 py-3 rounded-xl hover:bg-red-50 font-medium"
                                 >
                                     Cancel Order
                                 </button>
+                            )}
+
+                            {!canChangeStatus && !canWrite && (
+                                <p className="text-center text-xs text-gray-400 pt-2">You have view-only access to orders.</p>
                             )}
                         </div>
                     </div>

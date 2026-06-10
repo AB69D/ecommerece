@@ -2,13 +2,14 @@
 import { useState, useMemo, useCallback, useEffect } from "react";
 import {
     FiShoppingBag, FiLogOut, FiShoppingCart, FiTag, FiRotateCcw, FiBarChart2,
-    FiCheckCircle, FiAlertCircle, FiX, FiExternalLink, FiClock,
+    FiCheckCircle, FiAlertCircle, FiX, FiExternalLink, FiClock, FiTruck,
 } from "react-icons/fi";
 import SellView from "./SellView";
 import ReturnsView from "./ReturnsView";
 import ReportsView from "./ReportsView";
 import ShiftView from "./ShiftView";
-import { canSell, canRead, canManage } from "./posPerms";
+import OrdersView from "./OrdersView";
+import { canSell, canRead, canManage, canReadOrders, canChangeOrderStatus } from "./posPerms";
 import { getPosSettings } from "@/services/pos";
 
 export default function PosTerminal({ me, onLogout }) {
@@ -16,6 +17,8 @@ export default function PosTerminal({ me, onLogout }) {
     const sell = canSell(perms);
     const read = canRead(perms);
     const manage = canManage(perms);
+    const readOrders = canReadOrders(perms);
+    const changeOrders = canChangeOrderStatus(perms);
 
     // Shift tab visibility tracks the admin-toggleable posShift feature flag.
     const [shiftEnabled, setShiftEnabled] = useState(false);
@@ -32,10 +35,11 @@ export default function PosTerminal({ me, onLogout }) {
             list.push({ key: "wholesale", label: "Wholesale", icon: FiTag });
             list.push({ key: "returns", label: "Returns", icon: FiRotateCcw });
         }
+        if (readOrders) list.push({ key: "orders", label: "Orders", icon: FiTruck });
         if (shiftEnabled && (sell || read)) list.push({ key: "shift", label: "Shift", icon: FiClock });
         if (read) list.push({ key: "reports", label: "Reports", icon: FiBarChart2 });
         return list;
-    }, [sell, read, shiftEnabled]);
+    }, [sell, read, readOrders, shiftEnabled]);
 
     const [tab, setTab] = useState(tabs[0]?.key || "reports");
     const [toasts, setToasts] = useState([]);
@@ -112,6 +116,7 @@ export default function PosTerminal({ me, onLogout }) {
                 {tab === "sell" && <SellView mode="retail" notify={notify} />}
                 {tab === "wholesale" && <SellView mode="wholesale" notify={notify} />}
                 {tab === "returns" && <ReturnsView notify={notify} />}
+                {tab === "orders" && <OrdersView canChange={changeOrders} />}
                 {tab === "shift" && <ShiftView notify={notify} canManage={manage} />}
                 {tab === "reports" && <ReportsView />}
             </main>

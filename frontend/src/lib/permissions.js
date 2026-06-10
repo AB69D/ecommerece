@@ -18,15 +18,13 @@ export const hasAnyPermission = (me, list = []) =>
 export const ROLE_LABELS = {
     'super-admin': 'Super Admin',
     admin: 'Admin',
-    manager: 'Manager',
-    support: 'Support',
-    viewer: 'Viewer',
+    moderator: 'Moderator',
+    salesman: 'Salesman',
 };
 
 export const ROLE_BADGE = {
     'super-admin': 'bg-purple-100 text-purple-700 border-purple-200',
     admin: 'bg-indigo-100 text-indigo-700 border-indigo-200',
-    manager: 'bg-emerald-100 text-emerald-700 border-emerald-200',
-    support: 'bg-amber-100 text-amber-700 border-amber-200',
-    viewer: 'bg-gray-100 text-gray-600 border-gray-200',
+    moderator: 'bg-amber-100 text-amber-700 border-amber-200',
+    salesman: 'bg-emerald-100 text-emerald-700 border-emerald-200',
 };

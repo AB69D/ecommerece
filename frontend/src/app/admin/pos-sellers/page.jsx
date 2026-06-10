@@ -33,7 +33,7 @@ export default function PosSellersPage() {
         try {
             const res = await listAdminUsers();
             if (res?.success) {
-                setSellers((res.data || []).filter((u) => u.role === "pos-seller"));
+                setSellers((res.data || []).filter((u) => u.role === "salesman"));
             }
         } catch {
             flash("error", "Failed to load sellers");
@@ -223,7 +223,7 @@ function SellerFormModal({ onClose, onCreated, onError }) {
                 password: form.password,
                 fullName: form.fullName.trim(),
                 email: form.email.trim(),
-                role: "pos-seller",
+                role: "salesman",
             });
             if (res?.success) {
                 onCreated(`POS seller "${form.username.trim().toLowerCase()}" created`);

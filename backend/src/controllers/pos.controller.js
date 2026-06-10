@@ -1,7 +1,7 @@
 // ---------------------------------------------------------------
 // POS (Point of Sale) controller.
 //
-// In-store terminal used by `pos-seller` accounts (and any admin with the
+// In-store terminal used by `salesman` accounts (and any admin with the
 // `pos:sell` / `pos:read` permissions). POS sales are stored in the SAME
 // Order collection as e-commerce orders (source: 'pos') and draw down the
 // SAME product inventory, so stock stays in sync across both channels.

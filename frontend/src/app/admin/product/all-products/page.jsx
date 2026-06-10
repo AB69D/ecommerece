@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { FiEdit, FiTrash2, FiSearch, FiX, FiImage } from "react-icons/fi";
 import { useRouter } from "next/navigation";
+import { useAdminAuth } from "@/context/AdminAuthContext";
 
 // Mirror of the backend GS1 (prefix 2) barcode generator for in-form previews.
 const genBarcodePreview = (index = 0) => {
@@ -14,6 +15,10 @@ const genBarcodePreview = (index = 0) => {
 };
 
 export default function AllProductsPage() {
+    const { can } = useAdminAuth();
+    const canWrite = can("product:write");
+    const canDelete = can("product:delete");
+
     const [products, setProducts] = useState([]);
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState("");
@@ -168,9 +173,11 @@ export default function AllProductsPage() {
         <div>
             <div className="flex items-center justify-between mb-6">
                 <h3 className="text-2xl font-bold text-gray-800">All Products</h3>
-                <Link href="/admin/product" className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors text-sm">
-                    + Add New
-                </Link>
+                {canWrite && (
+                    <Link href="/admin/product" className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors text-sm">
+                        + Add New
+                    </Link>
+                )}
             </div>
 
             {message && (
@@ -251,18 +258,25 @@ export default function AllProductsPage() {
                                             </td>
                                             <td className="px-4 py-3">
                                                 <div className="flex items-center gap-2">
-                                                    <button
-                                                        onClick={() => openEdit(product)}
-                                                        className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                                                    >
-                                                        <FiEdit className="w-4 h-4" />
-                                                    </button>
-                                                    <button
-                                                        onClick={() => setDeleteModal({ show: true, product })}
-                                                        className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                                                    >
-                                                        <FiTrash2 className="w-4 h-4" />
-                                                    </button>
+                                                    {canWrite && (
+                                                        <button
+                                                            onClick={() => openEdit(product)}
+                                                            className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                                                        >
+                                                            <FiEdit className="w-4 h-4" />
+                                                        </button>
+                                                    )}
+                                                    {canDelete && (
+                                                        <button
+                                                            onClick={() => setDeleteModal({ show: true, product })}
+                                                            className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                                        >
+                                                            <FiTrash2 className="w-4 h-4" />
+                                                        </button>
+                                                    )}
+                                                    {!canWrite && !canDelete && (
+                                                        <span className="text-xs text-gray-400">View only</span>
+                                                    )}
                                                 </div>
                                             </td>
                                         </tr>

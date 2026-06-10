@@ -51,7 +51,7 @@ export default function AccountPage() {
                     <div>
                         <div className="font-semibold text-gray-800">{me?.fullName || me?.username}</div>
                         <div className="text-sm text-gray-400">@{me?.username}{me?.email ? ` · ${me.email}` : ""}</div>
-                        <span className={`inline-flex items-center gap-1 mt-1 text-xs font-medium px-2.5 py-0.5 rounded-full border ${ROLE_BADGE[me?.role] || ROLE_BADGE.viewer}`}>
+                        <span className={`inline-flex items-center gap-1 mt-1 text-xs font-medium px-2.5 py-0.5 rounded-full border ${ROLE_BADGE[me?.role] || "bg-gray-100 text-gray-600 border-gray-200"}`}>
                             <FiShield className="w-3 h-3" /> {ROLE_LABELS[me?.role] || me?.role}
                         </span>
                     </div>

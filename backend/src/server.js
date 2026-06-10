@@ -13,6 +13,7 @@ import { errorHandler } from './middlewares/error.middleware.js';
 import { notFound } from './middlewares/notFound.middleware.js';
 import requireAuth from './middlewares/auth.middleware.js';
 import { auditMutations } from './lib/audit.js';
+import AdminModel from './models/admin.model.js';
 
 import categoryRouter from './routes/category.route.js';
 import productRouter from './routes/product.route.js';
@@ -152,9 +153,33 @@ app.use('/api/client/chatbot', chatbotRouter);
 app.use(notFound);
 app.use(errorHandler);
 
+// Collapse the legacy six-role model down to the four roles the app now
+// supports. Idempotent: only touches docs that still carry an old role.
+const migrateRoles = async () => {
+    try {
+        const toModerator = await AdminModel.updateMany(
+            { role: { $in: ['manager', 'support', 'viewer'] } },
+            { $set: { role: 'moderator' } },
+        );
+        const toSalesman = await AdminModel.updateMany(
+            { role: 'pos-seller' },
+            { $set: { role: 'salesman' } },
+        );
+        const moved = (toModerator.modifiedCount || 0) + (toSalesman.modifiedCount || 0);
+        if (moved > 0) {
+            logger.info(
+                `Role migration: ${toModerator.modifiedCount || 0} -> moderator, ${toSalesman.modifiedCount || 0} -> salesman`,
+            );
+        }
+    } catch (err) {
+        logger.error({ err }, 'Role migration failed (continuing startup)');
+    }
+};
+
 const start = async () => {
     try {
         await connectDB();
+        await migrateRoles();
         const server = app.listen(env.PORT, () => {
             logger.info(`Server listening on port ${env.PORT} [${env.NODE_ENV}]`);
         });

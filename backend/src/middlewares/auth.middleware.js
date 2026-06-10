@@ -68,4 +68,18 @@ export const requirePermission = (...required) =>
         next();
     });
 
+// Fine-grained gate. Passes if the user holds ANY ONE of the listed
+// permissions. Useful when several distinct grants should unlock the same
+// action (e.g. order:write OR order:status can change an order's status).
+export const requireAnyPermission = (...required) =>
+    asyncHandler(async (req, _res, next) => {
+        if (!req.admin) throw ApiError.unauthorized();
+        const set = req.permissions || new Set();
+        const ok = required.some((p) => setHasPermission(set, p));
+        if (!ok) {
+            throw ApiError.forbidden(`Missing permission: one of ${required.join(', ')}`);
+        }
+        next();
+    });
+
 export default requireAuth;
