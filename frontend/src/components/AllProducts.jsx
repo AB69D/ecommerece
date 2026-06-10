@@ -5,6 +5,7 @@ import { FiEye, FiPlus } from "react-icons/fi";
 import { ProductGridSkeleton } from "./ProductCardSkeleton";
 import { useCurrency } from "@/context/CurrencyContext.jsx";
 import ProductRating from "./ProductRating.jsx";
+import WishlistButton from "./WishlistButton.jsx";
 
 export default function AllProducts() {
     const [products, setProducts] = useState([]);
@@ -135,6 +136,8 @@ export default function AllProducts() {
                                         -{minWeight.discountPercent}%
                                     </div>
                                 )}
+
+                                <WishlistButton product={product} className="absolute top-2 right-2" />
                             </div>
 
                             <div className="p-2 sm:p-3 flex flex-col items-center">

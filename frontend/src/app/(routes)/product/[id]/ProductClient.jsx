@@ -7,6 +7,7 @@ import { PiWhatsappLogoBold } from "react-icons/pi";
 import { addToCart } from "@/utils/cart";
 import { useCurrency } from "@/context/CurrencyContext.jsx";
 import ProductReviews from "@/components/ProductReviews.jsx";
+import WishlistButton from "@/components/WishlistButton.jsx";
 
 export default function ProductClient({ productId }) {
     const [product, setProduct] = useState(null);
@@ -401,6 +402,7 @@ export default function ProductClient({ productId }) {
                                  <span>Chat on WhatsApp</span>
                              </a>
                          </div>
+                         {product && <WishlistButton product={product} variant="detail" className="w-full" />}
                          <div className="flex gap-3">
                              <a
                                  href="tel:+10000000000"

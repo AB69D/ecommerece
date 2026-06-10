@@ -6,6 +6,7 @@ import { useRouter, usePathname } from "next/navigation";
 import {
     FiSearch,
     FiShoppingCart,
+    FiHeart,
     FiTruck,
     FiMenu,
     FiX,
@@ -16,21 +17,19 @@ import {
     FiChevronRight,
 } from "react-icons/fi";
 import { GiHoneypot, GiOlive } from "react-icons/gi";
+import { getWishlist, setWishlistEnabled } from "@/services/wishlist";
 
 function Navbar() {
     const [categories, setCategories] = useState([]);
     const [branding, setBranding] = useState({ siteName: "Ab9dEcommerce", logoUrl: "" });
     const [cartCount, setCartCount] = useState(0);
+    const [wishlistCount, setWishlistCount] = useState(0);
+    const [wishlistOn, setWishlistOn] = useState(true);
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
     const [mobileCategoriesOpen, setMobileCategoriesOpen] = useState(false);
     const [searchQuery, setSearchQuery] = useState("");
-    const [isHydrated, setIsHydrated] = useState(false);
     const router = useRouter();
     const pathname = usePathname();
-
-    useEffect(() => {
-        setIsHydrated(true);
-    }, []);
 
     const fetchCategories = useCallback(async () => {
         try {
@@ -69,10 +68,22 @@ function Navbar() {
         }
     }, [getGuestId]);
 
+    const fetchWishlistCount = useCallback(async () => {
+        try {
+            const data = await getWishlist();
+            if (data?.success && data.data) {
+                setWishlistCount(data.data.items?.length || 0);
+            }
+        } catch (error) {
+            console.error("Failed to fetch wishlist count", error);
+        }
+    }, []);
+
     useEffect(() => {
-        fetchCategories();
-        fetchCartCount();
         (async () => {
+            await fetchCategories();
+            await fetchCartCount();
+            await fetchWishlistCount();
             try {
                 const res = await fetch(`/api/client/site-settings`);
                 const data = await res.json();
@@ -81,14 +92,24 @@ function Navbar() {
                         siteName: data.data.siteName || "Ab9dEcommerce",
                         logoUrl: data.data.logoUrl || "",
                     });
+                    // Mirror the wishlist feature flag so every product card's
+                    // heart can respect the admin toggle without re-fetching.
+                    const on = data.data.features?.wishlist !== false;
+                    setWishlistOn(on);
+                    setWishlistEnabled(on);
                 }
             } catch { /* keep defaults */ }
         })();
 
         const handleCartUpdate = () => fetchCartCount();
+        const handleWishlistUpdate = () => fetchWishlistCount();
         window.addEventListener("cart-updated", handleCartUpdate);
-        return () => window.removeEventListener("cart-updated", handleCartUpdate);
-    }, [fetchCategories, fetchCartCount]);
+        window.addEventListener("wishlist-updated", handleWishlistUpdate);
+        return () => {
+            window.removeEventListener("cart-updated", handleCartUpdate);
+            window.removeEventListener("wishlist-updated", handleWishlistUpdate);
+        };
+    }, [fetchCategories, fetchCartCount, fetchWishlistCount]);
 
     useEffect(() => {
         if (mobileMenuOpen) {
@@ -226,12 +247,28 @@ function Navbar() {
                         {/* RIGHT ZONE — equal flex, content pushed to the end */}
                         <div className="flex-1 flex items-center justify-end space-x-1.5 sm:space-x-3 min-w-0">
                             <button
-                                onClick={() => isHydrated && setMobileMenuOpen(true)}
+                                onClick={() => setMobileMenuOpen(true)}
                                 className="p-2 text-gray-600 hover:text-emerald-600 hover:bg-emerald-50 rounded-full transition-all focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2"
                                 aria-label="Search"
                             >
                                 <FiSearch className="w-5 h-5 sm:w-6 sm:h-6" />
                             </button>
+
+                            {wishlistOn && (
+                                <Link href="/wishlist" className="relative" aria-label="Wishlist">
+                                    <button
+                                        className="p-2 text-gray-600 hover:text-rose-500 hover:bg-rose-50 rounded-full transition-all focus:outline-none focus:ring-2 focus:ring-rose-400 focus:ring-offset-2"
+                                        aria-label="Wishlist"
+                                    >
+                                        <FiHeart className="w-5 h-5 sm:w-6 sm:h-6" />
+                                    </button>
+                                    {wishlistCount > 0 && (
+                                        <span className="absolute top-0 right-0 inline-flex items-center justify-center min-w-[18px] h-[18px] sm:min-w-[20px] sm:h-[20px] px-1 text-[10px] sm:text-xs font-bold leading-none text-white transform translate-x-1/4 -translate-y-1/4 bg-rose-500 rounded-full border-2 border-white shadow-sm">
+                                            {wishlistCount}
+                                        </span>
+                                    )}
+                                </Link>
+                            )}
 
                             <Link href="/cart" className="relative" aria-label="Cart">
                                 <button
