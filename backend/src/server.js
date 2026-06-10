@@ -38,6 +38,7 @@ import rbacRouter from './routes/rbac.route.js';
 import auditLogRouter from './routes/auditLog.route.js';
 import analyticsRouter from './routes/analytics.route.js';
 import chatbotRouter from './routes/chatbot.route.js';
+import trackingRouter from './routes/tracking.route.js';
 import customerRouter from './routes/customer.route.js';
 import clientCheckoutRouter from './routes/clientCheckout.route.js';
 import posRouter from './routes/pos.route.js';
@@ -149,6 +150,7 @@ app.use('/api/client/footer', footerRouter.client);
 app.use('/api/client/page', pageRouter.client);
 app.use('/api/client/nav-menu', navMenuRouter.client);
 app.use('/api/client/chatbot', chatbotRouter);
+app.use('/api/client/track', trackingRouter);
 
 app.use(notFound);
 app.use(errorHandler);

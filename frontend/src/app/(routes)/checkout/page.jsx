@@ -1,8 +1,9 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { FiArrowLeft, FiCheck, FiTag, FiX } from "react-icons/fi";
 import { useCurrency } from "@/context/CurrencyContext.jsx";
+import { trackInitiateCheckout, trackPurchase } from "@/lib/tracking";
 import { validateCouponPublic } from "@/services/coupons";
 import { useWhatsApp } from "@/hooks/useWhatsApp";
 import { PiWhatsappLogoBold } from "react-icons/pi";
@@ -18,8 +19,9 @@ export default function CheckoutPage() {
     const [appliedCoupon, setAppliedCoupon] = useState(null); // { code, discount, description }
     const [couponError, setCouponError] = useState("");
     const [couponLoading, setCouponLoading] = useState(false);
-    const { symbol } = useCurrency();
+    const { symbol, code } = useCurrency();
     const router = useRouter();
+    const checkoutTracked = useRef(false);
 
     const getGuestId = () => {
         if (typeof window === 'undefined') return null;
@@ -80,6 +82,19 @@ export default function CheckoutPage() {
 
         return () => clearTimeout(timer);
     }, [formData, orderPlaced]);
+
+    // Fire Meta Pixel "InitiateCheckout" once, as soon as the cart has loaded
+    // with items (browser + server-side via the shared tracking helper).
+    useEffect(() => {
+        const its = cart?.items || [];
+        if (checkoutTracked.current || its.length === 0) return;
+        checkoutTracked.current = true;
+        const value = its.reduce(
+            (sum, i) => sum + i.price * i.quantity * (1 - (i.discountPercent || 0) / 100),
+            0,
+        );
+        trackInitiateCheckout({ items: its, value, currency: code });
+    }, [cart, code]);
 
     const fetchCart = async () => {
         try {
@@ -145,6 +160,17 @@ export default function CheckoutPage() {
             const data = await res.json();
 
             if (data.success) {
+                // Meta Pixel "Purchase" (browser + server-side). Customer
+                // email/phone are hashed server-side for better match quality.
+                trackPurchase({
+                    items,
+                    value: data.data?.totalAmount ?? totalAmount,
+                    currency: code,
+                    orderId: data.data?.orderId,
+                    email: formData.customerEmail,
+                    phone: formData.customerPhone,
+                    firstName: formData.customerName,
+                });
                 setOrderPlaced(true);
                 setOrderData(data.data);
                 localStorage.removeItem('guestId');

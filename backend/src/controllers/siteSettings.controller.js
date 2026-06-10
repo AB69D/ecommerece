@@ -27,6 +27,12 @@ const flattenForSet = (obj, prefix = '', out = {}) => {
 export const getPublicSettings = asyncHandler(async (_req, res) => {
     const doc = await getOrCreate();
     const { _id, key, createdAt, updatedAt, __v, ...publicView } = doc.toObject();
+    // Never expose server-side secrets to the storefront. The Conversions API
+    // access token (and its test event code) are used only by the backend.
+    if (publicView.analytics) {
+        const { metaCapiToken, metaTestEventCode, ...analyticsPublic } = publicView.analytics;
+        publicView.analytics = analyticsPublic;
+    }
     return ok(res, publicView);
 });
 

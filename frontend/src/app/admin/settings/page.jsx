@@ -244,6 +244,8 @@ export default function SettingsPage() {
                     ga4Id: settings.analytics?.ga4Id || "",
                     metaPixelId: settings.analytics?.metaPixelId || "",
                     gtmId: settings.analytics?.gtmId || "",
+                    metaCapiToken: settings.analytics?.metaCapiToken || "",
+                    metaTestEventCode: settings.analytics?.metaTestEventCode || "",
                 },
                 whatsapp: {
                     businessNumber: settings.whatsapp?.businessNumber || "",
@@ -539,8 +541,14 @@ export default function SettingsPage() {
                             <Field label="Google Analytics 4 ID" hint="e.g. G-XXXXXXXXXX">
                                 <input className={inputCls} value={settings.analytics?.ga4Id || ""} onChange={(e) => setAnalytics({ ga4Id: e.target.value })} />
                             </Field>
-                            <Field label="Meta Pixel ID">
+                            <Field label="Meta Pixel ID" hint="Used for browser-side Pixel + server-side Conversions API.">
                                 <input className={inputCls} value={settings.analytics?.metaPixelId || ""} onChange={(e) => setAnalytics({ metaPixelId: e.target.value })} />
+                            </Field>
+                            <Field label="Meta Conversions API token" hint="Events Manager → Settings → Conversions API → Generate access token. Enables server-side tracking. Kept secret — never sent to the storefront.">
+                                <input type="password" autoComplete="off" className={inputCls} value={settings.analytics?.metaCapiToken || ""} onChange={(e) => setAnalytics({ metaCapiToken: e.target.value })} placeholder="EAAG… (leave blank for browser-only)" />
+                            </Field>
+                            <Field label="Meta test event code" hint="Optional. From Events Manager → Test Events. Routes events to the Test tab while you verify setup, then clear it.">
+                                <input className={inputCls} value={settings.analytics?.metaTestEventCode || ""} onChange={(e) => setAnalytics({ metaTestEventCode: e.target.value })} placeholder="TEST12345" />
                             </Field>
                             <Field label="Google Tag Manager ID" hint="e.g. GTM-XXXXXXX">
                                 <input className={inputCls} value={settings.analytics?.gtmId || ""} onChange={(e) => setAnalytics({ gtmId: e.target.value })} />

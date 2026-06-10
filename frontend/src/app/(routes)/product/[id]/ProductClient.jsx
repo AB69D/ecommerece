@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { FiShoppingCart, FiCheck, FiHelpCircle, FiMessageCircle, FiPhoneCall, FiPackage, FiArrowLeft } from "react-icons/fi";
 import { PiWhatsappLogoBold } from "react-icons/pi";
 import { addToCart } from "@/utils/cart";
+import { trackViewContent, trackAddToCart } from "@/lib/tracking";
 import { useCurrency } from "@/context/CurrencyContext.jsx";
 import ProductReviews from "@/components/ProductReviews.jsx";
 import WishlistButton from "@/components/WishlistButton.jsx";
@@ -23,7 +24,7 @@ export default function ProductClient({ productId }) {
     const [qaExpanded, setQaExpanded] = useState({});
     const [relatedProducts, setRelatedProducts] = useState([]);
     const [relatedLoading, setRelatedLoading] = useState(false);
-    const { symbol } = useCurrency();
+    const { symbol, code } = useCurrency();
     const router = useRouter();
     const productRef = useRef(null);
 
@@ -75,6 +76,15 @@ export default function ProductClient({ productId }) {
         }
     }, [productId]);
 
+    // Fire the Meta Pixel "ViewContent" event once the product has loaded
+    // (browser + server-side via the shared tracking helper).
+    useEffect(() => {
+        if (product?._id) {
+            trackViewContent(product, { currency: code, price: product.weights?.[0]?.price });
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [product?._id]);
+
     const handleAddToCart = async () => {
         if (!product || !product.weights[selectedWeight]) return;
 
@@ -109,6 +119,9 @@ export default function ProductClient({ productId }) {
             const data = await res.json();
 
             if (data.success) {
+                const w = product.weights[selectedWeight];
+                const effPrice = (w.price || 0) * (1 - (w.discountPercent || 0) / 100);
+                trackAddToCart({ productId: product._id, name: product.firstName, price: effPrice, quantity, currency: code });
                 setAdded(true);
                 setTimeout(() => setAdded(false), 2000);
                 window.dispatchEvent(new Event('cart-updated'));
@@ -162,6 +175,8 @@ export default function ProductClient({ productId }) {
             const data = await res.json();
 
             if (data.success) {
+                const effPrice = (currentWeight.price || 0) * (1 - (currentWeight.discountPercent || 0) / 100);
+                trackAddToCart({ productId: product._id, name: product.firstName, price: effPrice, quantity, currency: code });
                 window.dispatchEvent(new Event('cart-updated'));
                 router.push('/checkout');
             } else {

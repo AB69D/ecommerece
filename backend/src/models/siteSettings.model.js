@@ -92,6 +92,12 @@ const siteSettingsSchema = new mongoose.Schema(
             ga4Id: { type: String, default: '' },     // G-XXXXXXXXXX
             metaPixelId: { type: String, default: '' },
             gtmId: { type: String, default: '' },     // GTM-XXXXXXX
+            // Meta Conversions API (server-side tracking). The access token is a
+            // SECRET — the public site-settings endpoint strips it before
+            // responding so it never reaches the browser. The optional test
+            // event code routes events to Meta's "Test Events" tab during setup.
+            metaCapiToken: { type: String, default: '' },
+            metaTestEventCode: { type: String, default: '' },
         },
 
         // WhatsApp order / status notifications.

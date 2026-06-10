@@ -62,6 +62,8 @@ const analytics = z
         ga4Id: z.string().max(40),
         metaPixelId: z.string().max(40),
         gtmId: z.string().max(40),
+        metaCapiToken: z.string().max(400),
+        metaTestEventCode: z.string().max(40),
     })
     .partial();
 
