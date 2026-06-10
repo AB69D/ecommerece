@@ -313,23 +313,63 @@ export const me = async (request, response) => {
         }
         const token = authHeader.slice(7);
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
-        const admin = await AdminModel.findById(decoded.sub).lean();
-        if (!admin || !admin.isActive) {
-            return response.status(401).json({ success: false, error: true, message: "Account inactive or removed" });
+
+        // Username/password flow — JWT carries `sub` = admin id.
+        if (decoded.sub) {
+            const admin = await AdminModel.findById(decoded.sub).lean();
+            if (!admin || !admin.isActive) {
+                return response.status(401).json({ success: false, error: true, message: "Account inactive or removed" });
+            }
+            return response.json({
+                success: true,
+                data: {
+                    id: admin._id,
+                    username: admin.username,
+                    email: admin.email || null,
+                    fullName: admin.fullName,
+                    role: admin.role,
+                    permissions: admin.permissions || [],
+                    effectivePermissions: [...effectivePermissions(admin)],
+                    lastLoginAt: admin.lastLoginAt,
+                },
+            });
         }
-        return response.json({
-            success: true,
-            data: {
-                id: admin._id,
-                username: admin.username,
-                email: admin.email || null,
-                fullName: admin.fullName,
-                role: admin.role,
-                permissions: admin.permissions || [],
-                effectivePermissions: [...effectivePermissions(admin)],
-                lastLoginAt: admin.lastLoginAt,
-            },
-        });
+
+        // Legacy OTP / email flow — JWT carries `email`. Resolve identity +
+        // permissions from the env owner allow-list and/or the matching record
+        // so these accounts aren't bounced back to the login screen.
+        if (decoded.email) {
+            const email = String(decoded.email).toLowerCase();
+            const admin = await AdminModel.findOne({ email }).lean();
+            if (admin && admin.isActive === false) {
+                return response.status(401).json({ success: false, error: true, message: "Account inactive or removed" });
+            }
+            const isEnvAdmin = ADMIN_EMAILS.includes(email);
+            if (!admin && !isEnvAdmin) {
+                return response.status(401).json({ success: false, error: true, message: "Account inactive or removed" });
+            }
+            // Env owners are full super-admins; legacy email admins created
+            // before roles existed default to the full "admin" role.
+            const role = isEnvAdmin ? 'super-admin' : (admin?.role || 'admin');
+            const perms = isEnvAdmin
+                ? new Set(['*'])
+                : effectivePermissions({ role, permissions: admin?.permissions });
+            return response.json({
+                success: true,
+                data: {
+                    id: admin?._id || null,
+                    username: admin?.username || email,
+                    email,
+                    fullName: admin?.fullName || '',
+                    role,
+                    permissions: admin?.permissions || [],
+                    effectivePermissions: [...perms],
+                    lastLoginAt: admin?.lastLoginAt || null,
+                },
+            });
+        }
+
+        return response.status(401).json({ success: false, error: true, message: "Unauthorized" });
     } catch (err) {
         return response.status(401).json({ success: false, error: true, message: "Invalid or expired token" });
     }

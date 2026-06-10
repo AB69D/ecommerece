@@ -20,6 +20,13 @@ const verify = (token) => {
     }
 };
 
+// Owner accounts configured via ADMIN_EMAILS sign in through the email OTP
+// flow, so their JWT carries `email` (not `sub`). They predate the
+// username/password + role system and must be treated as full super-admins —
+// otherwise every permission-gated route (e.g. the Profit report's
+// analytics:read gate) would 403 for them.
+const ENV_ADMIN_EMAILS = new Set(env.ADMIN_EMAILS || []);
+
 // Verifies the JWT, then loads the live admin record so role/permission
 // changes and deactivations take effect immediately (no stale-token access).
 export const requireAuth = asyncHandler(async (req, _res, next) => {
@@ -36,8 +43,33 @@ export const requireAuth = asyncHandler(async (req, _res, next) => {
         if (!admin.isActive) throw ApiError.forbidden('Account is deactivated');
         req.adminDoc = admin;
         req.permissions = effectivePermissions(admin);
+    } else if (decoded.email) {
+        // Legacy OTP / email flow. Resolve permissions so these accounts aren't
+        // left permission-less (which would 403 every gated route).
+        const email = String(decoded.email).toLowerCase();
+
+        if (ENV_ADMIN_EMAILS.has(email)) {
+            // Env owner allow-list — full super-admin access.
+            req.admin.role = 'super-admin';
+            req.permissions = new Set(['*']);
+        } else {
+            const admin = await AdminModel.findOne({ email }).select('+permissions');
+            if (admin) {
+                if (admin.isActive === false) throw ApiError.forbidden('Account is deactivated');
+                req.adminDoc = admin;
+                // Email admins created before roles existed default to the full
+                // "admin" role (mirrors the model default) so their historical
+                // access is preserved under the new permission system.
+                req.permissions = effectivePermissions({
+                    role: admin.role || 'admin',
+                    permissions: admin.permissions,
+                });
+            } else {
+                // Authenticated email with no matching record / allow-list entry.
+                req.permissions = new Set();
+            }
+        }
     } else {
-        // Legacy OTP token (email only) — no DB record / permissions.
         req.permissions = new Set();
     }
 
