@@ -100,7 +100,7 @@ export default function CartPage() {
 
     if (loading) {
         return (
-            <div className="w-full py-20 flex items-center justify-center">
+            <div className="w-full py-12 sm:py-20 flex items-center justify-center">
                 <p className="text-gray-500">Loading cart...</p>
             </div>
         );
@@ -108,7 +108,7 @@ export default function CartPage() {
 
     if (error) {
         return (
-            <div className="w-full py-20 flex items-center justify-center">
+            <div className="w-full py-12 sm:py-20 flex items-center justify-center px-4 text-center">
                 <p className="text-red-500">{error}</p>
             </div>
         );
@@ -127,7 +127,7 @@ export default function CartPage() {
     
     if (items.length === 0) {
         return (
-            <div className="w-full py-20 flex flex-col items-center justify-center">
+            <div className="w-full py-12 sm:py-20 flex flex-col items-center justify-center px-4 text-center">
                 <FiShoppingCart className="w-16 h-16 text-gray-300 mb-4" />
                 <h2 className="text-xl font-semibold text-gray-800 mb-2">Your cart is empty</h2>
                 <p className="text-gray-500 mb-4">Add some products to get started</p>
@@ -151,8 +151,8 @@ export default function CartPage() {
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                 <div className="lg:col-span-2 space-y-4">
                     {items.map((item) => (
-                        <div key={item._id} className="bg-white border rounded-lg p-4 flex gap-4">
-                            <div className="w-24 h-24 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0">
+                        <div key={item._id} className="bg-white border rounded-lg p-3 sm:p-4 flex gap-3 sm:gap-4">
+                            <div className="w-20 h-20 sm:w-24 sm:h-24 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0">
                                 {item.productImage ? (
                                     <img
                                         src={item.productImage}
@@ -167,8 +167,8 @@ export default function CartPage() {
                                     </div>
                                 )}
                             </div>
-                             <div className="flex-1">
-                                 <h3 className="font-semibold text-gray-800">{item.productName}</h3>
+                             <div className="flex-1 min-w-0">
+                                 <h3 className="font-semibold text-gray-800 text-sm sm:text-base break-words">{item.productName}</h3>
                                  {item.weight && (
                                      <p className="text-sm text-gray-500">{item.weight}</p>
                                  )}
@@ -203,7 +203,7 @@ export default function CartPage() {
                                      </button>
                                  </div>
                              </div>
-                             <div className="flex flex-col items-end justify-between">
+                             <div className="flex flex-col items-end justify-between flex-shrink-0">
                                  <button
                                      onClick={() => removeItem(item._id)}
                                      disabled={updating}
@@ -228,7 +228,7 @@ export default function CartPage() {
                     ))}
                 </div>
 
-                <div className="bg-white border rounded-lg p-6 h-fit">
+                <div className="bg-white border rounded-lg p-5 sm:p-6 h-fit lg:sticky lg:top-24">
                     <h2 className="text-lg font-bold text-gray-800 mb-4">Order Summary</h2>
                     <div className="space-y-2 text-gray-600">
                          <div className="flex justify-between">

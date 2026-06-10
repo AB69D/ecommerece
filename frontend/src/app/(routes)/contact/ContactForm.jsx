@@ -52,8 +52,8 @@ export function ContactForm() {
     };
 
     return (
-        <div className="bg-white rounded-2xl shadow-sm p-8">
-            <h2 className="text-2xl font-bold text-gray-900 mb-6">Send us a Message</h2>
+        <div className="bg-white rounded-2xl shadow-sm p-6 sm:p-8">
+            <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-6">Send us a Message</h2>
 
             {success && (
                 <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg">

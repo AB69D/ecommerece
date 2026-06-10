@@ -178,11 +178,11 @@ export default function CheckoutPage() {
 
     if (orderPlaced && orderData) {
         return (
-            <div className="w-full py-12 flex flex-col items-center justify-center">
+            <div className="w-full py-12 px-4 flex flex-col items-center justify-center text-center">
                 <div className="w-20 h-20 bg-emerald-100 rounded-full flex items-center justify-center mb-6">
                     <FiCheck className="w-10 h-10 text-emerald-600" />
                 </div>
-                <h1 className="text-3xl font-bold text-gray-800 mb-2">Order Successfully Placed!</h1>
+                <h1 className="text-2xl sm:text-3xl font-bold text-gray-800 mb-2">Order Successfully Placed!</h1>
                 <p className="text-gray-600 mb-2">Your order is waiting for confirmation.</p>
                 <div className="bg-gray-50 rounded-lg p-4 mb-6">
                     <p className="text-sm text-gray-500 mb-1">Your Order ID</p>
@@ -230,7 +230,7 @@ export default function CheckoutPage() {
 
     if (loading) {
         return (
-            <div className="w-full py-20 flex items-center justify-center">
+            <div className="w-full py-12 sm:py-20 flex items-center justify-center">
                 <p className="text-gray-500">Loading...</p>
             </div>
         );
@@ -238,7 +238,7 @@ export default function CheckoutPage() {
 
     if (items.length === 0) {
         return (
-            <div className="w-full py-20 flex flex-col items-center justify-center">
+            <div className="w-full py-12 sm:py-20 flex flex-col items-center justify-center px-4 text-center">
                 <h2 className="text-xl font-semibold text-gray-800 mb-2">Your cart is empty</h2>
                 <button
                     onClick={() => router.push('/')}
@@ -265,7 +265,7 @@ export default function CheckoutPage() {
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                 <div className="lg:col-span-2">
                     <form onSubmit={handleSubmit} className="space-y-6">
-                        <div className="bg-white border rounded-lg p-6">
+                        <div className="bg-white border rounded-lg p-4 sm:p-6">
                             <h2 className="text-lg font-bold text-gray-800 mb-4">Delivery Information</h2>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div>
@@ -276,7 +276,7 @@ export default function CheckoutPage() {
                                         value={formData.customerName}
                                         onChange={handleChange}
                                         required
-                                        className="w-full px-4 py-2 border border-gray-300 rounded-lg"
+                                        className="w-full px-4 py-2 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition"
                                         placeholder="Your full name"
                                     />
                                 </div>
@@ -288,7 +288,7 @@ export default function CheckoutPage() {
                                         value={formData.customerPhone}
                                         onChange={handleChange}
                                         required
-                                        className="w-full px-4 py-2 border border-gray-300 rounded-lg"
+                                        className="w-full px-4 py-2 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition"
                                         placeholder="01XXXXXXXXX"
                                     />
                                 </div>
@@ -299,7 +299,7 @@ export default function CheckoutPage() {
                                         name="customerEmail"
                                         value={formData.customerEmail}
                                         onChange={handleChange}
-                                        className="w-full px-4 py-2 border border-gray-300 rounded-lg"
+                                        className="w-full px-4 py-2 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition"
                                         placeholder="your@email.com"
                                     />
                                 </div>
@@ -309,7 +309,7 @@ export default function CheckoutPage() {
                                         name="deliveryArea"
                                         value={formData.deliveryArea}
                                         onChange={handleChange}
-                                        className="w-full px-4 py-2 border border-gray-300 rounded-lg"
+                                        className="w-full px-4 py-2 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition"
                                     >
                                         <option value="local">Local Delivery ({symbol}70)</option>
                                         <option value="regional">Regional Delivery ({symbol}100)</option>
@@ -323,7 +323,7 @@ export default function CheckoutPage() {
                                         onChange={handleChange}
                                         required
                                         rows={3}
-                                        className="w-full px-4 py-2 border border-gray-300 rounded-lg"
+                                        className="w-full px-4 py-2 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition"
                                         placeholder="Full delivery address"
                                     />
                                 </div>
@@ -341,7 +341,7 @@ export default function CheckoutPage() {
                 </div>
 
                 <div>
-                    <div className="bg-white border rounded-lg p-6 sticky top-24">
+                    <div className="bg-white border rounded-lg p-5 sm:p-6 lg:sticky lg:top-24">
                         <h2 className="text-lg font-bold text-gray-800 mb-4">Order Summary</h2>
                         <div className="space-y-3 max-h-80 overflow-y-auto">
                             {items.map((item) => (
@@ -353,7 +353,7 @@ export default function CheckoutPage() {
                                             <div className="w-full h-full flex items-center justify-center text-gray-400 text-xs">No Image</div>
                                         )}
                                     </div>
-                                    <div className="flex-1">
+                                    <div className="flex-1 min-w-0">
                                         <p className="text-sm font-medium text-gray-800 truncate">{item.productName}</p>
                                         <p className="text-xs text-gray-500">Qty: {item.quantity}</p>
                                         {item.discountPercent > 0 ? (

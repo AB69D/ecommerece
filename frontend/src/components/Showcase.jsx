@@ -43,7 +43,7 @@ export default function Showcase() {
 
     if (loading) {
         return (
-            <div className="mt-4 lg:mt-8 relative w-full aspect-[2/1] lg:!h-[62vh] overflow-hidden bg-gradient-to-r from-gray-100 via-gray-200 to-gray-100 animate-pulse" />
+            <div className="mt-4 lg:mt-8 relative w-full aspect-[16/10] sm:aspect-[2/1] lg:!h-[62vh] overflow-hidden bg-gradient-to-r from-gray-100 via-gray-200 to-gray-100 animate-pulse" />
         );
     }
 
@@ -64,7 +64,7 @@ export default function Showcase() {
     }
 
     return (
-        <div className="mt-4 lg:mt-8 relative w-full aspect-[2/1] lg:!h-[62vh] overflow-hidden bg-gray-100">
+        <div className="mt-4 lg:mt-8 relative w-full aspect-[16/10] sm:aspect-[2/1] lg:!h-[62vh] overflow-hidden bg-gray-100">
             <div
                 ref={sliderRef}
                 className="flex h-full transition-transform duration-700 ease-in-out"

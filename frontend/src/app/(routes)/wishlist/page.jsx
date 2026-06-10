@@ -76,7 +76,7 @@ export default function WishlistPage() {
 
     if (loading) {
         return (
-            <div className="w-full py-20 flex items-center justify-center">
+            <div className="w-full py-12 sm:py-20 flex items-center justify-center">
                 <div className="w-9 h-9 border-4 border-gray-200 border-t-rose-500 rounded-full animate-spin" />
             </div>
         );
@@ -84,7 +84,7 @@ export default function WishlistPage() {
 
     if (items.length === 0) {
         return (
-            <div className="w-full py-20 flex flex-col items-center justify-center text-center">
+            <div className="w-full py-12 sm:py-20 flex flex-col items-center justify-center text-center px-4">
                 <FiHeart className="w-16 h-16 text-gray-300 mb-4" />
                 <h2 className="text-xl font-semibold text-gray-800 mb-2">Your wishlist is empty</h2>
                 <p className="text-gray-500 mb-5">Tap the heart on any product to save it for later.</p>

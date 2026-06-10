@@ -2,6 +2,9 @@
 
 html {
     scroll-behavior: smooth;
+    /* Never allow sideways scroll on any device. `clip` (unlike `hidden`) does
+       NOT create a scroll container, so sticky headers keep working. */
+    overflow-x: clip;
 }
 
 body {
@@ -9,6 +12,34 @@ body {
     -moz-osx-font-smoothing: grayscale;
     -webkit-tap-highlight-color: transparent;
     text-rendering: optimizeLegibility;
+    overflow-x: clip;
+    /* A hard stop against any stray element pushing the page wider than the
+       viewport — the root cause of the "side scroll" on phones. */
+    max-width: 100%;
+}
+
+/* Media never overflows its container, even when authored with fixed sizes
+   (CMS HTML, embeds, etc.). Next/Image already sets its own sizing. */
+img,
+video,
+canvas,
+svg:not([class*="w-"]):not([class*="h-"]) {
+    max-width: 100%;
+}
+
+/* Long words / URLs wrap instead of forcing the layout wider. */
+h1, h2, h3, h4, p, a, span, li {
+    overflow-wrap: break-word;
+}
+
+/* Larger, comfortable tap targets on touch devices without affecting desktop. */
+@media (hover: none) and (pointer: coarse) {
+    button,
+    a[role="button"],
+    [type="button"],
+    [type="submit"] {
+        touch-action: manipulation;
+    }
 }
 
 /* Modern, slim scrollbar that fits a premium look (desktop only) */

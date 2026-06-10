@@ -327,7 +327,7 @@ export default function ProductClient({ productId }) {
                         <label className="block text-sm font-medium text-gray-700 mb-2">
                             Quantity
                         </label>
-                        <div className="flex items-center gap-3">
+                        <div className="flex flex-wrap items-center gap-3">
                             <button
                                 onClick={() => setQuantity(Math.max(1, quantity - 1))}
                                 className="w-10 h-10 rounded-lg border border-gray-300 flex items-center justify-center hover:bg-gray-100 transition-colors text-lg font-medium"
@@ -390,7 +390,7 @@ export default function ProductClient({ productId }) {
                              <button
                                  onClick={added ? goToCart : handleAddToCart}
                                  disabled={adding || !currentWeight?.stock}
-                                 className="flex-1 bg-emerald-600 text-white font-medium py-3 sm:py-3.5 rounded-lg hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 transition-colors"
+                                 className="flex-1 min-w-0 bg-emerald-600 text-white font-medium py-3 sm:py-3.5 rounded-lg hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 transition-colors"
                              >
                                  {adding ? 'Adding...' : added ? <><FiCheck className="w-5 h-5" /> Added</> : currentWeight?.stock > 0 ? 'Add to Cart' : 'Out of Stock'}
                              </button>
@@ -399,7 +399,7 @@ export default function ProductClient({ productId }) {
                                      href={wa.chatUrl(`Hi, I'd like to know more about ${product?.firstName}.`)}
                                      target="_blank"
                                      rel="noopener noreferrer"
-                                     className="flex-1 bg-green-500 hover:bg-green-600 text-white text-sm sm:text-base font-medium py-3 sm:py-3.5 rounded-lg flex items-center justify-center gap-1.5 transition-colors whitespace-nowrap"
+                                     className="flex-1 min-w-0 bg-green-500 hover:bg-green-600 text-white text-sm sm:text-base font-medium py-3 sm:py-3.5 rounded-lg flex items-center justify-center gap-1.5 transition-colors text-center"
                                  >
                                      <PiWhatsappLogoBold className="w-4 h-4 sm:w-5 sm:h-5 shrink-0" />
                                      <span>Chat on WhatsApp</span>
@@ -411,7 +411,7 @@ export default function ProductClient({ productId }) {
                              {wa.contactPhone && (
                                  <a
                                      href={`tel:${wa.contactPhone.replace(/\s/g, "")}`}
-                                     className="flex-1 bg-emerald-700 hover:bg-emerald-800 text-white text-sm sm:text-base font-medium py-3 sm:py-3.5 rounded-lg flex items-center justify-center gap-1.5 transition-colors whitespace-nowrap shadow-sm hover:shadow-md"
+                                     className="flex-1 min-w-0 bg-emerald-700 hover:bg-emerald-800 text-white text-sm sm:text-base font-medium py-3 sm:py-3.5 rounded-lg flex items-center justify-center gap-1.5 transition-colors text-center shadow-sm hover:shadow-md"
                                      aria-label="Call to order"
                                  >
                                      <FiPhoneCall className="w-4 h-4 sm:w-5 sm:h-5 shrink-0" />
@@ -422,7 +422,7 @@ export default function ProductClient({ productId }) {
                                  href={`https://m.me/ab9d-ecommerce?text=${encodeURIComponent(`Hi, I'd like to know more about ${product?.firstName}.`)}`}
                                  target="_blank"
                                  rel="noopener noreferrer"
-                                 className="flex-1 bg-blue-500 hover:bg-blue-600 text-white text-sm sm:text-base font-medium py-3 sm:py-3.5 rounded-lg flex items-center justify-center gap-1.5 transition-colors whitespace-nowrap shadow-sm hover:shadow-md"
+                                 className="flex-1 min-w-0 bg-blue-500 hover:bg-blue-600 text-white text-sm sm:text-base font-medium py-3 sm:py-3.5 rounded-lg flex items-center justify-center gap-1.5 transition-colors text-center shadow-sm hover:shadow-md"
                              >
                                  <svg className="w-4 h-4 sm:w-5 sm:h-5 shrink-0" viewBox="0 0 24 24" fill="currentColor">
                                      <path d="M12 0C5.373 0 0 4.975 0 11.111c0 3.497 1.745 6.616 4.472 8.652V24l4.086-2.242c1.09.301 2.246.464 3.442.464 6.627 0 12-4.974 12-11.111C24 4.975 18.627 0 12 0zm1.193 14.963l-3.056-3.259-5.963 3.259L10.732 8.2l3.131 3.259L19.752 8.2l-6.559 6.763z"/>

@@ -140,26 +140,26 @@ export default function AllProducts() {
                                 <WishlistButton product={product} className="absolute top-2 right-2" />
                             </div>
 
-                            <div className="p-2 sm:p-3 flex flex-col items-center">
-                                <h3 className="font-medium text-gray-800 text-[10px] sm:text-sm text-center truncate w-full">
+                            <div className="p-2.5 sm:p-3 flex flex-col items-center">
+                                <h3 className="font-semibold text-gray-800 text-xs sm:text-sm text-center truncate w-full">
                                     {product.firstName}
                                 </h3>
                                 {product.lastName && (
-                                    <p className="text-[10px] sm:text-xs text-gray-500 truncate text-center w-full">
+                                    <p className="text-[11px] sm:text-xs text-gray-500 truncate text-center w-full">
                                         {product.lastName}
                                     </p>
                                 )}
                                 {product.category && (
-                                    <p className="text-[10px] sm:text-xs text-emerald-600 mt-1 truncate text-center">
+                                    <p className="text-[11px] sm:text-xs text-emerald-600 mt-0.5 truncate text-center">
                                         {product.category.category_name}
                                     </p>
                                 )}
                                 <ProductRating productId={product._id} className="mt-1" />
-                                <div className="mt-1 sm:mt-2 text-center">
+                                <div className="mt-1.5 sm:mt-2 text-center">
                                     {minWeight && (
                                         hasDiscount ? (
-                                            <div className="flex items-center justify-center gap-1 sm:gap-2">
-                                                <p className="text-[10px] sm:text-sm text-gray-400 line-through">{symbol}{minWeight.price}</p>
+                                            <div className="flex items-center justify-center gap-1.5 sm:gap-2 flex-wrap">
+                                                <p className="text-[11px] sm:text-sm text-gray-400 line-through">{symbol}{minWeight.price}</p>
                                                 <p className="text-sm sm:text-base font-bold text-emerald-600">
                                                     {symbol}{(minWeight.price - (minWeight.price * minWeight.discountPercent / 100)).toFixed(0)}
                                                 </p>

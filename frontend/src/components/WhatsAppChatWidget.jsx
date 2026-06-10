@@ -74,9 +74,9 @@ export default function WhatsAppChatWidget() {
     if (!isVisible) return null;
 
     return (
-        <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end">
+        <div className="fixed bottom-5 right-4 sm:bottom-6 sm:right-6 z-50 flex flex-col items-end">
             {isOpen && !isMinimized && (
-                <div className="mb-4 w-[320px] sm:w-[360px] bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col h-[450px]">
+                <div className="mb-4 w-[calc(100vw-2rem)] max-w-[360px] sm:w-[360px] bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col h-[450px] max-h-[70vh]">
                     <div className="bg-emerald-600 text-white p-4 flex items-center justify-between">
                         <div className="flex items-center gap-3">
                             <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center">
@@ -177,7 +177,7 @@ export default function WhatsAppChatWidget() {
             )}
 
             {isOpen && isMinimized && (
-                <div className="mb-4 w-[280px] bg-white rounded-xl shadow-lg p-3">
+                <div className="mb-4 w-[calc(100vw-2rem)] max-w-[280px] bg-white rounded-xl shadow-lg p-3">
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
                             <div className="w-8 h-8 bg-emerald-100 rounded-full flex items-center justify-center">

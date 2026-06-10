@@ -35,19 +35,19 @@ export default async function AboutPage() {
     return (
         <div className="min-h-screen bg-gray-50">
             {/* Hero Section */}
-            <div className="bg-emerald-600 text-white py-20 px-4">
+            <div className="bg-emerald-600 text-white py-12 sm:py-20 px-4">
                 <div className="max-w-4xl mx-auto text-center">
-                    <h1 className="text-4xl md:text-5xl font-bold mb-6">About Ab9dEcommerce</h1>
-                    <p className="text-xl md:text-2xl font-light">
+                    <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold mb-4 sm:mb-6">About Ab9dEcommerce</h1>
+                    <p className="text-lg sm:text-xl md:text-2xl font-light">
                         Bringing the Purity of the Village to Your Doorstep
                     </p>
                 </div>
             </div>
 
             {/* Main Content */}
-            <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+            <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-10 sm:py-16">
                 {/* Introduction */}
-                <div className="bg-white rounded-2xl shadow-sm p-8 md:p-12 mb-12">
+                <div className="bg-white rounded-2xl shadow-sm p-6 sm:p-8 md:p-12 mb-12">
                     <p className="text-lg text-gray-700 leading-relaxed">
                         Welcome to <span className="font-semibold text-emerald-600">AB9DECOMMERCE</span>, your trusted gateway to authentic, quality, and farm-fresh products. In an era of mass production and chemical additives, we are on a mission to reconnect urban households with the wholesome, untainted flavors of local communities.
                     </p>

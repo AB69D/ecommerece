@@ -129,9 +129,9 @@ export default function Footer() {
                 />
 
                 <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-14">
-                    <div className="grid grid-cols-1 md:grid-cols-12 gap-10">
+                    <div className="grid grid-cols-2 md:grid-cols-12 gap-8 md:gap-10">
                         {/* Left — brand block */}
-                        <div className="md:col-span-5">
+                        <div className="col-span-2 md:col-span-5">
                             <div className="mb-4 inline-flex items-center justify-center bg-white/95 rounded-full shadow-lg ring-4 ring-amber-400 w-36 h-36 sm:w-40 sm:h-40">
                                 <Image
                                     src={settings.logoUrl || "/logo.png"}
@@ -205,7 +205,7 @@ export default function Footer() {
 
                         {/* Middle/right — dynamic columns */}
                         {columns.slice(0, 2).map((col, idx) => (
-                            <div key={col.title + idx} className={idx === 0 ? "md:col-span-3" : "md:col-span-4"}>
+                            <div key={col.title + idx} className={idx === 0 ? "col-span-1 md:col-span-3" : "col-span-1 md:col-span-4"}>
                                 <h3 className="text-base font-bold text-white mb-4 relative inline-block">
                                     {col.title}
                                     <span className="absolute -bottom-1.5 left-0 w-10 h-0.5 bg-amber-400 rounded-full" />

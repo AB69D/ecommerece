@@ -46,7 +46,7 @@ function SearchContent() {
 
     if (loading) {
         return (
-            <div className="w-full py-20 flex items-center justify-center">
+            <div className="w-full py-12 sm:py-20 flex items-center justify-center">
                 <p className="text-gray-500">Searching...</p>
             </div>
         );
@@ -54,7 +54,7 @@ function SearchContent() {
 
     if (error) {
         return (
-            <div className="w-full py-20 flex items-center justify-center">
+            <div className="w-full py-12 sm:py-20 flex items-center justify-center">
                 <p className="text-red-500">{error}</p>
             </div>
         );
@@ -77,7 +77,7 @@ function SearchContent() {
                     </Link>
                 </div>
             ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 fade-in-stagger">
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-6 fade-in-stagger">
                     {products.map((product) => (
                         <Link
                             key={product._id}
@@ -93,8 +93,8 @@ function SearchContent() {
                                     className="w-full h-full object-cover"
                                 />
                             </div>
-                            <div className="p-4">
-                                <h3 className="font-medium text-gray-800 line-clamp-1">{product.firstName}</h3>
+                            <div className="p-3 sm:p-4">
+                                <h3 className="font-semibold text-sm sm:text-base text-gray-800 line-clamp-1">{product.firstName}</h3>
                                 {product.lastName && (
                                     <p className="text-sm text-gray-500 line-clamp-1">{product.lastName}</p>
                                 )}
@@ -116,7 +116,7 @@ function SearchContent() {
 export default function SearchPage() {
     return (
         <Suspense fallback={
-            <div className="w-full py-20 flex items-center justify-center">
+            <div className="w-full py-12 sm:py-20 flex items-center justify-center">
                 <p className="text-gray-500">Loading...</p>
             </div>
         }>

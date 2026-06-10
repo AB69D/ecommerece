@@ -24,6 +24,8 @@ export default function TopSelling() {
             const width = window.innerWidth;
             if (width >= 1024) {
                 setProductsPerView(4);
+            } else if (width >= 768) {
+                setProductsPerView(3);
             } else {
                 setProductsPerView(2);
             }
@@ -88,7 +90,7 @@ export default function TopSelling() {
                     <h2 className="text-xl sm:text-2xl font-bold text-gray-800 text-center">Top Selling</h2>
                     <div className="w-9 h-9 rounded-full bg-gray-100" />
                 </div>
-                <div className="max-w-7xl mx-auto grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+                <div className="max-w-7xl mx-auto grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
                     {Array.from({ length: productsPerView }).map((_, i) => (
                         <ProductCardSkeleton key={i} />
                     ))}
@@ -138,7 +140,7 @@ export default function TopSelling() {
             </div>
 
             <div ref={containerRef} className="max-w-7xl mx-auto">
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 fade-in-stagger">
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4 fade-in-stagger">
                     {visibleProducts.map((product) => {
                         const productImage = product.cover_image || (product.weights && product.weights[0]?.images?.[0]) || null;
                         const minWeight = getMinDiscountedWeight(product.weights);
