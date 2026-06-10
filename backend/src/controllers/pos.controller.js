@@ -11,10 +11,12 @@
 // ---------------------------------------------------------------
 import OrderModel from '../models/order.model.js';
 import ProductModel from '../models/product.model.js';
+import CouponModel from '../models/coupon.model.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { ApiError } from '../lib/ApiError.js';
 import { ok, created } from '../lib/ApiResponse.js';
 import { setHasPermission } from '../lib/permissions.js';
+import { evaluateCoupon } from '../lib/coupon.js';
 
 // Net unit price for a product weight after its own discount.
 const retailUnitPrice = (w) => {
@@ -153,6 +155,7 @@ export const createPosSale = asyncHandler(async (req, res) => {
         customerEmail,
         paymentMethod = 'cash',
         notes = '',
+        couponCode = '',
     } = req.body;
 
     if (!Array.isArray(items) || items.length === 0) {
@@ -226,6 +229,25 @@ export const createPosSale = asyncHandler(async (req, res) => {
     }
 
     const subtotal = Math.round(orderItems.reduce((s, i) => s + i.totalPrice, 0) * 100) / 100;
+
+    // Re-validate any coupon server-side; an invalid code is ignored (the sale
+    // still completes) rather than rejected at the till.
+    let discount = 0;
+    let appliedCoupon = '';
+    let couponDoc = null;
+    const wantCoupon = String(couponCode || '').trim().toUpperCase();
+    if (wantCoupon) {
+        couponDoc = await CouponModel.findOne({ code: wantCoupon });
+        const result = evaluateCoupon(couponDoc, { subtotal, channel: 'pos' });
+        if (result.ok && result.discount > 0) {
+            discount = result.discount;
+            appliedCoupon = couponDoc.code;
+        } else {
+            couponDoc = null;
+        }
+    }
+    const totalAmount = Math.max(0, Math.round((subtotal - discount) * 100) / 100);
+
     const seller = sellerSnapshot(req);
 
     const timestamp = Date.now().toString(36).toUpperCase();
@@ -247,7 +269,9 @@ export const createPosSale = asyncHandler(async (req, res) => {
         items: orderItems,
         subtotal,
         deliveryCharge: 0,
-        totalAmount: subtotal,
+        couponCode: appliedCoupon,
+        discount,
+        totalAmount,
         paymentMethod: ['cash', 'card', 'online'].includes(paymentMethod) ? paymentMethod : 'cash',
         paymentStatus: 'paid',
         orderStatus: 'delivered',
@@ -255,6 +279,15 @@ export const createPosSale = asyncHandler(async (req, res) => {
         confirmedAt: now,
         notes,
     });
+
+    // Count the redemption (best-effort, non-fatal).
+    if (couponDoc) {
+        try {
+            await CouponModel.updateOne({ _id: couponDoc._id }, { $inc: { usedCount: 1 } });
+        } catch {
+            // ignore
+        }
+    }
 
     return created(res, order, 'Sale completed');
 });

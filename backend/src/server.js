@@ -38,6 +38,7 @@ import chatbotRouter from './routes/chatbot.route.js';
 import customerRouter from './routes/customer.route.js';
 import clientCheckoutRouter from './routes/clientCheckout.route.js';
 import posRouter from './routes/pos.route.js';
+import couponRouter from './routes/coupon.route.js';
 
 const app = express();
 
@@ -121,6 +122,7 @@ app.use('/api/admin/audit-logs', requireAuth, auditLogRouter);
 app.use('/api/admin/analytics', requireAuth, analyticsRouter);
 app.use('/api/admin/pos', requireAuth, posRouter);
 app.use('/api/admin/customer', requireAuth, customerRouter);
+app.use('/api/admin/coupon', requireAuth, couponRouter.admin);
 app.use('/api/admin/site-settings', requireAuth, siteSettingsRouter.admin);
 app.use('/api/admin/footer', requireAuth, footerRouter.admin);
 app.use('/api/admin/nav-menu', requireAuth, navMenuRouter.admin);
@@ -134,6 +136,7 @@ app.use('/api/client/checkout', clientCheckoutRouter);
 app.use('/api/client/contact', contactMessageRouter);
 app.use('/api/client/review', clientReviewRouter);
 app.use('/api/client/category', clientCategoryRouter);
+app.use('/api/client/coupon', couponRouter.client);
 app.use('/api/client/site-settings', siteSettingsRouter.client);
 app.use('/api/client/footer', footerRouter.client);
 app.use('/api/client/nav-menu', navMenuRouter.client);

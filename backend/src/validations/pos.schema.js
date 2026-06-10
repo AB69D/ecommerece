@@ -16,6 +16,8 @@ export const createSaleSchema = z.object({
     customerEmail: z.string().max(160).optional(),
     paymentMethod: z.enum(['cash', 'card', 'online']).default('cash'),
     notes: z.string().max(400).optional(),
+    // Optional cart-level coupon code applied at the till.
+    couponCode: z.string().max(40).optional(),
 });
 
 export const returnSaleSchema = z.object({

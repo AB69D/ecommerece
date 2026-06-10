@@ -90,6 +90,15 @@ const orderSchema = new Schema({
         type: Number,
         default: 0
     },
+    // Cart-level coupon applied to this order (blank when none).
+    couponCode: {
+        type: String,
+        default: ''
+    },
+    discount: {
+        type: Number,
+        default: 0
+    },
     totalAmount: {
         type: Number,
         required: true

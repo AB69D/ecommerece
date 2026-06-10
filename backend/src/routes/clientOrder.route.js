@@ -3,6 +3,8 @@ import OrderModel from '../models/order.model.js';
 import CartModel from '../models/cart.model.js';
 import ProductModel from '../models/product.model.js';
 import CheckoutLeadModel from '../models/checkoutLead.model.js';
+import CouponModel from '../models/coupon.model.js';
+import { evaluateCoupon } from '../lib/coupon.js';
 
 const clientOrderRouter = Router();
 
@@ -19,7 +21,8 @@ clientOrderRouter.post('/create', async (req, res) => {
             shippingAddress, 
             deliveryArea = 'local',
             paymentMethod = 'cash_on_delivery',
-            notes = ''
+            notes = '',
+            couponCode = ''
         } = req.body;
         
         const deliveryCharges = {
@@ -71,7 +74,25 @@ clientOrderRouter.post('/create', async (req, res) => {
         }));
 
         const subtotal = cart.totalAmount;
-        const totalAmount = subtotal + deliveryCharge;
+
+        // Re-validate any coupon server-side (never trust a client discount).
+        // A now-invalid code is simply ignored so the order still goes through.
+        let discount = 0;
+        let appliedCoupon = '';
+        let couponDoc = null;
+        const wantCoupon = String(couponCode || '').trim().toUpperCase();
+        if (wantCoupon) {
+            couponDoc = await CouponModel.findOne({ code: wantCoupon });
+            const result = evaluateCoupon(couponDoc, { subtotal, channel: 'ecommerce' });
+            if (result.ok && result.discount > 0) {
+                discount = result.discount;
+                appliedCoupon = couponDoc.code;
+            } else {
+                couponDoc = null;
+            }
+        }
+
+        const totalAmount = Math.max(0, subtotal - discount) + deliveryCharge;
 
         // Generate order ID
         const timestamp = Date.now().toString(36).toUpperCase();
@@ -89,12 +110,23 @@ clientOrderRouter.post('/create', async (req, res) => {
             items: orderItems,
             subtotal,
             deliveryCharge,
+            couponCode: appliedCoupon,
+            discount,
             totalAmount,
             paymentMethod,
             notes
         });
 
         await order.save();
+
+        // Count the redemption (best-effort, non-fatal).
+        if (couponDoc) {
+            try {
+                await CouponModel.updateOne({ _id: couponDoc._id }, { $inc: { usedCount: 1 } });
+            } catch {
+                // ignore
+            }
+        }
 
         // Decrease stock for each item
         for (const item of orderItems) {
