@@ -1,6 +1,6 @@
 "use client";
-import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import Link, { storeHref } from "@/components/StoreLink";
+import { usePathname, useRouter, useParams } from "next/navigation";
 import { useEffect } from "react";
 import { FiUser, FiPackage, FiMapPin, FiLogOut } from "react-icons/fi";
 import { useCustomerAuth } from "@/context/CustomerAuthContext";
@@ -19,10 +19,11 @@ export default function AccountShell({ children, title, subtitle }) {
     const { customer, loading, logout } = useCustomerAuth();
     const pathname = usePathname();
     const router = useRouter();
+    const { store } = useParams();
 
     useEffect(() => {
         if (!loading && !customer) {
-            router.replace(`/account/login?next=${encodeURIComponent(pathname)}`);
+            router.replace(storeHref(`/account/login?next=${encodeURIComponent(pathname)}`, store));
         }
     }, [loading, customer, pathname, router]);
 
@@ -70,7 +71,7 @@ export default function AccountShell({ children, title, subtitle }) {
                                 );
                             })}
                             <button
-                                onClick={() => { logout(); router.push("/"); }}
+                                onClick={() => { logout(); router.push(storeHref("/", store)); }}
                                 className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-rose-600 hover:bg-rose-50 transition-colors"
                             >
                                 <FiLogOut className="w-4 h-4" />

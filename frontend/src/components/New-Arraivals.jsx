@@ -1,7 +1,7 @@
 "use client";
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { FiArrowLeft, FiArrowRight, FiEye, FiPlus } from "react-icons/fi";
-import { useRouter } from "next/navigation";
+import { useStorePush } from "@/components/StoreLink";
 import ProductCardSkeleton from "./ProductCardSkeleton";
 import { useCurrency } from "@/context/CurrencyContext.jsx";
 import ProductRating from "./ProductRating.jsx";
@@ -15,7 +15,7 @@ export default function NewArraivals() {
     const [productsPerView, setProductsPerView] = useState(2);
     const [hoveredProduct, setHoveredProduct] = useState(null);
     const { symbol } = useCurrency();
-    const router = useRouter();
+    const goTo = useStorePush();
     const sliderRef = useRef(null);
 
     useEffect(() => {
@@ -80,7 +80,7 @@ export default function NewArraivals() {
     }, [canScrollLeft, canScrollRight, productsPerView, products.length]);
 
     const goToProduct = (productId) => {
-        router.push(`/product/${productId}`);
+        goTo(`/product/${productId}`);
     };
 
     const getMinDiscountedWeight = (weights) => {

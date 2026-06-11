@@ -3,6 +3,15 @@ const getToken = () => {
     return localStorage.getItem('admin_token');
 };
 
+// The store segment of the current URL (/<store>/…), or '' on a platform/root
+// page. Lets these non-React services build store-aware redirect targets.
+const RESERVED_FIRST_SEG = new Set(['login', 'platform', 'sell', 'api']);
+const currentStore = () => {
+    if (typeof window === 'undefined') return '';
+    const seg = window.location.pathname.split('/')[1] || '';
+    return seg && !RESERVED_FIRST_SEG.has(seg) ? seg : '';
+};
+
 export const authFetch = async (url, options = {}) => {
     const token = getToken();
     const headers = {
@@ -17,7 +26,9 @@ export const authFetch = async (url, options = {}) => {
 
     if (res.status === 401 && typeof window !== 'undefined') {
         localStorage.removeItem('admin_token');
-        const loginUrl = '/admin/login';
+        // Global sign-in (path-based multi-tenancy): it routes the owner back to
+        // their own /<store>/admin (or the platform console) after re-auth.
+        const loginUrl = '/login';
         if (window.location.pathname !== loginUrl) {
             window.location.replace(loginUrl);
         }
@@ -44,7 +55,8 @@ export const customerFetch = async (url, options = {}) => {
 
     if (res.status === 401 && typeof window !== 'undefined') {
         localStorage.removeItem('customer_token');
-        const loginUrl = '/account/login';
+        const store = currentStore();
+        const loginUrl = store ? `/${store}/account/login` : '/account/login';
         if (window.location.pathname !== loginUrl) {
             window.location.replace(loginUrl);
         }

@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useStorePush } from "@/components/StoreLink";
 import { FiEye, FiPlus } from "react-icons/fi";
 import { ProductGridSkeleton } from "./ProductCardSkeleton";
 import { useCurrency } from "@/context/CurrencyContext.jsx";
@@ -13,7 +13,7 @@ export default function AllProducts() {
     const [error, setError] = useState(null);
     const [hoveredProduct, setHoveredProduct] = useState(null);
     const { symbol } = useCurrency();
-    const router = useRouter();
+    const goTo = useStorePush();
 
     useEffect(() => {
         const fetchProducts = async () => {
@@ -38,7 +38,7 @@ export default function AllProducts() {
     }, []);
 
     const goToProduct = (productId) => {
-        router.push(`/product/${productId}`);
+        goTo(`/product/${productId}`);
     };
 
     const getMinDiscountedWeight = (weights) => {

@@ -23,6 +23,9 @@ export const registerStore = async (payload) => {
 // ── Super-admin only (env ADMIN_EMAILS allow-list). authFetch attaches the
 // admin token; the backend's requireSuperAdmin re-checks the email claim. ──────
 
+// Platform owner home dashboard: every store with order count + revenue + totals.
+export const getOverview = () => authFetch(`${BASE}/overview`).then(json);
+
 // status is optional: '' | 'pending' | 'approved' | 'suspended' | 'rejected'.
 export const listTenants = (status = "") => {
     const qs = status ? `?status=${encodeURIComponent(status)}` : "";

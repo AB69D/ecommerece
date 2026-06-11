@@ -12,11 +12,31 @@
 
 import { cookies } from "next/headers";
 
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8080";
+
 // Matches the backend subdomain rule (and the SignupForm validator): a DNS label
 // of 2–63 chars, lowercase letters/digits/hyphens, no leading/trailing hyphen.
 const SUBDOMAIN_RE = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/;
-const isValidStore = (s) =>
+export const isValidStore = (s) =>
     typeof s === "string" && s.length >= 2 && s.length <= 63 && SUBDOMAIN_RE.test(s);
+
+// Does this store slug resolve to a live, approved tenant? The backend's
+// resolveTenant 404s an unknown / un-approved store and 403s a suspended one, so
+// a 2xx on its public site-settings means "real, browsable store". Used by the
+// [store] layout to 404 a bad /<store> URL. no-store so one store's answer is
+// never cached for another.
+export async function validateStore(store) {
+    if (!isValidStore(store)) return false;
+    try {
+        const res = await fetch(`${BACKEND_URL}/api/client/site-settings`, {
+            headers: { "X-Tenant": store },
+            cache: "no-store",
+        });
+        return res.ok;
+    } catch {
+        return false;
+    }
+}
 
 // The store a guest is currently viewing on the shared domain, from the `store`
 // cookie. Returns '' for the primary store (no cookie) or when called outside a

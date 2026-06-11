@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useStorePush } from "@/components/StoreLink";
 import { FiEye, FiPlus } from "react-icons/fi";
 import { useCurrency } from "@/context/CurrencyContext.jsx";
 import ProductRating from "./ProductRating.jsx";
@@ -23,9 +23,9 @@ const getMinDiscountedWeight = (weights) => {
 export default function ProductCard({ product, showCategory = true }) {
     const [hovered, setHovered] = useState(false);
     const { symbol } = useCurrency();
-    const router = useRouter();
+    const goTo = useStorePush();
 
-    const goToProduct = () => router.push(`/product/${product._id}`);
+    const goToProduct = () => goTo(`/product/${product._id}`);
 
     const productImage =
         product.cover_image || (product.weights && product.weights[0]?.images?.[0]) || null;

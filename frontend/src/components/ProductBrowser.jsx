@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
-import Link from "next/link";
+import Link from "@/components/StoreLink";
 import { FiSearch, FiX, FiChevronLeft, FiChevronRight, FiSliders } from "react-icons/fi";
 import ProductCard from "./ProductCard";
 import { ProductGridSkeleton } from "./ProductCardSkeleton";

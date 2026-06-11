@@ -1,6 +1,6 @@
 "use client";
 import { useState, useRef, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useStorePush } from "@/components/StoreLink";
 import { FiSearch, FiX } from "react-icons/fi";
 import { useCurrency } from "@/context/CurrencyContext.jsx";
 import { suggestProducts } from "@/services/product";
@@ -20,7 +20,7 @@ const fromPrice = (weights) => {
 // button) goes to the full /search page; picking a suggestion opens that
 // product. `onNavigate` lets the host close its drawer/overlay on navigation.
 export default function SearchAutocomplete({ onNavigate, autoFocus = false }) {
-    const router = useRouter();
+    const goTo = useStorePush();
     const { symbol } = useCurrency();
 
     const [query, setQuery] = useState("");
@@ -97,7 +97,7 @@ export default function SearchAutocomplete({ onNavigate, autoFocus = false }) {
     const goToProduct = (id) => {
         reset();
         onNavigate?.();
-        router.push(`/product/${id}`);
+        goTo(`/product/${id}`);
     };
 
     const submitSearch = (e) => {
@@ -106,7 +106,7 @@ export default function SearchAutocomplete({ onNavigate, autoFocus = false }) {
         if (!q) return;
         reset();
         onNavigate?.();
-        router.push(`/search?q=${encodeURIComponent(q)}`);
+        goTo(`/search?q=${encodeURIComponent(q)}`);
     };
 
     const onKeyDown = (e) => {

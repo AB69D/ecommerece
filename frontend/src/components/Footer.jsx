@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import Link from "next/link";
+import Link from "@/components/StoreLink";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { FiMapPin, FiPhone, FiMail } from "react-icons/fi";

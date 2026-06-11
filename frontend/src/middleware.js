@@ -1,114 +1,88 @@
 import { NextResponse } from 'next/server';
 
-// ── Tenant signal injection (Phase 2) ───────────────────────────────────────
-// The storefront is multi-tenant by subdomain: acme.<BASE_DOMAIN> is the "acme"
-// store. The browser knows which store it's on (it's in the Host), but the
-// backend never sees that Host: next.config.mjs rewrites /api/:path* to the API
-// origin and, like any proxy, replaces the Host with the API's own. So the
-// subdomain would be lost in transit.
+// ── Tenant routing (path-based multi-tenancy) ────────────────────────────────
+// Each store lives under /<store> — storefront at /<store>, admin at
+// /<store>/admin, pos at /<store>/pos. The store slug in the FIRST path segment
+// is the source of truth. This middleware does two jobs:
 //
-// This middleware is the one place that still sees the browser's real Host. It
-// runs BEFORE the rewrite, reads the subdomain, and forwards it to the API as an
-// explicit `X-Tenant` header. That single hook covers every backend call the app
-// makes — all three fetch wrappers (admin/customer/pos) and every raw fetch —
-// because they all go through /api/*. The backend's resolveTenant reads X-Tenant
-// first and scopes the request to that tenant.
+//   1. Page requests under a store -> remember the slug in a `store` cookie, so
+//      the store's CLIENT-SIDE /api/client/* calls (which carry no slug in their
+//      URL) can be scoped. Reserved roots (/, /login, /platform, /sell) clear it.
+//   2. /api/* requests -> turn that signal into an explicit `X-Tenant` header for
+//      the backend (a real Host subdomain wins when present; otherwise the cookie,
+//      but only for the public storefront API — admin/platform/pos are token-scoped).
 //
-// In the single-tenant interim (no BASE_DOMAIN configured, apex, localhost, IP)
-// no header is injected and the backend falls through to its default tenant, so
-// behaviour is unchanged until real subdomains go live.
+// SSR reads the slug straight from the route params, so it never depends on the
+// cookie timing; the cookie exists purely for client-side storefront fetches.
 
-// Base domain for tenant subdomains, e.g. 'myapp.com' so acme.myapp.com -> 'acme'.
-// Must match the backend's PLATFORM_BASE_DOMAIN. Unset => no subdomain routing.
 const BASE_DOMAIN = (process.env.NEXT_PUBLIC_BASE_DOMAIN || '').trim().toLowerCase();
-
-// Infra/platform labels that are never tenants. Kept in lockstep with the
-// backend's RESERVED_LABELS so both ends agree on what "no tenant" looks like.
 const RESERVED = new Set(['www', 'api', 'cdn', 'assets', 'static', 'mail', 'admin']);
 
-// ── Interim path-routing on the shared domain (before subdomains) ────────────
-// Until each store gets acme.<BASE_DOMAIN>, a guest browses a store by visiting
-// /s/<sub>/... . We stamp the chosen store into a `store` cookie and rewrite to
-// the clean URL; thereafter the cookie (read here) supplies X-Tenant on the
-// storefront API, and the server data layer reads the same cookie for SSR. This
-// whole block is throwaway once real subdomains land.
+// DNS-label rule, matches the backend subdomain validator.
 const SUBDOMAIN_RE = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/;
 const isValidStore = (s) =>
     typeof s === 'string' && s.length >= 2 && s.length <= 63 && SUBDOMAIN_RE.test(s);
+
+// First-segment words that are platform pages, never a store.
+const ROOT_RESERVED = new Set(['login', 'platform', 'sell']);
+
 const STORE_COOKIE = 'store';
 const STORE_COOKIE_MAX_AGE = 60 * 60 * 24 * 30; // 30 days
 
-// Extract the tenant label from a Host. Mirrors backend subdomainFromHost():
-// 'acme.myapp.com' + base 'myapp.com' -> 'acme'. Apex / IP / localhost / a
-// different domain / a reserved label all -> '' (meaning "no tenant").
+// Extract a tenant label from a real Host subdomain (the future permanent signal):
+// 'acme.myapp.com' + base 'myapp.com' -> 'acme'. Empty when not applicable.
 function tenantFromHost(rawHost) {
     const host = String(rawHost || '').split(':')[0].trim().toLowerCase();
     if (!host) return '';
     if (host === 'localhost' || host.endsWith('.localhost')) return '';
-    if (/^\d{1,3}(\.\d{1,3}){3}$/.test(host)) return ''; // bare IPv4 (port stripped)
+    if (/^\d{1,3}(\.\d{1,3}){3}$/.test(host)) return '';
     if (!BASE_DOMAIN || host === BASE_DOMAIN) return '';
     const suffix = `.${BASE_DOMAIN}`;
-    if (!host.endsWith(suffix)) return ''; // a different domain entirely
+    if (!host.endsWith(suffix)) return '';
     const label = host.slice(0, -suffix.length).split('.')[0] || '';
     return RESERVED.has(label) ? '' : label;
 }
 
 export function middleware(request) {
     const { pathname } = request.nextUrl;
+    const seg = pathname.split('/')[1] || '';
 
-    // Enter/leave a store on the shared domain: /s/<sub> in, /s out.
-    if (pathname === '/s' || pathname.startsWith('/s/')) {
-        return handleStorePath(request);
+    // 1) Backend calls — derive X-Tenant.
+    if (seg === 'api') {
+        let tenant = tenantFromHost(request.headers.get('host'));
+        if (!tenant && pathname.startsWith('/api/client/')) {
+            const cookieStore = request.cookies.get(STORE_COOKIE)?.value;
+            if (isValidStore(cookieStore)) tenant = cookieStore;
+        }
+        const headers = new Headers(request.headers);
+        headers.delete('x-tenant'); // never trust an inbound value
+        if (tenant) headers.set('x-tenant', tenant);
+        return NextResponse.next({ request: { headers } });
     }
 
-    // A real subdomain (the permanent signal) wins. Otherwise fall back to the
-    // `store` cookie a guest picked via /s/<sub> — but ONLY for the public
-    // storefront API. Admin/platform/POS requests are scoped by their own token,
-    // so a stale store cookie must never leak into them.
-    let tenant = tenantFromHost(request.headers.get('host'));
-    if (!tenant && pathname.startsWith('/api/client/')) {
-        const cookieStore = request.cookies.get(STORE_COOKIE)?.value;
-        if (isValidStore(cookieStore)) tenant = cookieStore;
-    }
-
-    const requestHeaders = new Headers(request.headers);
-    // Anti-spoof: never trust an X-Tenant that arrived from the client. We always
-    // derive it ourselves, so drop any inbound value first, then set our own.
-    requestHeaders.delete('x-tenant');
-    if (tenant) requestHeaders.set('x-tenant', tenant);
-
-    return NextResponse.next({ request: { headers: requestHeaders } });
-}
-
-// Path-routing entry/exit handler (shared-domain interim).
-//   /s/<sub>[/rest][?q]  -> set `store` cookie, redirect to /rest (clean URL)
-//   /s, /s/, bad label   -> clear `store` cookie, redirect home (exit the store)
-function handleStorePath(request) {
-    const url = request.nextUrl.clone();
-    const rest = request.nextUrl.pathname.replace(/^\/s\/?/, ''); // '' for /s and /s/
-    const [sub, ...tail] = rest.split('/');
-
-    if (!isValidStore(sub) || RESERVED.has(sub)) {
-        url.pathname = '/';
-        const res = NextResponse.redirect(url);
-        res.cookies.set(STORE_COOKIE, '', { path: '/', maxAge: 0 });
+    // 2) A store page (/<store>/...): remember the slug for client-side API calls.
+    if (seg && !ROOT_RESERVED.has(seg) && isValidStore(seg)) {
+        const res = NextResponse.next();
+        res.cookies.set(STORE_COOKIE, seg, {
+            path: '/',
+            maxAge: STORE_COOKIE_MAX_AGE,
+            sameSite: 'lax',
+            httpOnly: false, // storefront client code reads it for its fetches
+        });
         return res;
     }
 
-    url.pathname = '/' + tail.join('/'); // '/' when there is no remainder
-    const res = NextResponse.redirect(url);
-    res.cookies.set(STORE_COOKIE, sub, {
-        path: '/',
-        maxAge: STORE_COOKIE_MAX_AGE,
-        sameSite: 'lax',
-        httpOnly: false, // the storefront banner reads it via document.cookie
-    });
+    // 3) Platform pages / root / static: not a store — drop any stale cookie so a
+    //    client /api/client/* call here can't inherit a previous store.
+    const res = NextResponse.next();
+    if (request.cookies.get(STORE_COOKIE)) {
+        res.cookies.set(STORE_COOKIE, '', { path: '/', maxAge: 0 });
+    }
     return res;
 }
 
-// The API proxy needs the tenant signal; the /s paths need the entry/exit hook.
-// Everything else (page navigation, static assets) is untouched — SSR tenant
-// scoping is handled in the data layer via the same cookie (see storeContext.js).
+// Run on everything except Next internals and static asset files (so store page
+// navigations get their cookie set, and /api/* gets X-Tenant).
 export const config = {
-    matcher: ['/api/:path*', '/s', '/s/:path*'],
+    matcher: ['/((?!_next/static|_next/image|favicon.ico|.*\\.(?:png|jpg|jpeg|gif|svg|ico|webp|css|js|woff2?|ttf|map|txt|xml|webmanifest)$).*)'],
 };

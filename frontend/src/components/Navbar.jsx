@@ -1,8 +1,8 @@
 "use client";
-import Link from "next/link";
+import Link, { useStorePush } from "@/components/StoreLink";
 import Image from "next/image";
 import { useState, useEffect, useCallback } from "react";
-import { useRouter, usePathname } from "next/navigation";
+import { usePathname } from "next/navigation";
 import {
     FiSearch,
     FiShoppingCart,
@@ -41,7 +41,7 @@ function Navbar() {
     // Universal search overlay (the header search icon opens this on every
     // screen size — the mobile drawer is hidden on desktop).
     const [searchOpen, setSearchOpen] = useState(false);
-    const router = useRouter();
+    const goTo = useStorePush();
     const pathname = usePathname();
     const { customer, logout } = useCustomerAuth();
 
@@ -285,7 +285,7 @@ function Navbar() {
                                 drawer's account block instead). */}
                             <div className="relative group hidden md:block">
                                 <button
-                                    onClick={() => router.push(customer ? "/account" : "/account/login")}
+                                    onClick={() => goTo(customer ? "/account" : "/account/login")}
                                     className="p-2 opacity-90 hover:opacity-100 hover:bg-white/10 rounded-full transition-all focus:outline-none focus:ring-2 focus:ring-white/40"
                                     aria-label="Account"
                                 >
@@ -309,7 +309,7 @@ function Navbar() {
                                                 <FiMapPin className="w-4 h-4" /> Addresses
                                             </Link>
                                             <button
-                                                onClick={() => { logout(); router.push("/"); }}
+                                                onClick={() => { logout(); goTo("/"); }}
                                                 className="w-full text-left flex items-center gap-2.5 px-4 py-2.5 text-sm text-rose-600 hover:bg-rose-50 transition-colors border-t border-gray-50"
                                             >
                                                 <FiLogOut className="w-4 h-4" /> Sign out
@@ -483,7 +483,7 @@ function Navbar() {
                                             <FiMapPin className="w-4 h-4 text-emerald-600" /> Addresses
                                         </Link>
                                         <button
-                                            onClick={() => { logout(); closeMobileMenu(); router.push("/"); }}
+                                            onClick={() => { logout(); closeMobileMenu(); goTo("/"); }}
                                             className="w-full text-left flex items-center gap-2.5 px-4 py-3 text-sm text-rose-600 hover:bg-rose-50 transition-colors border-t border-gray-50"
                                         >
                                             <FiLogOut className="w-4 h-4" /> Sign out
