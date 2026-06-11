@@ -15,6 +15,8 @@ import { notFound } from './middlewares/notFound.middleware.js';
 import requireAuth from './middlewares/auth.middleware.js';
 import { auditMutations } from './lib/audit.js';
 import AdminModel from './models/admin.model.js';
+import { runAsSystem } from './tenancy/tenantContext.js';
+import { bootstrapTenancy } from './tenancy/bootstrapTenancy.js';
 
 import categoryRouter from './routes/category.route.js';
 import productRouter from './routes/product.route.js';
@@ -205,7 +207,13 @@ const migrateRoles = async () => {
 const start = async () => {
     try {
         await connectDB();
-        await migrateRoles();
+        // Startup data tasks run in a platform (system) context so they stay
+        // cross-tenant once the scoping plugin is enabled in Phase 1. The
+        // tenancy bootstrap is idempotent and purely additive (see Phase 0).
+        await runAsSystem(async () => {
+            await bootstrapTenancy();
+            await migrateRoles();
+        });
         const server = app.listen(env.PORT, () => {
             logger.info(`Server listening on port ${env.PORT} [${env.NODE_ENV}]`);
         });

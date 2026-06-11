@@ -25,6 +25,24 @@ const schema = z.object({
             s.split(',').map((e) => e.trim().toLowerCase()).filter(Boolean),
         ),
 
+    // ── Multi-tenant (SaaS) config ──────────────────────────────────────────
+    // Master switch for tenant query scoping. OFF until the Phase 1 data
+    // back-fill is complete; flipping it ON makes the scoping plugin fail loud
+    // when a tenant-owned query runs with no tenant in context. Accepts
+    // 'true'/'1' (anything else, incl. unset, => false).
+    TENANT_ENFORCEMENT: z
+        .string()
+        .optional()
+        .transform((v) => v === 'true' || v === '1'),
+    // Base domain for tenant subdomains, e.g. 'yourapp.com' so acme.yourapp.com
+    // resolves to tenant 'acme'. Optional until subdomain routing lands (Phase 2).
+    PLATFORM_BASE_DOMAIN: z.string().optional(),
+    // Subdomain assigned to the primary ("tenant zero") business at bootstrap.
+    TENANT_ZERO_SUBDOMAIN: z.string().default('app'),
+    // Currency the platform bills tenants in (their storefront currency is
+    // separate). BDT matches the SSLCommerz setup.
+    PLATFORM_CURRENCY: z.string().default('BDT'),
+
     CLOUDINARY_CLOUD_NAME: z.string().min(1).optional(),
     CLOUDINARY_API_KEY: z.string().min(1).optional(),
     CLOUDINARY_API_SECRET: z.string().min(1).optional(),
