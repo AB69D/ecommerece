@@ -826,7 +826,10 @@ function ProductCard({ product, onAdd, money }) {
         <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden flex flex-col">
             <div className="relative aspect-square bg-slate-100">
                 {product.coverImage ? (
-                    <Image src={product.coverImage} alt={product.name} fill sizes="200px" className="object-cover" />
+                    // `unoptimized` serves the image URL directly (like the storefront's
+                    // plain <img>), bypassing the Next optimizer's host allowlist so
+                    // product images load from any source — Cloudinary, demo data, etc.
+                    <Image src={product.coverImage} alt={product.name} fill sizes="200px" className="object-cover" unoptimized />
                 ) : (
                     <div className="w-full h-full flex items-center justify-center text-slate-300">
                         <FiPackage className="w-8 h-8" />
@@ -906,7 +909,7 @@ function CartPanel(props) {
                         <div key={l.key} className="flex gap-2.5 p-2.5 rounded-xl border border-slate-100 bg-slate-50/60">
                             <div className="relative w-12 h-12 rounded-lg overflow-hidden bg-slate-100 shrink-0">
                                 {l.image ? (
-                                    <Image src={l.image} alt={l.name} fill sizes="48px" className="object-cover" />
+                                    <Image src={l.image} alt={l.name} fill sizes="48px" className="object-cover" unoptimized />
                                 ) : (
                                     <div className="w-full h-full flex items-center justify-center text-slate-300"><FiPackage className="w-5 h-5" /></div>
                                 )}
