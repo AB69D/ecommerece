@@ -20,15 +20,22 @@ const SUBDOMAIN_RE = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/;
 export const isValidStore = (s) =>
     typeof s === "string" && s.length >= 2 && s.length <= 63 && SUBDOMAIN_RE.test(s);
 
-// Does this store slug resolve to a live, approved tenant? The backend's
-// resolveTenant 404s an unknown / un-approved store and 403s a suspended one, so
-// a 2xx on its public site-settings means "real, browsable store". Used by the
-// [store] layout to 404 a bad /<store> URL. no-store so one store's answer is
+// Infra labels that are never a store. The backend treats these as "no tenant"
+// and falls back to the primary store, so we must reject them here ourselves —
+// otherwise /admin etc. would render the primary storefront. (Not 'app': that IS
+// the primary store's slug.)
+const RESERVED_STORE = new Set(["www", "api", "cdn", "assets", "static", "mail", "admin"]);
+
+// Does this slug resolve to a live, approved tenant? resolveTenant 404s an unknown
+// or un-approved store and 403s a suspended one. We probe the products list (not
+// site-settings) because it returns 200 for a brand-new store that hasn't saved
+// any settings yet — so a freshly-approved blank store is still browsable. Used by
+// the [store] layout to 404 a bad /<store> URL. no-store so one store's answer is
 // never cached for another.
 export async function validateStore(store) {
-    if (!isValidStore(store)) return false;
+    if (!isValidStore(store) || RESERVED_STORE.has(store)) return false;
     try {
-        const res = await fetch(`${BACKEND_URL}/api/client/site-settings`, {
+        const res = await fetch(`${BACKEND_URL}/api/client/product/products?limit=1`, {
             headers: { "X-Tenant": store },
             cache: "no-store",
         });

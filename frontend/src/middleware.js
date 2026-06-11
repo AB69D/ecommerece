@@ -61,7 +61,8 @@ export function middleware(request) {
     }
 
     // 2) A store page (/<store>/...): remember the slug for client-side API calls.
-    if (seg && !ROOT_RESERVED.has(seg) && isValidStore(seg)) {
+    //    Skip infra labels (admin/api/…) — they're never a store.
+    if (seg && !ROOT_RESERVED.has(seg) && !RESERVED.has(seg) && isValidStore(seg)) {
         const res = NextResponse.next();
         res.cookies.set(STORE_COOKIE, seg, {
             path: '/',
