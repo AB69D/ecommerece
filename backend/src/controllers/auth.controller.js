@@ -351,6 +351,10 @@ export const me = async (request, response) => {
                     permissions: admin.permissions || [],
                     effectivePermissions: [...effectivePermissions(admin)],
                     lastLoginAt: admin.lastLoginAt,
+                    // Platform owner = env ADMIN_EMAILS allow-list (NOT the
+                    // per-store "super-admin" role). Gates the cross-tenant
+                    // platform UI so a store owner can't reach /api/platform.
+                    isPlatformOwner: ADMIN_EMAILS.includes(String(admin.email || '').toLowerCase()),
                 },
             });
         }
@@ -385,6 +389,9 @@ export const me = async (request, response) => {
                     permissions: admin?.permissions || [],
                     effectivePermissions: [...perms],
                     lastLoginAt: admin?.lastLoginAt || null,
+                    // Env owners ARE the platform owners; legacy DB email admins
+                    // are not. Gates the cross-tenant platform UI.
+                    isPlatformOwner: isEnvAdmin,
                 },
             });
         }
