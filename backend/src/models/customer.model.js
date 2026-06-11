@@ -60,6 +60,11 @@ const customerSchema = new mongoose.Schema(
     { timestamps: true },
 );
 
+// Look up a password-reset request by its token hash in one indexed hit. Sparse
+// so it only indexes the handful of accounts with a reset in flight (the field
+// is unset the moment a token is used or a new password is set).
+customerSchema.index({ resetTokenHash: 1 }, { sparse: true });
+
 const CustomerModel = mongoose.model('Customer', customerSchema);
 
 export default CustomerModel;
