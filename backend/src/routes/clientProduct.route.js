@@ -48,7 +48,8 @@ clientProductRouter.get('/products', async (req, res) => {
         const skip = (pageNum - 1) * limitNum;
 
         const [data, totalCount] = await Promise.all([
-            ProductModel.find(query).sort({ createdAt: -1 }).skip(skip).limit(limitNum).populate('category'),
+            // Strip costPrice (internal margin data) from the public payload.
+            ProductModel.find(query).select('-weights.costPrice').sort({ createdAt: -1 }).skip(skip).limit(limitNum).populate('category'),
             ProductModel.countDocuments(query)
         ]);
 
@@ -77,7 +78,7 @@ clientProductRouter.get('/product/:id', async (req, res) => {
         const product = await ProductModel.findOne({
             _id: id,
             showInEcommerce: { $ne: false }
-        }).populate('category');
+        }).select('-weights.costPrice').populate('category');
 
         if (!product) {
             return res.status(404).json({
@@ -126,7 +127,7 @@ clientProductRouter.get('/top-selling', async (req, res) => {
         const products = await ProductModel.find({
             _id: { $in: productIds },
             showInEcommerce: { $ne: false }
-        }).populate('category');
+        }).select('-weights.costPrice').populate('category');
 
         const productsWithSales = products.map(product => {
             const salesData = topSelling.find(item => item._id === product._id.toString());
@@ -280,6 +281,38 @@ clientProductRouter.get('/search', async (req, res) => {
             },
             appliedSort: sortKey,
         });
+    } catch (error) {
+        return res.status(500).json({
+            message: error.message || error,
+            error: true,
+            success: false,
+        });
+    }
+});
+
+// Lightweight autocomplete for the storefront search box: the few best
+// name-matches for a query, with just enough fields to render a suggestion row
+// (no heavy aggregation, no costPrice). Two-character minimum keeps it cheap.
+clientProductRouter.get('/suggest', async (req, res) => {
+    try {
+        const text = String(req.query.q || '').trim().slice(0, 80);
+        const limitNum = Math.min(10, Math.max(1, parseInt(req.query.limit) || 6));
+
+        if (text.length < 2) {
+            return res.json({ message: 'Suggestions', error: false, success: true, data: [] });
+        }
+
+        const rx = new RegExp(escapeRegex(text), 'i');
+        const data = await ProductModel.find({
+            showInEcommerce: { $ne: false },
+            $or: [{ firstName: rx }, { lastName: rx }],
+        })
+            .select('firstName lastName cover_image weights.price weights.discountPercent')
+            .sort({ createdAt: -1 })
+            .limit(limitNum)
+            .lean();
+
+        return res.json({ message: 'Suggestions', error: false, success: true, data });
     } catch (error) {
         return res.status(500).json({
             message: error.message || error,
