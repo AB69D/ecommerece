@@ -8,6 +8,7 @@ import PwaRegister from "@/components/PwaRegister.jsx";
 import Analytics from "@/components/Analytics.jsx";
 import JsonLd from "@/components/JsonLd.jsx";
 import { CurrencyProvider } from "@/context/CurrencyContext.jsx";
+import { CustomerAuthProvider } from "@/context/CustomerAuthContext.jsx";
 import { fetchSiteSettings } from "@/lib/dynamicContent.js";
 import { SITE_URL, absoluteUrl, buildSiteJsonLd } from "@/lib/seo.js";
 
@@ -144,14 +145,16 @@ export default async function RootLayout({ children }) {
           <JsonLd key={i} data={node} />
         ))}
         <CurrencyProvider initialSymbol={currencySymbol} initialCode={currencyCode}>
-          <HeaderTop />
-          <Navbar />
-          <main className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            {children}
-          </main>
-          <Footer />
-          <OrderChatbot />
-          <PwaRegister enabled={pwaEnabled} />
+          <CustomerAuthProvider>
+            <HeaderTop />
+            <Navbar />
+            <main className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+              {children}
+            </main>
+            <Footer />
+            <OrderChatbot />
+            <PwaRegister enabled={pwaEnabled} />
+          </CustomerAuthProvider>
         </CurrencyProvider>
       </body>
     </html>

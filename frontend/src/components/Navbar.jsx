@@ -15,8 +15,13 @@ import {
     FiInfo,
     FiPhone,
     FiChevronRight,
+    FiUser,
+    FiPackage,
+    FiMapPin,
+    FiLogOut,
 } from "react-icons/fi";
 import { getWishlist, setWishlistEnabled } from "@/services/wishlist";
+import { useCustomerAuth } from "@/context/CustomerAuthContext";
 
 function Navbar() {
     const [categories, setCategories] = useState([]);
@@ -35,6 +40,7 @@ function Navbar() {
     const [searchQuery, setSearchQuery] = useState("");
     const router = useRouter();
     const pathname = usePathname();
+    const { customer, logout } = useCustomerAuth();
 
     const fetchCategories = useCallback(async () => {
         try {
@@ -274,6 +280,53 @@ function Navbar() {
                                 <FiSearch className="w-5 h-5 sm:w-6 sm:h-6" />
                             </button>
 
+                            {/* Account — desktop hover menu (small screens use the
+                                drawer's account block instead). */}
+                            <div className="relative group hidden md:block">
+                                <button
+                                    onClick={() => router.push(customer ? "/account" : "/account/login")}
+                                    className="p-2 opacity-90 hover:opacity-100 hover:bg-white/10 rounded-full transition-all focus:outline-none focus:ring-2 focus:ring-white/40"
+                                    aria-label="Account"
+                                >
+                                    <FiUser className="w-5 h-5 sm:w-6 sm:h-6" />
+                                </button>
+                                <div className="absolute right-0 mt-0 w-60 bg-white border border-gray-100 rounded-xl shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-300 transform translate-y-2 group-hover:translate-y-0 z-50 overflow-hidden">
+                                    <div className="h-1" style={{ background: "linear-gradient(to right, var(--theme-primary), var(--theme-accent))" }} />
+                                    {customer ? (
+                                        <div className="py-1">
+                                            <div className="px-4 py-3 border-b border-gray-50">
+                                                <p className="text-sm font-semibold text-gray-800 truncate">{customer.name}</p>
+                                                <p className="text-xs text-gray-500 truncate">{customer.email}</p>
+                                            </div>
+                                            <Link href="/account" className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-700 hover:bg-emerald-50 hover:text-emerald-700 transition-colors">
+                                                <FiUser className="w-4 h-4" /> My Account
+                                            </Link>
+                                            <Link href="/account/orders" className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-700 hover:bg-emerald-50 hover:text-emerald-700 transition-colors">
+                                                <FiPackage className="w-4 h-4" /> My Orders
+                                            </Link>
+                                            <Link href="/account/addresses" className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-700 hover:bg-emerald-50 hover:text-emerald-700 transition-colors">
+                                                <FiMapPin className="w-4 h-4" /> Addresses
+                                            </Link>
+                                            <button
+                                                onClick={() => { logout(); router.push("/"); }}
+                                                className="w-full text-left flex items-center gap-2.5 px-4 py-2.5 text-sm text-rose-600 hover:bg-rose-50 transition-colors border-t border-gray-50"
+                                            >
+                                                <FiLogOut className="w-4 h-4" /> Sign out
+                                            </button>
+                                        </div>
+                                    ) : (
+                                        <div className="py-1">
+                                            <Link href="/account/login" className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-700 hover:bg-emerald-50 hover:text-emerald-700 transition-colors">
+                                                <FiUser className="w-4 h-4" /> Sign in
+                                            </Link>
+                                            <Link href="/account/register" className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-700 hover:bg-emerald-50 hover:text-emerald-700 transition-colors">
+                                                <FiChevronRight className="w-4 h-4" /> Create account
+                                            </Link>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+
                             {wishlistOn && (
                                 <Link href="/wishlist" className="relative" aria-label="Wishlist">
                                     <button
@@ -394,6 +447,57 @@ function Navbar() {
                     </div>
 
                     <div className="flex-1 overflow-y-auto hide-scrollbar">
+                        {/* Account block */}
+                        <div className="p-4 border-b border-gray-100">
+                            {customer ? (
+                                <div className="rounded-xl ring-1 ring-emerald-100 overflow-hidden">
+                                    <div className="flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-emerald-50 to-amber-50">
+                                        <span className="flex-shrink-0 w-10 h-10 flex items-center justify-center rounded-full bg-emerald-600 text-white">
+                                            <FiUser className="w-5 h-5" />
+                                        </span>
+                                        <div className="min-w-0">
+                                            <p className="text-sm font-semibold text-gray-800 truncate">{customer.name}</p>
+                                            <p className="text-xs text-gray-500 truncate">{customer.email}</p>
+                                        </div>
+                                    </div>
+                                    <div className="bg-white">
+                                        <Link href="/account" onClick={closeMobileMenu} className="flex items-center gap-2.5 px-4 py-3 text-sm text-gray-700 hover:bg-emerald-50/60 hover:text-emerald-700 transition-colors border-t border-gray-50">
+                                            <FiUser className="w-4 h-4 text-emerald-600" /> My Account
+                                        </Link>
+                                        <Link href="/account/orders" onClick={closeMobileMenu} className="flex items-center gap-2.5 px-4 py-3 text-sm text-gray-700 hover:bg-emerald-50/60 hover:text-emerald-700 transition-colors border-t border-gray-50">
+                                            <FiPackage className="w-4 h-4 text-emerald-600" /> My Orders
+                                        </Link>
+                                        <Link href="/account/addresses" onClick={closeMobileMenu} className="flex items-center gap-2.5 px-4 py-3 text-sm text-gray-700 hover:bg-emerald-50/60 hover:text-emerald-700 transition-colors border-t border-gray-50">
+                                            <FiMapPin className="w-4 h-4 text-emerald-600" /> Addresses
+                                        </Link>
+                                        <button
+                                            onClick={() => { logout(); closeMobileMenu(); router.push("/"); }}
+                                            className="w-full text-left flex items-center gap-2.5 px-4 py-3 text-sm text-rose-600 hover:bg-rose-50 transition-colors border-t border-gray-50"
+                                        >
+                                            <FiLogOut className="w-4 h-4" /> Sign out
+                                        </button>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="flex gap-2">
+                                    <Link
+                                        href="/account/login"
+                                        onClick={closeMobileMenu}
+                                        className="flex-1 text-center px-4 py-2.5 rounded-xl bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700 transition-colors"
+                                    >
+                                        Sign in
+                                    </Link>
+                                    <Link
+                                        href="/account/register"
+                                        onClick={closeMobileMenu}
+                                        className="flex-1 text-center px-4 py-2.5 rounded-xl ring-1 ring-emerald-200 text-emerald-700 text-sm font-semibold hover:bg-emerald-50 transition-colors"
+                                    >
+                                        Register
+                                    </Link>
+                                </div>
+                            )}
+                        </div>
+
                         {/* Primary links — premium icon badges */}
                         <nav className="py-2">
                             {mobilePrimaryLinks.map(({ href, label, Icon }) => (

@@ -1,12 +1,14 @@
 "use client";
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { FiArrowLeft, FiCheck, FiTag, FiX } from "react-icons/fi";
+import { FiArrowLeft, FiCheck, FiTag, FiX, FiMapPin } from "react-icons/fi";
 import { useCurrency } from "@/context/CurrencyContext.jsx";
 import { trackInitiateCheckout, trackPurchase } from "@/lib/tracking";
 import { validateCouponPublic } from "@/services/coupons";
 import { useWhatsApp } from "@/hooks/useWhatsApp";
 import { PiWhatsappLogoBold } from "react-icons/pi";
+import { useCustomerAuth } from "@/context/CustomerAuthContext";
+import { customerFetch } from "@/services/api";
 
 export default function CheckoutPage() {
     const wa = useWhatsApp();
@@ -25,6 +27,13 @@ export default function CheckoutPage() {
     // Stable per-attempt idempotency key so a retried/double-tapped submit can't
     // create a duplicate order (the server returns the original instead).
     const idempotencyKeyRef = useRef(null);
+
+    // Signed-in shopper (if any): prefill their contact details and offer their
+    // saved addresses. Guests are unaffected — everything below stays optional.
+    const { customer } = useCustomerAuth();
+    const [savedAddresses, setSavedAddresses] = useState([]);
+    const [selectedAddressId, setSelectedAddressId] = useState("");
+    const prefilledRef = useRef(false);
 
     const getGuestId = () => {
         if (typeof window === 'undefined') return null;
@@ -59,6 +68,50 @@ export default function CheckoutPage() {
     useEffect(() => {
         fetchCart();
     }, []);
+
+    // Compose a saved address into the checkout form. `force` overwrites what's
+    // there (used when the shopper taps an address card); without it we only
+    // fill blanks (used for the initial default-address prefill so we never
+    // stomp something already typed). The storefront delivery selector only
+    // offers local/regional, so an "international" address keeps the current area.
+    const applyAddress = (a, { force = false } = {}) => {
+        const composed = [a.addressLine, a.city].filter(Boolean).join(", ");
+        setFormData((f) => ({
+            ...f,
+            shippingAddress: force || !f.shippingAddress ? composed : f.shippingAddress,
+            deliveryArea: a.area === "local" || a.area === "regional" ? a.area : f.deliveryArea,
+            customerName: force ? a.fullName || f.customerName : f.customerName || a.fullName || "",
+            customerPhone: force ? a.phone || f.customerPhone : f.customerPhone || a.phone || "",
+        }));
+        setSelectedAddressId(a._id);
+    };
+
+    // Once the auth context resolves a signed-in customer, prefill their contact
+    // details and load saved addresses (defaulting to their default address).
+    useEffect(() => {
+        if (!customer || prefilledRef.current) return;
+        prefilledRef.current = true;
+        setFormData((f) => ({
+            ...f,
+            customerName: f.customerName || customer.name || "",
+            customerPhone: f.customerPhone || customer.phone || "",
+            customerEmail: f.customerEmail || customer.email || "",
+        }));
+        (async () => {
+            try {
+                const res = await customerFetch("/api/client/auth/addresses");
+                const data = await res.json();
+                if (data.success && Array.isArray(data.data) && data.data.length) {
+                    setSavedAddresses(data.data);
+                    const def = data.data.find((x) => x.isDefault) || data.data[0];
+                    if (def) applyAddress(def);
+                }
+            } catch {
+                /* non-fatal: shopper can still type an address */
+            }
+        })();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [customer]);
 
     // Abandoned-checkout capture: once the customer has typed a name or phone,
     // debounce-save their progress so the admin can follow up even if they never
@@ -161,13 +214,18 @@ export default function CheckoutPage() {
 
         try {
             const guestId = getGuestId();
+            const headers = {
+                'Content-Type': 'application/json',
+                'guest-id': guestId,
+                'idempotency-key': idempotencyKeyRef.current
+            };
+            // Attach the customer token (when signed in) so the backend stamps
+            // this order with customerId and it shows up in their order history.
+            const token = typeof window !== 'undefined' ? localStorage.getItem('customer_token') : null;
+            if (token) headers['Authorization'] = `Bearer ${token}`;
             const res = await fetch(`/api/client/order/create`, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'guest-id': guestId,
-                    'idempotency-key': idempotencyKeyRef.current
-                },
+                headers,
                 body: JSON.stringify({ ...formData, couponCode: appliedCoupon?.code || "" })
             });
             const data = await res.json();
@@ -186,11 +244,19 @@ export default function CheckoutPage() {
                 });
                 setOrderPlaced(true);
                 setOrderData(data.data);
-                localStorage.removeItem('guestId');
-                
-                // Generate new guest ID for future orders
-                const newGuestId = `guest_${Date.now()}`;
-                localStorage.setItem('guestId', newGuestId);
+
+                // The server cleared the cart for this guestId. For a signed-in
+                // shopper, keep their account guestId so the (now empty) cart stays
+                // bound to the account; for a guest, mint a fresh anonymous id so the
+                // next order starts clean.
+                if (customer?.guestId) {
+                    localStorage.setItem('guestId', customer.guestId);
+                } else {
+                    localStorage.removeItem('guestId');
+                    const newGuestId = `guest_${Date.now()}`;
+                    localStorage.setItem('guestId', newGuestId);
+                }
+                if (typeof window !== 'undefined') window.dispatchEvent(new Event('cart-updated'));
             } else {
                 alert(data.message || 'Failed to place order');
             }
@@ -306,6 +372,52 @@ export default function CheckoutPage() {
                     <form onSubmit={handleSubmit} className="space-y-6">
                         <div className="bg-white border rounded-lg p-4 sm:p-6">
                             <h2 className="text-lg font-bold text-gray-800 mb-4">Delivery Information</h2>
+
+                            {customer && savedAddresses.length > 0 && (
+                                <div className="mb-5">
+                                    <p className="text-sm font-medium text-gray-700 mb-2 flex items-center gap-1.5">
+                                        <FiMapPin className="w-4 h-4 text-emerald-600" /> Deliver to a saved address
+                                    </p>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                                        {savedAddresses.map((a) => {
+                                            const active = selectedAddressId === a._id;
+                                            return (
+                                                <button
+                                                    type="button"
+                                                    key={a._id}
+                                                    onClick={() => applyAddress(a, { force: true })}
+                                                    className={`text-left rounded-xl border p-3 transition-all ${
+                                                        active
+                                                            ? "border-emerald-500 ring-1 ring-emerald-500 bg-emerald-50/50"
+                                                            : "border-gray-200 hover:border-emerald-300"
+                                                    }`}
+                                                >
+                                                    <div className="flex items-center justify-between gap-2">
+                                                        <span className="text-sm font-semibold text-gray-800 truncate">{a.label}</span>
+                                                        {a.isDefault && <span className="text-[11px] font-semibold text-amber-600 shrink-0">Default</span>}
+                                                    </div>
+                                                    <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">
+                                                        {[a.addressLine, a.city].filter(Boolean).join(", ")}
+                                                    </p>
+                                                </button>
+                                            );
+                                        })}
+                                        <button
+                                            type="button"
+                                            onClick={() => { setSelectedAddressId(""); setFormData((f) => ({ ...f, shippingAddress: "" })); }}
+                                            className={`text-left rounded-xl border border-dashed p-3 transition-all ${
+                                                selectedAddressId === ""
+                                                    ? "border-emerald-400 bg-emerald-50/40"
+                                                    : "border-gray-300 hover:border-emerald-300"
+                                            }`}
+                                        >
+                                            <span className="text-sm font-medium text-emerald-700">+ Use a new address</span>
+                                            <p className="text-xs text-gray-400 mt-0.5">Enter the details below</p>
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-1">Full Name *</label>
