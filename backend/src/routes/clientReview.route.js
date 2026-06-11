@@ -231,7 +231,11 @@ clientReviewRouter.get('/reviews', async (req, res) => {
             return res.json({ message: "Reviews are disabled", error: false, success: true, data: [] });
         }
 
-        const reviews = await ReviewModel.find().sort({ createdAt: -1 });
+        // Public, anonymous endpoint feeding the homepage testimonials carousel.
+        // Cap to the most recent 100 so an ever-growing reviews collection can't
+        // turn every page-load into a full-collection scan + unbounded payload;
+        // the carousel only rotates through a recent sample anyway.
+        const reviews = await ReviewModel.find().sort({ createdAt: -1 }).limit(100).lean();
 
         return res.json({
             message: "Reviews fetched successfully",

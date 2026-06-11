@@ -44,6 +44,11 @@ const reviewSchema = new mongoose.Schema({
     timestamps: true
 });
 
+// The homepage testimonials carousel and the admin list both read newest-first;
+// this index backs that sort so it doesn't scan the whole collection as reviews
+// accumulate.
+reviewSchema.index({ createdAt: -1 });
+
 const ReviewModel = mongoose.model('review', reviewSchema);
 
 export default ReviewModel;
