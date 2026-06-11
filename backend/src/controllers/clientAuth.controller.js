@@ -1,15 +1,21 @@
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
+import crypto from 'crypto';
 import { env } from '../config/env.js';
 import { ApiError } from '../lib/ApiError.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { ok, created } from '../lib/ApiResponse.js';
+import { sendPasswordResetEmail } from '../lib/authEmail.js';
 import CustomerModel from '../models/customer.model.js';
 import CartModel from '../models/cart.model.js';
 import WishlistModel from '../models/wishlist.model.js';
 import OrderModel from '../models/order.model.js';
 
 const BCRYPT_ROUNDS = 10;
+// One-time password-reset tokens are short-lived; the link is single-use and
+// cleared the moment it's redeemed.
+const RESET_TOKEN_TTL_MS = 60 * 60 * 1000; // 1 hour
+const hashToken = (raw) => crypto.createHash('sha256').update(String(raw)).digest('hex');
 // Storefront sessions are long-lived (unlike the 12h admin session) so shoppers
 // stay signed in across visits. The live-record reload in the middleware still
 // enforces deactivation immediately.
@@ -184,6 +190,70 @@ export const changePassword = asyncHandler(async (req, res) => {
     customer.passwordHash = await bcrypt.hash(newPassword, BCRYPT_ROUNDS);
     await customer.save();
     return ok(res, {}, 'Password updated');
+});
+
+// POST /api/client/auth/forgot-password  { email }
+// Starts the reset flow. ALWAYS returns the same generic success — never reveals
+// whether an account exists for that email — so it can't be used to enumerate
+// registered customers. When the email does belong to an active account we mint
+// a one-time token, store only its hash, and email a reset link.
+export const forgotPassword = asyncHandler(async (req, res) => {
+    const email = String(req.body.email || '').trim().toLowerCase();
+    const generic = 'If an account exists for that email, a password reset link is on its way.';
+    if (!isEmail(email)) return ok(res, {}, generic);
+
+    const customer = await CustomerModel.findOne({ email });
+    if (customer && customer.isActive) {
+        const rawToken = crypto.randomBytes(32).toString('hex');
+        customer.resetTokenHash = hashToken(rawToken);
+        customer.resetTokenExpiresAt = new Date(Date.now() + RESET_TOKEN_TTL_MS);
+        await customer.save();
+
+        const base = (env.FRONTEND_URL || '').replace(/\/$/, '');
+        const resetUrl = `${base}/account/reset-password?token=${rawToken}`;
+        // Best-effort + fire-without-revealing: we never surface send success or
+        // failure to the caller (doing so would leak account existence + timing).
+        // The mailer logs its own failures.
+        await sendPasswordResetEmail({
+            to: customer.email,
+            name: customer.name,
+            resetUrl,
+            expiresInLabel: '1 hour',
+        }).catch(() => {});
+    }
+
+    return ok(res, {}, generic);
+});
+
+// POST /api/client/auth/reset-password  { token, password }
+// Redeems a one-time reset token: verifies it's unexpired, sets the new
+// password, clears the token (single use), and signs the customer in by
+// returning a fresh JWT so they land back logged in.
+export const resetPassword = asyncHandler(async (req, res) => {
+    const token = String(req.body.token || '').trim();
+    const password = String(req.body.password || '');
+    if (!token) throw ApiError.badRequest('This password reset link is invalid.');
+    if (password.length < 8) throw ApiError.badRequest('Password must be at least 8 characters.');
+
+    const customer = await CustomerModel.findOne({
+        resetTokenHash: hashToken(token),
+        resetTokenExpiresAt: { $gt: new Date() },
+    }).select('+passwordHash +resetTokenHash +resetTokenExpiresAt');
+
+    // One generic message for "no such token" and "expired" so a stale link
+    // can't be probed for validity.
+    if (!customer || !customer.isActive) {
+        throw ApiError.badRequest('This password reset link is invalid or has expired.');
+    }
+
+    customer.passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS);
+    customer.resetTokenHash = undefined;
+    customer.resetTokenExpiresAt = undefined;
+    customer.lastLoginAt = new Date();
+    await customer.save();
+
+    const authToken = signToken(customer);
+    return ok(res, { token: authToken, customer: publicCustomer(customer) }, 'Password updated');
 });
 
 // Order history. Scoped strictly to orders linked to this account — either

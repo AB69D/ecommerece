@@ -2,38 +2,43 @@
 import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { FiMail, FiLock, FiArrowRight, FiAlertCircle, FiEye, FiEyeOff } from "react-icons/fi";
-import { login as loginRequest } from "@/services/customerAuth";
+import { FiLock, FiArrowRight, FiAlertCircle, FiEye, FiEyeOff } from "react-icons/fi";
+import { resetPassword as resetPasswordRequest } from "@/services/customerAuth";
 import { useCustomerAuth } from "@/context/CustomerAuthContext";
 
-function LoginForm() {
+function ResetPasswordForm() {
     const router = useRouter();
     const params = useSearchParams();
-    const nextUrl = params.get("next") || "/account";
+    const token = params.get("token") || "";
     const { login } = useCustomerAuth();
 
-    const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
+    const [confirm, setConfirm] = useState("");
     const [showPassword, setShowPassword] = useState(false);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        if (!email || !password) {
-            setError("Email and password are required.");
+        if (password.length < 8) {
+            setError("Password must be at least 8 characters.");
+            return;
+        }
+        if (password !== confirm) {
+            setError("Passwords do not match.");
             return;
         }
         setError("");
         setLoading(true);
         try {
-            const result = await loginRequest({ email: email.trim(), password });
+            const result = await resetPasswordRequest({ token, password });
             setLoading(false);
             if (result.success && result.data?.token) {
+                // Reset succeeded — the backend signed us straight in.
                 login(result.data.token, result.data.customer);
-                router.push(nextUrl);
+                router.push("/account");
             } else {
-                setError(result.message || "Invalid email or password.");
+                setError(result.message || "This password reset link is invalid or has expired.");
             }
         } catch {
             setLoading(false);
@@ -41,12 +46,36 @@ function LoginForm() {
         }
     };
 
+    // No token in the link — nothing to reset against.
+    if (!token) {
+        return (
+            <div className="max-w-md mx-auto py-10 sm:py-16 px-4">
+                <div className="bg-white rounded-2xl shadow-xl border border-gray-100 p-8 text-center">
+                    <div className="mx-auto w-14 h-14 rounded-full bg-red-50 flex items-center justify-center mb-4">
+                        <FiAlertCircle className="w-7 h-7 text-red-600" />
+                    </div>
+                    <h1 className="text-2xl font-bold text-gray-800">Invalid reset link</h1>
+                    <p className="text-gray-500 mt-2 text-sm leading-relaxed">
+                        This password reset link is missing or malformed. Please request a new one.
+                    </p>
+                    <Link
+                        href="/account/forgot-password"
+                        className="mt-6 inline-flex items-center gap-2 text-sm font-semibold text-emerald-600 hover:text-emerald-700"
+                    >
+                        Request a new link
+                        <FiArrowRight className="w-4 h-4" />
+                    </Link>
+                </div>
+            </div>
+        );
+    }
+
     return (
         <div className="max-w-md mx-auto py-10 sm:py-16 px-4">
             <div className="bg-white rounded-2xl shadow-xl border border-gray-100 p-8">
                 <div className="text-center mb-8">
-                    <h1 className="text-2xl font-bold text-gray-800">Welcome back</h1>
-                    <p className="text-gray-500 mt-1 text-sm">Sign in to your account</p>
+                    <h1 className="text-2xl font-bold text-gray-800">Set a new password</h1>
+                    <p className="text-gray-500 mt-1 text-sm">Choose a strong password you don&apos;t use elsewhere.</p>
                 </div>
 
                 {error && (
@@ -58,33 +87,17 @@ function LoginForm() {
 
                 <form onSubmit={handleSubmit} className="space-y-5">
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1.5">Email</label>
-                        <div className="relative">
-                            <FiMail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                            <input
-                                type="email"
-                                autoComplete="email"
-                                value={email}
-                                onChange={(e) => setEmail(e.target.value)}
-                                placeholder="you@example.com"
-                                required
-                                autoFocus
-                                className="w-full pl-11 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all placeholder:text-gray-400"
-                            />
-                        </div>
-                    </div>
-
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1.5">Password</label>
+                        <label className="block text-sm font-medium text-gray-700 mb-1.5">New password</label>
                         <div className="relative">
                             <FiLock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                             <input
                                 type={showPassword ? "text" : "password"}
-                                autoComplete="current-password"
+                                autoComplete="new-password"
                                 value={password}
                                 onChange={(e) => setPassword(e.target.value)}
-                                placeholder="••••••••"
+                                placeholder="At least 8 characters"
                                 required
+                                autoFocus
                                 className="w-full pl-11 pr-11 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all placeholder:text-gray-400"
                             />
                             <button
@@ -97,13 +110,21 @@ function LoginForm() {
                                 {showPassword ? <FiEyeOff className="w-5 h-5" /> : <FiEye className="w-5 h-5" />}
                             </button>
                         </div>
-                        <div className="mt-2 text-right">
-                            <Link
-                                href="/account/forgot-password"
-                                className="text-sm font-medium text-emerald-600 hover:text-emerald-700"
-                            >
-                                Forgot password?
-                            </Link>
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1.5">Confirm new password</label>
+                        <div className="relative">
+                            <FiLock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                            <input
+                                type={showPassword ? "text" : "password"}
+                                autoComplete="new-password"
+                                value={confirm}
+                                onChange={(e) => setConfirm(e.target.value)}
+                                placeholder="Re-enter your new password"
+                                required
+                                className="w-full pl-11 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all placeholder:text-gray-400"
+                            />
                         </div>
                     </div>
 
@@ -116,7 +137,7 @@ function LoginForm() {
                             <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                         ) : (
                             <>
-                                Sign in
+                                Reset password
                                 <FiArrowRight className="w-4 h-4" />
                             </>
                         )}
@@ -124,12 +145,8 @@ function LoginForm() {
                 </form>
 
                 <p className="text-sm text-gray-500 text-center mt-6">
-                    Don&apos;t have an account?{" "}
-                    <Link
-                        href={`/account/register${nextUrl !== "/account" ? `?next=${encodeURIComponent(nextUrl)}` : ""}`}
-                        className="font-semibold text-emerald-600 hover:text-emerald-700"
-                    >
-                        Create one
+                    <Link href="/account/login" className="font-semibold text-emerald-600 hover:text-emerald-700">
+                        Back to sign in
                     </Link>
                 </p>
             </div>
@@ -137,7 +154,7 @@ function LoginForm() {
     );
 }
 
-export default function CustomerLoginPage() {
+export default function ResetPasswordPage() {
     return (
         <Suspense
             fallback={
@@ -146,7 +163,7 @@ export default function CustomerLoginPage() {
                 </div>
             }
         >
-            <LoginForm />
+            <ResetPasswordForm />
         </Suspense>
     );
 }

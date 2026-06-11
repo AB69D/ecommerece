@@ -6,6 +6,8 @@ import {
     me,
     updateProfile,
     changePassword,
+    forgotPassword,
+    resetPassword,
     orders,
     listAddresses,
     addAddress,
@@ -31,6 +33,9 @@ const credentialLimiter = rateLimit({
 // Public credential endpoints
 router.post('/register', credentialLimiter, register);
 router.post('/login', credentialLimiter, login);
+// Forgot/reset password — also rate-limited (they send mail / accept tokens).
+router.post('/forgot-password', credentialLimiter, forgotPassword);
+router.post('/reset-password', credentialLimiter, resetPassword);
 
 // Authenticated account endpoints
 router.get('/me', requireCustomer, me);

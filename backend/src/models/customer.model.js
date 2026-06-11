@@ -50,6 +50,12 @@ const customerSchema = new mongoose.Schema(
         addresses: { type: [addressSchema], default: [] },
         isActive: { type: Boolean, default: true },
         lastLoginAt: { type: Date },
+        // Forgot-password flow. We persist only the SHA-256 hash of the one-time
+        // reset token — the raw token lives solely in the emailed link — so a
+        // database read can never be turned into an account takeover. Both are
+        // select:false (never serialised to the client) and cleared on use.
+        resetTokenHash: { type: String, select: false },
+        resetTokenExpiresAt: { type: Date, select: false },
     },
     { timestamps: true },
 );

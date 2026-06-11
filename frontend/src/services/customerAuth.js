@@ -41,6 +41,30 @@ export const login = async ({ email, password }) => {
     return res.json();
 };
 
+// Kick off a password reset. The backend always replies with the same generic
+// success (it never reveals whether the email has an account), so the UI shows
+// the same "check your email" message regardless.
+export const requestPasswordReset = async ({ email }) => {
+    const res = await fetch(`${API}/forgot-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+    });
+    return res.json();
+};
+
+// Redeem a reset token (from the emailed link) and set a new password. On
+// success the backend returns a fresh JWT + customer so the caller can sign the
+// shopper straight in via the auth context.
+export const resetPassword = async ({ token, password }) => {
+    const res = await fetch(`${API}/reset-password`, {
+        method: 'POST',
+        headers: headersWithGuest(),
+        body: JSON.stringify({ token, password }),
+    });
+    return res.json();
+};
+
 // Current customer from the stored JWT. Silent: a missing/expired token just
 // resolves to { success:false } (most visitors are anonymous — no redirect).
 export const fetchMe = async () => {
