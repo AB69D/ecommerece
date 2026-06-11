@@ -2,6 +2,7 @@ import { SiteSettings } from '../models/siteSettings.model.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { ok } from '../lib/ApiResponse.js';
 import { ApiError } from '../lib/ApiError.js';
+import { invalidateSettingsCache } from '../lib/siteSettings.js';
 
 const getOrCreate = async () => {
     let doc = await SiteSettings.findOne({ key: 'global' });
@@ -55,6 +56,9 @@ export const updateSettings = asyncHandler(async (req, res) => {
         { $set: flattenForSet(patch) },
         { new: true, upsert: true, runValidators: true },
     );
+    // Settings just changed — drop the cached copy so the next read (feature
+    // flags, payment config, etc.) reflects the new values immediately.
+    invalidateSettingsCache();
     req.audit?.({
         action: 'settings.update',
         resource: 'SiteSettings',
