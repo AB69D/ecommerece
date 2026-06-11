@@ -7,9 +7,11 @@ import OrderChatbot from "@/components/OrderChatbot.jsx";
 import PwaRegister from "@/components/PwaRegister.jsx";
 import Analytics from "@/components/Analytics.jsx";
 import JsonLd from "@/components/JsonLd.jsx";
+import StoreBanner from "@/components/StoreBanner.jsx";
 import { CurrencyProvider } from "@/context/CurrencyContext.jsx";
 import { CustomerAuthProvider } from "@/context/CustomerAuthContext.jsx";
 import { fetchSiteSettings } from "@/lib/dynamicContent.js";
+import { getActiveStore } from "@/lib/storeContext.js";
 import { SITE_URL, absoluteUrl, buildSiteJsonLd } from "@/lib/seo.js";
 
 const geistSans = Geist({
@@ -25,7 +27,7 @@ const geistMono = Geist_Mono({
 // Build the storefront's base metadata from the admin-editable site settings so
 // the title, description, social cards and favicon all follow the panel.
 export async function generateMetadata() {
-  const settings = await fetchSiteSettings();
+  const settings = await fetchSiteSettings(await getActiveStore());
   const siteName = settings?.siteName || "Ab9dEcommerce";
   const seo = settings?.seo || {};
   const title = seo.defaultTitle || `${siteName} - Quality Products Online`;
@@ -112,13 +114,13 @@ const themeCss = (t) => `:root{
 body{background-color:var(--theme-home-to);background-image:linear-gradient(180deg,var(--theme-home-from),var(--theme-home-to) 720px);background-repeat:no-repeat;}`;
 
 export async function generateViewport() {
-  const settings = await fetchSiteSettings();
+  const settings = await fetchSiteSettings(await getActiveStore());
   // Match the mobile browser chrome to the top of the navbar gradient.
   return { themeColor: settings?.theme?.navbarFrom || THEME_DEFAULTS.navbarFrom };
 }
 
 export default async function RootLayout({ children }) {
-  const settings = await fetchSiteSettings();
+  const settings = await fetchSiteSettings(await getActiveStore());
   const currencySymbol = settings?.currencySymbol || "$";
   const currencyCode = settings?.currencyCode || "USD";
   const pwaEnabled = settings?.features?.pwa !== false;
@@ -144,6 +146,9 @@ export default async function RootLayout({ children }) {
         {siteJsonLd.map((node, i) => (
           <JsonLd key={i} data={node} />
         ))}
+        {/* Interim shared-domain notice: shows which store a guest is browsing
+            (hidden on the primary store, admin and POS). */}
+        <StoreBanner />
         <CurrencyProvider initialSymbol={currencySymbol} initialCode={currencyCode}>
           <CustomerAuthProvider>
             <HeaderTop />

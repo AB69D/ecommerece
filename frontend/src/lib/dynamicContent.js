@@ -3,15 +3,29 @@
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8080";
 
-const fetchJson = async (path) => {
+// `store` is the optional active store (a subdomain) for the interim shared-domain
+// path-routing. Server components pass it (from getActiveStore in storeContext.js)
+// so SSR fetches hit the right tenant; the browser leaves it blank because the
+// middleware injects X-Tenant from the cookie on the relative /api proxy path.
+const fetchJson = async (path, store = "") => {
     // On the server (SSR / static export) a relative URL has no host to resolve
     // against and the prerender hangs, so target the absolute backend URL. In the
     // browser keep the relative path so the Next.js rewrite proxy handles it.
-    const url = typeof window === "undefined" ? `${BACKEND_URL}${path}` : path;
+    const isServer = typeof window === "undefined";
+    const url = isServer ? `${BACKEND_URL}${path}` : path;
+    // A guest viewing a specific store: forward the tenant ourselves (the absolute
+    // URL bypasses middleware) and skip the shared-URL data cache so store A's
+    // response is never served for store B. The primary store keeps the 60s cache.
+    const scoped = isServer && !!store;
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 5000);
     try {
-        const res = await fetch(url, { next: { revalidate: 60 }, signal: controller.signal });
+        const res = await fetch(url, {
+            ...(scoped
+                ? { headers: { "X-Tenant": store }, cache: "no-store" }
+                : { next: { revalidate: 60 } }),
+            signal: controller.signal,
+        });
         if (!res.ok) return null;
         const json = await res.json();
         return json?.data ?? null;
@@ -22,11 +36,11 @@ const fetchJson = async (path) => {
     }
 };
 
-export const fetchSiteSettings = () => fetchJson('/api/client/site-settings');
-export const fetchFooter = () => fetchJson('/api/client/footer');
-export const fetchNavMenu = (location) =>
-    fetchJson(location ? `/api/client/nav-menu?location=${location}` : '/api/client/nav-menu');
+export const fetchSiteSettings = (store = "") => fetchJson('/api/client/site-settings', store);
+export const fetchFooter = (store = "") => fetchJson('/api/client/footer', store);
+export const fetchNavMenu = (location, store = "") =>
+    fetchJson(location ? `/api/client/nav-menu?location=${location}` : '/api/client/nav-menu', store);
 
 // Admin-overridable content for a fixed page (returns null when no override has
 // been saved, so the route renders its built-in default content).
-export const fetchPage = (slug) => fetchJson(`/api/client/page/${slug}`);
+export const fetchPage = (slug, store = "") => fetchJson(`/api/client/page/${slug}`, store);

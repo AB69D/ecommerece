@@ -1,15 +1,26 @@
 import ProductClient from "./ProductClient";
 import JsonLd from "@/components/JsonLd.jsx";
 import { SITE_URL, absoluteUrl } from "@/lib/seo.js";
+import { storeHeaders } from "@/lib/storeContext.js";
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8080";
 
+// Fetch options scoped to the active store (interim shared-domain path-routing):
+// when a guest is viewing store <sub> we forward X-Tenant and bypass the shared
+// data cache so one store's product page never serves another's. The primary
+// store (no header) keeps the 60s revalidate cache. `headers` comes from
+// storeHeaders() — '{}' for the primary store, '{ "X-Tenant": sub }' otherwise.
+const fetchOpts = (headers) =>
+    headers && Object.keys(headers).length
+        ? { headers, cache: "no-store" }
+        : { next: { revalidate: 60 } };
+
 // Shared per-request fetch. generateMetadata() and the page component both call
-// this; Next dedupes identical GET fetches within a render so the network only
+// these; Next dedupes identical GET fetches within a render so the network only
 // sees one request each.
-async function getSettings() {
+async function getSettings(opts) {
     try {
-        const res = await fetch(`${BACKEND_URL}/api/client/site-settings`, { next: { revalidate: 60 } });
+        const res = await fetch(`${BACKEND_URL}/api/client/site-settings`, opts);
         const json = await res.json();
         return json?.data || {};
     } catch {
@@ -17,9 +28,9 @@ async function getSettings() {
     }
 }
 
-async function getProduct(id) {
+async function getProduct(id, opts) {
     try {
-        const res = await fetch(`${BACKEND_URL}/api/client/product/product/${id}`, { next: { revalidate: 60 } });
+        const res = await fetch(`${BACKEND_URL}/api/client/product/product/${id}`, opts);
         const json = await res.json();
         return json?.success ? json.data : null;
     } catch {
@@ -27,9 +38,9 @@ async function getProduct(id) {
     }
 }
 
-async function getRatingSummary(id) {
+async function getRatingSummary(id, opts) {
     try {
-        const res = await fetch(`${BACKEND_URL}/api/client/review/product/${id}`, { next: { revalidate: 60 } });
+        const res = await fetch(`${BACKEND_URL}/api/client/review/product/${id}`, opts);
         const json = await res.json();
         return json?.success ? json.data : null;
     } catch {
@@ -39,7 +50,8 @@ async function getRatingSummary(id) {
 
 export async function generateMetadata({ params }) {
     const { id } = await params;
-    const [settings, product] = await Promise.all([getSettings(), getProduct(id)]);
+    const opts = fetchOpts(await storeHeaders());
+    const [settings, product] = await Promise.all([getSettings(opts), getProduct(id, opts)]);
     const siteName = settings?.siteName || "Ab9dEcommerce";
     const currencySymbol = settings?.currencySymbol || "$";
 
@@ -82,10 +94,11 @@ export async function generateMetadata({ params }) {
 
 export default async function ProductDetailsPage({ params }) {
     const { id } = await params;
+    const opts = fetchOpts(await storeHeaders());
     const [settings, product, summary] = await Promise.all([
-        getSettings(),
-        getProduct(id),
-        getRatingSummary(id),
+        getSettings(opts),
+        getProduct(id, opts),
+        getRatingSummary(id, opts),
     ]);
 
     let productLd = null;

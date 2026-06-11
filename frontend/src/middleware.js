@@ -26,6 +26,18 @@ const BASE_DOMAIN = (process.env.NEXT_PUBLIC_BASE_DOMAIN || '').trim().toLowerCa
 // backend's RESERVED_LABELS so both ends agree on what "no tenant" looks like.
 const RESERVED = new Set(['www', 'api', 'cdn', 'assets', 'static', 'mail', 'admin']);
 
+// ── Interim path-routing on the shared domain (before subdomains) ────────────
+// Until each store gets acme.<BASE_DOMAIN>, a guest browses a store by visiting
+// /s/<sub>/... . We stamp the chosen store into a `store` cookie and rewrite to
+// the clean URL; thereafter the cookie (read here) supplies X-Tenant on the
+// storefront API, and the server data layer reads the same cookie for SSR. This
+// whole block is throwaway once real subdomains land.
+const SUBDOMAIN_RE = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/;
+const isValidStore = (s) =>
+    typeof s === 'string' && s.length >= 2 && s.length <= 63 && SUBDOMAIN_RE.test(s);
+const STORE_COOKIE = 'store';
+const STORE_COOKIE_MAX_AGE = 60 * 60 * 24 * 30; // 30 days
+
 // Extract the tenant label from a Host. Mirrors backend subdomainFromHost():
 // 'acme.myapp.com' + base 'myapp.com' -> 'acme'. Apex / IP / localhost / a
 // different domain / a reserved label all -> '' (meaning "no tenant").
@@ -42,20 +54,61 @@ function tenantFromHost(rawHost) {
 }
 
 export function middleware(request) {
-    const tenant = tenantFromHost(request.headers.get('host'));
+    const { pathname } = request.nextUrl;
+
+    // Enter/leave a store on the shared domain: /s/<sub> in, /s out.
+    if (pathname === '/s' || pathname.startsWith('/s/')) {
+        return handleStorePath(request);
+    }
+
+    // A real subdomain (the permanent signal) wins. Otherwise fall back to the
+    // `store` cookie a guest picked via /s/<sub> — but ONLY for the public
+    // storefront API. Admin/platform/POS requests are scoped by their own token,
+    // so a stale store cookie must never leak into them.
+    let tenant = tenantFromHost(request.headers.get('host'));
+    if (!tenant && pathname.startsWith('/api/client/')) {
+        const cookieStore = request.cookies.get(STORE_COOKIE)?.value;
+        if (isValidStore(cookieStore)) tenant = cookieStore;
+    }
 
     const requestHeaders = new Headers(request.headers);
     // Anti-spoof: never trust an X-Tenant that arrived from the client. We always
-    // derive it from the Host, so drop any inbound value first, then set our own.
+    // derive it ourselves, so drop any inbound value first, then set our own.
     requestHeaders.delete('x-tenant');
     if (tenant) requestHeaders.set('x-tenant', tenant);
 
     return NextResponse.next({ request: { headers: requestHeaders } });
 }
 
-// Only the API proxy path needs the tenant signal; SSR/page rendering is handled
-// separately (and is single-tenant for now). Scoping the matcher keeps the
-// middleware off static assets and page navigations.
+// Path-routing entry/exit handler (shared-domain interim).
+//   /s/<sub>[/rest][?q]  -> set `store` cookie, redirect to /rest (clean URL)
+//   /s, /s/, bad label   -> clear `store` cookie, redirect home (exit the store)
+function handleStorePath(request) {
+    const url = request.nextUrl.clone();
+    const rest = request.nextUrl.pathname.replace(/^\/s\/?/, ''); // '' for /s and /s/
+    const [sub, ...tail] = rest.split('/');
+
+    if (!isValidStore(sub) || RESERVED.has(sub)) {
+        url.pathname = '/';
+        const res = NextResponse.redirect(url);
+        res.cookies.set(STORE_COOKIE, '', { path: '/', maxAge: 0 });
+        return res;
+    }
+
+    url.pathname = '/' + tail.join('/'); // '/' when there is no remainder
+    const res = NextResponse.redirect(url);
+    res.cookies.set(STORE_COOKIE, sub, {
+        path: '/',
+        maxAge: STORE_COOKIE_MAX_AGE,
+        sameSite: 'lax',
+        httpOnly: false, // the storefront banner reads it via document.cookie
+    });
+    return res;
+}
+
+// The API proxy needs the tenant signal; the /s paths need the entry/exit hook.
+// Everything else (page navigation, static assets) is untouched — SSR tenant
+// scoping is handled in the data layer via the same cookie (see storeContext.js).
 export const config = {
-    matcher: ['/api/:path*'],
+    matcher: ['/api/:path*', '/s', '/s/:path*'],
 };

@@ -1,4 +1,5 @@
 import { fetchPage } from "@/lib/dynamicContent";
+import { getActiveStore } from "@/lib/storeContext";
 import CmsArticle from "@/components/CmsArticle";
 
 export const metadata = {
@@ -15,7 +16,7 @@ export const metadata = {
 };
 
 export default async function TermsConditionPage() {
-    const page = await fetchPage("terms-condition");
+    const page = await fetchPage("terms-condition", await getActiveStore());
     if (page?.body) return <CmsArticle title={page.title} html={page.body} />;
     return (
         <div className="min-h-screen bg-gray-50">

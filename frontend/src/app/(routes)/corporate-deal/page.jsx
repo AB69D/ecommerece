@@ -1,9 +1,10 @@
 import Image from "next/image";
 import { fetchPage } from "@/lib/dynamicContent";
+import { getActiveStore } from "@/lib/storeContext";
 import CmsArticle from "@/components/CmsArticle";
 
 export default async function CorporateDealPage() {
-    const page = await fetchPage("corporate-deal");
+    const page = await fetchPage("corporate-deal", await getActiveStore());
     if (page?.body) return <CmsArticle title={page.title} html={page.body} />;
     return (
         <div className="py-8 px-4 max-w-7xl mx-auto">
