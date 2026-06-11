@@ -48,3 +48,36 @@ export const rejectTenant = (id, reason = "") =>
         headers: jsonHeaders,
         body: JSON.stringify({ reason }),
     }).then(json);
+
+// "Log in as" a store's owner — returns { token, store } so the UI can swap the
+// admin token and step into that store's panel.
+export const impersonateStore = (id) =>
+    authFetch(`${BASE}/tenants/${id}/impersonate`, { method: "POST" }).then(json);
+
+// ── Owner management ─────────────────────────────────────────────────────────
+// Platform owners (cross-tenant super-admins).
+export const listOwners = () => authFetch(`${BASE}/owners`).then(json);
+
+export const createOwner = (payload) =>
+    authFetch(`${BASE}/owners`, {
+        method: "POST",
+        headers: jsonHeaders,
+        body: JSON.stringify(payload),
+    }).then(json);
+
+export const revokeOwner = (id) =>
+    authFetch(`${BASE}/owners/${id}/revoke`, { method: "POST" }).then(json);
+
+// Store owners (per-tenant owner accounts).
+export const listStoreOwners = () => authFetch(`${BASE}/store-owners`).then(json);
+
+// Shared account ops, keyed by the admin's id (works for either surface).
+export const resetAdminPassword = (id, password) =>
+    authFetch(`${BASE}/admins/${id}/password`, {
+        method: "POST",
+        headers: jsonHeaders,
+        body: JSON.stringify({ password }),
+    }).then(json);
+
+export const toggleAdminActive = (id) =>
+    authFetch(`${BASE}/admins/${id}/toggle`, { method: "POST" }).then(json);

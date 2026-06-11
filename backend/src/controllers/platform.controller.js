@@ -1,9 +1,11 @@
 import mongoose from 'mongoose';
 import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
 import TenantModel from '../models/tenant.model.js';
 import AdminModel from '../models/admin.model.js';
-import { runAsTenant } from '../tenancy/tenantContext.js';
+import { runAsTenant, runAsSystem } from '../tenancy/tenantContext.js';
 import { provisionTenant } from '../tenancy/provisionTenant.js';
+import { isPlatformEmail } from '../middlewares/platformAuth.middleware.js';
 import { sendEmail } from '../lib/mailer.js';
 import { logger } from '../lib/logger.js';
 import { env } from '../config/env.js';
@@ -280,6 +282,340 @@ export const rejectTenant = async (req, res) => {
         return ok(res, `Rejected "${tenant.businessName}".`, { tenant });
     } catch (err) {
         return fail(res, 500, err.message || 'Reject failed');
+    }
+};
+
+// ═══════════════════════════════════════════════════════════════════════════
+// OWNER MANAGEMENT (super-admin)
+// Two surfaces: PLATFORM owners (cross-tenant super-admins who run the fleet)
+// and STORE owners (the per-store owner account of each tenant). All handlers
+// run in the system context so cross-tenant reads/writes are intentional.
+// ═══════════════════════════════════════════════════════════════════════════
+
+// Mark the row that belongs to the caller so the UI can hide self-destructive
+// actions (you can't revoke or deactivate yourself).
+const isSelf = (me, admin) =>
+    (!!me?.id && String(me.id) === String(admin._id)) ||
+    (!!me?.email && !!admin?.email && me.email === String(admin.email).toLowerCase());
+
+// ---------------------------------------------------------------------------
+// GET /api/platform/owners   — list platform owners (DB-flagged + env bootstrap)
+// ---------------------------------------------------------------------------
+export const listOwners = async (req, res) => {
+    try {
+        const me = req.platformAdmin || {};
+        const envEmails = env.ADMIN_EMAILS || [];
+
+        const [dbOwners, envAdmins] = await Promise.all([
+            runAsSystem(() =>
+                AdminModel.find({ isPlatformOwner: true })
+                    .select('username email fullName isActive lastLoginAt createdAt')
+                    .sort({ createdAt: 1 })
+                    .lean()
+                    .exec(),
+            ),
+            envEmails.length
+                ? runAsSystem(() =>
+                      AdminModel.find({ email: { $in: envEmails } })
+                          .select('username email fullName isActive lastLoginAt createdAt')
+                          .lean()
+                          .exec(),
+                  )
+                : [],
+        ]);
+
+        const byId = new Map();
+        const add = (a) => {
+            const key = String(a._id);
+            const env_ = isPlatformEmail(a.email);
+            const existing = byId.get(key);
+            if (existing) { existing.isEnv = existing.isEnv || env_; return; }
+            byId.set(key, {
+                id: a._id,
+                username: a.username,
+                email: a.email || null,
+                fullName: a.fullName || '',
+                isActive: a.isActive !== false,
+                lastLoginAt: a.lastLoginAt || null,
+                createdAt: a.createdAt || null,
+                isEnv: env_,            // granted via env → cannot be revoked here
+                source: 'db',
+                isSelf: isSelf(me, a),
+            });
+        };
+        dbOwners.forEach(add);
+        envAdmins.forEach(add);
+
+        // Env emails with NO admin record yet (pure bootstrap identities).
+        const seen = new Set([...byId.values()].map((o) => String(o.email || '').toLowerCase()));
+        envEmails.forEach((em) => {
+            if (seen.has(em)) return;
+            byId.set(`env:${em}`, {
+                id: null, username: null, email: em, fullName: '',
+                isActive: true, lastLoginAt: null, createdAt: null,
+                isEnv: true, source: 'env', isSelf: me.email === em,
+            });
+        });
+
+        const owners = [...byId.values()];
+        return ok(res, 'Platform owners', { owners, count: owners.length });
+    } catch (err) {
+        return fail(res, 500, err.message || 'Failed to list owners');
+    }
+};
+
+// ---------------------------------------------------------------------------
+// POST /api/platform/owners   — create a NEW dedicated platform owner
+// Body: { username, email, password, fullName? }
+// The account lives on the primary store (its "home" tenant) and carries the
+// cross-tenant isPlatformOwner flag.
+// ---------------------------------------------------------------------------
+export const createOwner = async (req, res) => {
+    try {
+        const b = req.body || {};
+        const username = String(b.username || '').trim().toLowerCase();
+        const email = String(b.email || '').trim().toLowerCase();
+        const fullName = String(b.fullName || '').trim();
+        const password = String(b.password || '');
+
+        if (!username || username.length < 3 || username.length > 64 || !USERNAME_RE.test(username)) {
+            return fail(res, 400, 'Username must be 3–64 chars: letters, numbers, dot, underscore or hyphen.');
+        }
+        if (!email || !EMAIL_RE.test(email)) return fail(res, 400, 'A valid email is required.');
+        if (!password || password.length < 8) return fail(res, 400, 'Password must be at least 8 characters.');
+
+        // Auth identifiers are global-unique across every store.
+        const dupe = await runAsSystem(() =>
+            AdminModel.findOne({ $or: [{ username }, { email }] }).select('username email').lean().exec(),
+        );
+        if (dupe) {
+            const which = dupe.username === username ? 'username' : 'email';
+            return fail(res, 409, `That ${which} is already in use. Please choose another.`);
+        }
+
+        const primary = await TenantModel.findOne({ isPrimary: true }).select('_id').lean();
+        if (!primary) return fail(res, 500, 'No primary store is configured to host the owner account.');
+
+        const passwordHash = await bcrypt.hash(password, 10);
+        let admin;
+        try {
+            await runAsTenant(primary._id, async () => {
+                admin = await AdminModel.create({
+                    username,
+                    email,
+                    fullName,
+                    role: 'super-admin',
+                    isActive: true,
+                    isPlatformOwner: true,
+                    passwordHash,
+                    addedBy: req.platformAdmin?.email || 'platform',
+                });
+            });
+        } catch (e) {
+            if (e?.code === 11000) return fail(res, 409, 'That username or email is already in use.');
+            throw e;
+        }
+
+        logger.info({ id: String(admin._id), username }, 'platform.createOwner');
+        return ok(res, `Platform owner "${username}" created.`, {
+            owner: {
+                id: admin._id, username: admin.username, email: admin.email,
+                fullName: admin.fullName, isActive: true, isPlatformOwner: true,
+            },
+        });
+    } catch (err) {
+        logger.error({ err }, 'platform.createOwner failed');
+        return fail(res, 500, err.message || 'Failed to create owner');
+    }
+};
+
+// ---------------------------------------------------------------------------
+// POST /api/platform/owners/:id/revoke   — demote a DB platform owner
+// Clears isPlatformOwner (the account survives as a normal admin). Env owners
+// can't be revoked here (their access comes from the server env, not the DB).
+// ---------------------------------------------------------------------------
+export const revokeOwner = async (req, res) => {
+    try {
+        const { id } = req.params;
+        if (!mongoose.isValidObjectId(id)) return fail(res, 400, 'Invalid owner id');
+
+        const me = req.platformAdmin || {};
+        if (me.id && String(me.id) === String(id)) {
+            return fail(res, 400, 'You cannot revoke your own platform access.');
+        }
+
+        const admin = await runAsSystem(() =>
+            AdminModel.findById(id).select('username email isPlatformOwner').lean().exec(),
+        );
+        if (!admin) return fail(res, 404, 'Owner not found');
+        if (isPlatformEmail(admin.email)) {
+            return fail(res, 409, 'This owner is granted via the server ADMIN_EMAILS list. Remove them there to revoke.');
+        }
+        if (!admin.isPlatformOwner) return ok(res, 'This account is already not a platform owner.', {});
+
+        await runAsSystem(() => AdminModel.updateOne({ _id: id }, { $set: { isPlatformOwner: false } }).exec());
+        logger.info({ id, by: me.email }, 'platform.revokeOwner');
+        return ok(res, `Revoked platform access for "${admin.username}".`, {});
+    } catch (err) {
+        return fail(res, 500, err.message || 'Failed to revoke owner');
+    }
+};
+
+// ---------------------------------------------------------------------------
+// POST /api/platform/admins/:id/password   — reset ANY admin's password
+// Body: { password }.  Works for platform owners and store owners alike.
+// ---------------------------------------------------------------------------
+export const resetAdminPassword = async (req, res) => {
+    try {
+        const { id } = req.params;
+        if (!mongoose.isValidObjectId(id)) return fail(res, 400, 'Invalid account id');
+        const password = String(req.body?.password || '');
+        if (password.length < 8) return fail(res, 400, 'Password must be at least 8 characters.');
+
+        const admin = await runAsSystem(() =>
+            AdminModel.findById(id).select('+passwordHash username').exec(),
+        );
+        if (!admin) return fail(res, 404, 'Account not found');
+
+        admin.passwordHash = await bcrypt.hash(password, 10);
+        await admin.save();
+        logger.info({ id, by: req.platformAdmin?.email }, 'platform.resetAdminPassword');
+        return ok(res, `Password reset for "${admin.username}".`, {});
+    } catch (err) {
+        return fail(res, 500, err.message || 'Failed to reset password');
+    }
+};
+
+// ---------------------------------------------------------------------------
+// POST /api/platform/admins/:id/toggle   — flip an admin's isActive
+// Can't deactivate yourself, nor an env-bootstrap platform owner (lockout-proof).
+// ---------------------------------------------------------------------------
+export const toggleAdminActive = async (req, res) => {
+    try {
+        const { id } = req.params;
+        if (!mongoose.isValidObjectId(id)) return fail(res, 400, 'Invalid account id');
+
+        const me = req.platformAdmin || {};
+        if (me.id && String(me.id) === String(id)) {
+            return fail(res, 400, 'You cannot deactivate your own account.');
+        }
+
+        const admin = await runAsSystem(() =>
+            AdminModel.findById(id).select('username email isActive').exec(),
+        );
+        if (!admin) return fail(res, 404, 'Account not found');
+        if (admin.isActive && isPlatformEmail(admin.email)) {
+            return fail(res, 409, 'This platform owner is defined in the server env and cannot be deactivated here.');
+        }
+
+        admin.isActive = !admin.isActive;
+        await admin.save();
+        logger.info({ id, isActive: admin.isActive, by: me.email }, 'platform.toggleAdminActive');
+        return ok(res, `${admin.isActive ? 'Activated' : 'Deactivated'} "${admin.username}".`, {
+            isActive: admin.isActive,
+        });
+    } catch (err) {
+        return fail(res, 500, err.message || 'Failed to update account');
+    }
+};
+
+// ---------------------------------------------------------------------------
+// GET /api/platform/store-owners   — every tenant with its owner account
+// ---------------------------------------------------------------------------
+export const listStoreOwners = async (req, res) => {
+    try {
+        const tenants = await TenantModel.find({})
+            .select('businessName subdomain status isPrimary ownerAdminId ownerEmail createdAt')
+            .sort({ createdAt: -1 })
+            .lean();
+
+        const ownerIds = tenants.map((t) => t.ownerAdminId).filter(Boolean);
+        const admins = ownerIds.length
+            ? await runAsSystem(() =>
+                  AdminModel.find({ _id: { $in: ownerIds } })
+                      .select('username email fullName isActive lastLoginAt isPlatformOwner')
+                      .lean()
+                      .exec(),
+              )
+            : [];
+        const byId = new Map(admins.map((a) => [String(a._id), a]));
+
+        const owners = tenants.map((t) => {
+            const a = t.ownerAdminId ? byId.get(String(t.ownerAdminId)) : null;
+            return {
+                tenantId: t._id,
+                businessName: t.businessName,
+                subdomain: t.subdomain,
+                status: t.status,
+                isPrimary: !!t.isPrimary,
+                owner: a
+                    ? {
+                          id: a._id,
+                          username: a.username,
+                          email: a.email || t.ownerEmail || null,
+                          fullName: a.fullName || '',
+                          isActive: a.isActive !== false,
+                          lastLoginAt: a.lastLoginAt || null,
+                          isPlatformOwner: !!a.isPlatformOwner,
+                      }
+                    : t.ownerEmail
+                        ? { id: null, username: null, email: t.ownerEmail, fullName: '', isActive: false, lastLoginAt: null, isPlatformOwner: false }
+                        : null,
+            };
+        });
+
+        return ok(res, 'Store owners', { owners, count: owners.length });
+    } catch (err) {
+        return fail(res, 500, err.message || 'Failed to list store owners');
+    }
+};
+
+// ---------------------------------------------------------------------------
+// POST /api/platform/tenants/:id/impersonate   — "log in as" the store owner
+// Mints a short-lived admin token bound to that store so the platform owner can
+// step into the store's admin panel to help. Only approved stores with an active
+// owner can be entered.
+// ---------------------------------------------------------------------------
+export const impersonateStoreOwner = async (req, res) => {
+    try {
+        const { id } = req.params;
+        if (!mongoose.isValidObjectId(id)) return fail(res, 400, 'Invalid tenant id');
+
+        const tenant = await TenantModel.findById(id).lean();
+        if (!tenant) return fail(res, 404, 'Tenant not found');
+        if (!tenant.ownerAdminId) return fail(res, 400, 'This store has no owner account.');
+        if (tenant.status !== 'approved') return fail(res, 409, 'Only an approved store can be accessed.');
+
+        const owner = await runAsSystem(() =>
+            AdminModel.findById(tenant.ownerAdminId)
+                .select('username email role isActive')
+                .lean()
+                .exec(),
+        );
+        if (!owner) return fail(res, 404, 'Store owner account not found.');
+        if (owner.isActive === false) return fail(res, 409, 'The store owner account is deactivated. Activate it first.');
+
+        const token = jwt.sign(
+            {
+                sub: String(owner._id),
+                username: owner.username,
+                role: owner.role || 'super-admin',
+                email: owner.email || undefined,
+                tenantId: String(tenant._id),
+                imp: true,                                   // marks an impersonation session
+                by: req.platformAdmin?.email || 'platform',  // audit: who entered
+            },
+            process.env.JWT_SECRET,
+            { expiresIn: '2h' },
+        );
+
+        logger.info({ tenantId: id, by: req.platformAdmin?.email }, 'platform.impersonate');
+        return ok(res, `Signed in as ${owner.username} — ${tenant.businessName}.`, {
+            token,
+            store: { businessName: tenant.businessName, subdomain: tenant.subdomain, owner: owner.username },
+        });
+    } catch (err) {
+        return fail(res, 500, err.message || 'Failed to access store');
     }
 };
 

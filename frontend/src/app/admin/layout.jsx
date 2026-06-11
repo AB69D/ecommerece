@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
@@ -11,6 +11,23 @@ import { isAuthenticated, logout, fetchMe } from "@/services/adminAuth";
 import { AdminAuthContext, buildCan } from "@/context/AdminAuthContext";
 import { hasAnyPermission } from "@/lib/permissions";
 
+// "Log in as" leaves the platform owner's own token under admin_owner_token while
+// the store session takes over admin_token. Reading that backup tells us we're in
+// an impersonation session (returns the store label, or '' when not). A primitive
+// snapshot keeps useSyncExternalStore stable; the value only changes on the full
+// reload that enters/exits impersonation, so a no-op subscribe is enough.
+const readImpersonationStore = () => {
+    if (typeof window === "undefined") return "";
+    try {
+        return localStorage.getItem("admin_owner_token")
+            ? (localStorage.getItem("admin_impersonation_store") || "this store")
+            : "";
+    } catch {
+        return "";
+    }
+};
+const subscribeImpersonation = () => () => {};
+
 export default function AdminLayout({ children }) {
     const pathname = usePathname();
     const router = useRouter();
@@ -18,6 +35,7 @@ export default function AdminLayout({ children }) {
     const [isMobile, setIsMobile] = useState(false);
     const [checkedAuth, setCheckedAuth] = useState(false);
     const [me, setMe] = useState(null);
+    const impersonationStore = useSyncExternalStore(subscribeImpersonation, readImpersonationStore, () => "");
 
     const isLoginPage = pathname === '/admin/login';
 
@@ -63,6 +81,16 @@ export default function AdminLayout({ children }) {
         document.body.style.overflow = sidebarOpen ? 'hidden' : 'unset';
         return () => { document.body.style.overflow = 'unset'; };
     }, [sidebarOpen]);
+
+    const exitImpersonation = () => {
+        try {
+            const backup = localStorage.getItem('admin_owner_token');
+            if (backup) localStorage.setItem('admin_token', backup);
+            localStorage.removeItem('admin_owner_token');
+            localStorage.removeItem('admin_impersonation_store');
+        } catch { /* ignore */ }
+        window.location.assign('/admin/owners');
+    };
 
     if (isLoginPage) {
         return <>{children}</>;
@@ -129,6 +157,7 @@ export default function AdminLayout({ children }) {
             requirePlatform: true,
             items: [
                 { name: 'Stores', path: '/admin/stores', icon: <FiGlobe className="w-5 h-5" />, perms: [] },
+                { name: 'Owner Management', path: '/admin/owners', icon: <FiShield className="w-5 h-5" />, perms: [] },
             ],
         },
     ];
@@ -241,6 +270,20 @@ export default function AdminLayout({ children }) {
                 </div>
 
                 <div className="flex-1 min-h-screen p-4 lg:p-6 overflow-y-auto lg:ml-0">
+                    {impersonationStore && (
+                        <div className="max-w-6xl mx-auto mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl bg-amber-500 text-amber-950 px-4 py-2.5 shadow-sm">
+                            <span className="text-sm font-medium flex items-center gap-2">
+                                <FiShield className="w-4 h-4 shrink-0" />
+                                You&apos;re signed in as the owner of <span className="font-bold">{impersonationStore}</span> (impersonation).
+                            </span>
+                            <button
+                                onClick={exitImpersonation}
+                                className="inline-flex items-center gap-1.5 text-sm font-semibold bg-amber-950 text-amber-50 px-3 py-1.5 rounded-lg hover:bg-amber-900 transition-colors"
+                            >
+                                <FiLogOut className="w-4 h-4" /> Exit to platform
+                            </button>
+                        </div>
+                    )}
                     <div className="max-w-6xl mx-auto bg-white rounded-xl shadow-sm border border-gray-100 p-4 sm:p-6 lg:p-8">
                         {children}
                     </div>

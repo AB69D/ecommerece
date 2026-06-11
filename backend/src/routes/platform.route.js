@@ -7,6 +7,13 @@ import {
     approveTenant,
     suspendTenant,
     rejectTenant,
+    listOwners,
+    createOwner,
+    revokeOwner,
+    resetAdminPassword,
+    toggleAdminActive,
+    listStoreOwners,
+    impersonateStoreOwner,
 } from '../controllers/platform.controller.js';
 import { requireSuperAdmin } from '../middlewares/platformAuth.middleware.js';
 
@@ -24,12 +31,28 @@ const registerLimiter = rateLimit({
 // Public: a prospective store owner signs up (pending until approved).
 router.post('/register', registerLimiter, registerStore);
 
-// Everything below is platform super-admin only (env owner allow-list).
+// Everything below is platform super-admin only (env allow-list OR the DB-backed
+// isPlatformOwner flag — see requireSuperAdmin).
 router.use(requireSuperAdmin);
+
+// Tenant fleet.
 router.get('/tenants', listTenants);
 router.get('/tenants/:id', getTenant);
 router.post('/tenants/:id/approve', approveTenant);
 router.post('/tenants/:id/suspend', suspendTenant);
 router.post('/tenants/:id/reject', rejectTenant);
+router.post('/tenants/:id/impersonate', impersonateStoreOwner);
+
+// Platform owners (cross-tenant super-admins).
+router.get('/owners', listOwners);
+router.post('/owners', createOwner);
+router.post('/owners/:id/revoke', revokeOwner);
+
+// Store owners (the per-tenant owner accounts).
+router.get('/store-owners', listStoreOwners);
+
+// Account ops shared by both surfaces (keyed by the admin's _id).
+router.post('/admins/:id/password', resetAdminPassword);
+router.post('/admins/:id/toggle', toggleAdminActive);
 
 export default router;

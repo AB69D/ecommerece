@@ -43,6 +43,17 @@ const adminSchema = new mongoose.Schema(
             type: Boolean,
             default: true,
         },
+        // Platform owner = a CROSS-TENANT super-admin who runs the whole fleet
+        // (approves stores, manages owners, etc.) — distinct from the per-store
+        // "super-admin" role, which only owns ONE store. DB-backed so it can be
+        // granted/revoked from the Owner Management panel; the env ADMIN_EMAILS
+        // allow-list is an ADDITIONAL bootstrap that can never be revoked from the
+        // UI, so the platform can't lock itself out.
+        isPlatformOwner: {
+            type: Boolean,
+            default: false,
+            index: true,
+        },
         lastLoginAt: {
             type: Date,
         },
