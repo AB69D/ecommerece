@@ -1,5 +1,6 @@
 import mongoose from 'mongoose';
 import { randomUUID } from 'crypto';
+import { tenantPlugin } from '../tenancy/tenantPlugin.js';
 
 // A saved delivery address. Mirrors the fields the storefront checkout already
 // collects (shippingAddress + deliveryArea) so a saved address can prefill the
@@ -29,7 +30,6 @@ const customerSchema = new mongoose.Schema(
         email: {
             type: String,
             required: true,
-            unique: true,
             lowercase: true,
             trim: true,
         },
@@ -43,7 +43,6 @@ const customerSchema = new mongoose.Schema(
         guestId: {
             type: String,
             required: true,
-            unique: true,
             index: true,
             default: () => `cust_${randomUUID()}`,
         },
@@ -64,6 +63,12 @@ const customerSchema = new mongoose.Schema(
 // so it only indexes the handful of accounts with a reset in flight (the field
 // is unset the moment a token is used or a new password is set).
 customerSchema.index({ resetTokenHash: 1 }, { sparse: true });
+
+customerSchema.plugin(tenantPlugin);
+
+// Login email + storefront identity are unique PER TENANT (were global-unique).
+customerSchema.index({ tenantId: 1, email: 1 }, { unique: true });
+customerSchema.index({ tenantId: 1, guestId: 1 }, { unique: true });
 
 const CustomerModel = mongoose.model('Customer', customerSchema);
 

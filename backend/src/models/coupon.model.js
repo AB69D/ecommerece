@@ -1,4 +1,5 @@
 import { Schema, model } from 'mongoose';
+import { tenantPlugin } from '../tenancy/tenantPlugin.js';
 
 // Cart-level discount codes (distinct from per-product `discountPercent`).
 // A coupon applies to the order subtotal at storefront checkout and/or the
@@ -9,7 +10,6 @@ const couponSchema = new Schema(
         code: {
             type: String,
             required: true,
-            unique: true,
             uppercase: true,
             trim: true,
             index: true,
@@ -43,6 +43,11 @@ const couponSchema = new Schema(
     },
     { timestamps: true },
 );
+
+couponSchema.plugin(tenantPlugin);
+
+// Coupon codes are unique PER TENANT (was global-unique).
+couponSchema.index({ tenantId: 1, code: 1 }, { unique: true });
 
 const CouponModel = model('Coupon', couponSchema);
 

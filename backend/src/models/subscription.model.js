@@ -11,11 +11,13 @@ import mongoose from 'mongoose';
 
 const subscriptionSchema = new mongoose.Schema(
     {
+        // No field-level `index: true` here: the explicit unique index below
+        // (one subscription per tenant) already covers { tenantId: 1 } lookups.
+        // Declaring both would emit a "Duplicate schema index" warning.
         tenantId: {
             type: mongoose.Schema.Types.ObjectId,
             ref: 'Tenant',
             required: true,
-            index: true,
         },
         planId: { type: mongoose.Schema.Types.ObjectId, ref: 'Plan', required: true },
 

@@ -1,4 +1,5 @@
 import mongoose, { Schema, model } from 'mongoose';
+import { tenantPlugin } from '../tenancy/tenantPlugin.js';
 
 const orderItemSchema = new Schema({
     productId: {
@@ -46,8 +47,7 @@ const orderItemSchema = new Schema({
 const orderSchema = new Schema({
     orderId: {
         type: String,
-        required: true,
-        unique: true
+        required: true
     },
     // Where the sale originated. 'ecommerce' = storefront checkout (default,
     // keeps all historical orders valid), 'pos' = in-store POS terminal.
@@ -197,7 +197,7 @@ const orderSchema = new Schema({
 // (storefront checkouts). POS/legacy orders without the field are unaffected,
 // so this avoids the "duplicate null" collision a plain unique index would hit.
 orderSchema.index(
-    { idempotencyKey: 1 },
+    { tenantId: 1, idempotencyKey: 1 },
     { unique: true, partialFilterExpression: { idempotencyKey: { $type: 'string' } } }
 );
 
@@ -207,8 +207,13 @@ orderSchema.index(
 //   - track-order by phone:  OrderModel.find({ customerPhone }).sort({ createdAt: -1 })
 // Without these, every order lookup is a full collection scan that degrades
 // linearly as the orders collection grows.
-orderSchema.index({ guestId: 1, createdAt: -1 });
-orderSchema.index({ customerPhone: 1, createdAt: -1 });
+orderSchema.index({ tenantId: 1, guestId: 1, createdAt: -1 });
+orderSchema.index({ tenantId: 1, customerPhone: 1, createdAt: -1 });
+
+orderSchema.plugin(tenantPlugin);
+
+// Human order id is unique PER TENANT (was global-unique).
+orderSchema.index({ tenantId: 1, orderId: 1 }, { unique: true });
 
 const OrderModel = model('Order', orderSchema);
 

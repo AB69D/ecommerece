@@ -3,6 +3,8 @@ import { logger } from '../lib/logger.js';
 import PlanModel from '../models/plan.model.js';
 import TenantModel from '../models/tenant.model.js';
 import SubscriptionModel from '../models/subscription.model.js';
+import { setDefaultTenantId } from './tenantContext.js';
+import { backfillTenantId, syncTenantIndexes } from './migrateTenantData.js';
 
 // ── Tenancy bootstrap (idempotent) ──────────────────────────────────────────
 // Ensures the SaaS scaffolding exists for the CURRENT live business ("tenant
@@ -68,6 +70,17 @@ export async function bootstrapTenancy() {
         });
         logger.info('Tenancy bootstrap: created primary subscription');
     }
+
+    // ── Phase 1: partition existing data under this primary tenant ───────────
+    // Set the primary as the fallback tenant for the single-tenant interim (no
+    // per-request tenant is resolved until Phase 2 subdomain routing), so the
+    // now-active scoping plugin stamps writes and scopes reads to it. Then stamp
+    // tenantId onto every legacy document and reconcile indexes. All idempotent,
+    // and all BEFORE the server starts listening (see server.js), so requests
+    // only ever see a fully-migrated, consistently-scoped database.
+    setDefaultTenantId(tenant._id);
+    await backfillTenantId(tenant._id);
+    await syncTenantIndexes();
 
     return tenant;
 }

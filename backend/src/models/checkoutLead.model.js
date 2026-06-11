@@ -1,4 +1,5 @@
 import mongoose, { Schema, model } from 'mongoose';
+import { tenantPlugin } from '../tenancy/tenantPlugin.js';
 
 // Captures a checkout attempt as the customer fills the order form. Lets the
 // admin see leads who started but never completed an order ("abandoned
@@ -16,7 +17,6 @@ const checkoutLeadSchema = new Schema({
     guestId: {
         type: String,
         required: true,
-        unique: true,
         index: true
     },
     customerName: { type: String, default: '' },
@@ -39,6 +39,11 @@ const checkoutLeadSchema = new Schema({
 }, {
     timestamps: true
 });
+
+checkoutLeadSchema.plugin(tenantPlugin);
+
+// One lead per guest PER TENANT (was global-unique on guestId).
+checkoutLeadSchema.index({ tenantId: 1, guestId: 1 }, { unique: true });
 
 const CheckoutLeadModel = model('CheckoutLead', checkoutLeadSchema);
 

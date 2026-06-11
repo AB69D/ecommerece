@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { tenantPlugin } from '../tenancy/tenantPlugin.js';
 
 const headerSchema = new mongoose.Schema({
     image: {
@@ -12,6 +13,8 @@ const headerSchema = new mongoose.Schema({
 }, {
     timestamps: true
 });
+
+headerSchema.plugin(tenantPlugin);
 
 const HeaderModel = mongoose.model('header', headerSchema);
 

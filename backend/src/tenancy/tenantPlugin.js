@@ -1,6 +1,6 @@
 import mongoose from 'mongoose';
 import { env } from '../config/env.js';
-import { getTenantId, isSystemContext } from './tenantContext.js';
+import { getEffectiveTenantId, isSystemContext } from './tenantContext.js';
 
 // ── Tenant scoping plugin ───────────────────────────────────────────────────
 // Applied to every TENANT-OWNED schema (see tenantModels.js). It does two jobs,
@@ -51,7 +51,7 @@ export function tenantPlugin(schema) {
     // Stamp tenantId on create/save for single documents.
     schema.pre('save', function stampTenant(next) {
         if (!this.tenantId) {
-            const tenantId = getTenantId();
+            const tenantId = getEffectiveTenantId();
             if (tenantId) this.tenantId = tenantId;
         }
         next();
@@ -59,7 +59,7 @@ export function tenantPlugin(schema) {
 
     // Stamp tenantId on bulk inserts.
     schema.pre('insertMany', function stampMany(next, docs) {
-        const tenantId = getTenantId();
+        const tenantId = getEffectiveTenantId();
         if (tenantId && Array.isArray(docs)) {
             for (const doc of docs) {
                 if (doc && !doc.tenantId) doc.tenantId = tenantId;
@@ -72,7 +72,7 @@ export function tenantPlugin(schema) {
     FILTERED_OPS.forEach((op) => {
         schema.pre(op, function scopeQuery(next) {
             if (isSystemContext()) return next(); // intentional cross-tenant op
-            const tenantId = getTenantId();
+            const tenantId = getEffectiveTenantId();
             if (!tenantId) {
                 if (env.TENANT_ENFORCEMENT) {
                     return next(new Error(`Tenant scope missing for ${op} on ${this.model?.modelName ?? 'model'}`));
@@ -89,7 +89,7 @@ export function tenantPlugin(schema) {
     // manual system-context escape — reviewed per-pipeline in Phase 1.)
     schema.pre('aggregate', function scopeAggregate(next) {
         if (isSystemContext()) return next();
-        const tenantId = getTenantId();
+        const tenantId = getEffectiveTenantId();
         if (!tenantId) {
             if (env.TENANT_ENFORCEMENT) {
                 return next(new Error('Tenant scope missing for aggregate'));

@@ -1,11 +1,11 @@
 import mongoose from "mongoose";
+import { tenantPlugin } from '../tenancy/tenantPlugin.js';
 
 const adminSchema = new mongoose.Schema(
     {
         username: {
             type: String,
             required: true,
-            unique: true,
             lowercase: true,
             trim: true,
             minlength: 3,
@@ -21,8 +21,6 @@ const adminSchema = new mongoose.Schema(
             type: String,
             lowercase: true,
             trim: true,
-            sparse: true,
-            unique: true,
         },
         fullName: {
             type: String,
@@ -54,6 +52,17 @@ const adminSchema = new mongoose.Schema(
         },
     },
     { timestamps: true },
+);
+
+adminSchema.plugin(tenantPlugin);
+
+// Auth identifiers are unique PER TENANT (were global-unique pre-multi-tenancy).
+// email uses a partial filter so multiple admins MAY omit an email per tenant,
+// while any email that IS set stays unique within the tenant.
+adminSchema.index({ tenantId: 1, username: 1 }, { unique: true });
+adminSchema.index(
+    { tenantId: 1, email: 1 },
+    { unique: true, partialFilterExpression: { email: { $type: 'string' } } },
 );
 
 const AdminModel = mongoose.model("Admin", adminSchema);

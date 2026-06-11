@@ -1,4 +1,5 @@
 import { Schema, model } from 'mongoose';
+import { tenantPlugin } from '../tenancy/tenantPlugin.js';
 
 // One row per online-payment attempt against an order. The order itself carries
 // the authoritative paymentStatus; this collection is the gateway audit trail —
@@ -8,7 +9,7 @@ const paymentSchema = new Schema(
     {
         // Our unique transaction id sent to the gateway as `tran_id`. Unique so a
         // replayed IPN can't create a second row and we can look the attempt up.
-        tranId: { type: String, required: true, unique: true, index: true },
+        tranId: { type: String, required: true, index: true },
 
         // Link back to the order (human id + Mongo ref) and the buyer.
         orderId: { type: String, required: true, index: true },
@@ -53,6 +54,11 @@ const paymentSchema = new Schema(
     },
     { timestamps: true },
 );
+
+paymentSchema.plugin(tenantPlugin);
+
+// Gateway transaction id is unique PER TENANT (was global-unique).
+paymentSchema.index({ tenantId: 1, tranId: 1 }, { unique: true });
 
 const PaymentModel = model('Payment', paymentSchema);
 

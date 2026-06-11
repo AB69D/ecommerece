@@ -1,4 +1,5 @@
 import mongoose, { Schema, model } from 'mongoose';
+import { tenantPlugin } from '../tenancy/tenantPlugin.js';
 
 const cartItemSchema = new Schema({
     productId: {
@@ -39,8 +40,7 @@ const cartItemSchema = new Schema({
 const cartSchema = new Schema({
     guestId: {
         type: String,
-        required: true,
-        unique: true
+        required: true
     },
     items: [cartItemSchema],
     totalAmount: {
@@ -50,6 +50,11 @@ const cartSchema = new Schema({
 }, {
     timestamps: true
 });
+
+cartSchema.plugin(tenantPlugin);
+
+// One cart per guest PER TENANT (was global-unique on guestId).
+cartSchema.index({ tenantId: 1, guestId: 1 }, { unique: true });
 
 const CartModel = model('Cart', cartSchema);
 

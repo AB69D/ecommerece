@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import { tenantPlugin } from '../tenancy/tenantPlugin.js';
 
 const socialLinkSchema = new mongoose.Schema(
     {
@@ -11,8 +12,9 @@ const socialLinkSchema = new mongoose.Schema(
 
 const siteSettingsSchema = new mongoose.Schema(
     {
-        // Singleton — there should only ever be one document.
-        key: { type: String, default: 'global', unique: true, immutable: true },
+        // Singleton PER TENANT — exactly one document per tenant (see compound
+        // index below). `key` stays for backwards-compatible reads/upserts.
+        key: { type: String, default: 'global', immutable: true },
 
         siteName: { type: String, default: 'Ab9dEcommerce', trim: true },
         tagline: { type: String, default: '', trim: true },
@@ -160,5 +162,10 @@ const siteSettingsSchema = new mongoose.Schema(
     },
     { timestamps: true },
 );
+
+siteSettingsSchema.plugin(tenantPlugin);
+
+// One settings document PER TENANT (was a single global singleton).
+siteSettingsSchema.index({ tenantId: 1, key: 1 }, { unique: true });
 
 export const SiteSettings = mongoose.model('SiteSettings', siteSettingsSchema);

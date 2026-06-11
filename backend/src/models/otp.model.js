@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { tenantPlugin } from '../tenancy/tenantPlugin.js';
 
 const otpSchema = new mongoose.Schema({
     email: {
@@ -24,6 +25,11 @@ const otpSchema = new mongoose.Schema({
 })
 
 otpSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 })
+
+otpSchema.plugin(tenantPlugin);
+
+// OTP verification looks up by email within a tenant.
+otpSchema.index({ tenantId: 1, email: 1 })
 
 const OtpModel = mongoose.model('Otp', otpSchema)
 

@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import { tenantPlugin } from '../tenancy/tenantPlugin.js';
 
 // ---------------------------------------------------------------
 // Immutable audit trail of admin actions.
@@ -32,8 +33,10 @@ const auditLogSchema = new mongoose.Schema(
     { timestamps: true },
 );
 
-auditLogSchema.index({ createdAt: -1 });
-auditLogSchema.index({ 'actor.id': 1, createdAt: -1 });
+auditLogSchema.index({ tenantId: 1, createdAt: -1 });
+auditLogSchema.index({ tenantId: 1, 'actor.id': 1, createdAt: -1 });
+
+auditLogSchema.plugin(tenantPlugin);
 
 const AuditLogModel = mongoose.model('AuditLog', auditLogSchema);
 

@@ -1,4 +1,5 @@
 import { Schema, model } from 'mongoose';
+import { tenantPlugin } from '../tenancy/tenantPlugin.js';
 
 // ---------------------------------------------------------------
 // POS shift / cash-drawer session.
@@ -70,8 +71,11 @@ const shiftSchema = new Schema(
 // One cashier can only have a single OPEN shift at a time. A partial index
 // scoped to open sessions lets the same cashier accumulate many closed
 // shifts in history without tripping the unique constraint.
+shiftSchema.plugin(tenantPlugin);
+
+// One OPEN shift per cashier PER TENANT (was global per-cashier).
 shiftSchema.index(
-    { 'cashier.id': 1 },
+    { tenantId: 1, 'cashier.id': 1 },
     { unique: true, partialFilterExpression: { status: 'open' } },
 );
 

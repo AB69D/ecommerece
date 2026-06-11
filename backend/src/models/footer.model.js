@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import { tenantPlugin } from '../tenancy/tenantPlugin.js';
 
 const linkSchema = new mongoose.Schema(
     {
@@ -21,7 +22,7 @@ const columnSchema = new mongoose.Schema(
 
 const footerSchema = new mongoose.Schema(
     {
-        key: { type: String, default: 'global', unique: true, immutable: true },
+        key: { type: String, default: 'global', immutable: true },
 
         aboutText: { type: String, default: '', trim: true },
 
@@ -38,5 +39,10 @@ const footerSchema = new mongoose.Schema(
     },
     { timestamps: true },
 );
+
+footerSchema.plugin(tenantPlugin);
+
+// One footer document PER TENANT (was a single global singleton).
+footerSchema.index({ tenantId: 1, key: 1 }, { unique: true });
 
 export const Footer = mongoose.model('Footer', footerSchema);

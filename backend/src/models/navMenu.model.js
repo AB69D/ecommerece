@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import { tenantPlugin } from '../tenancy/tenantPlugin.js';
 
 const menuItemSchema = new mongoose.Schema(
     {
@@ -24,6 +25,8 @@ const menuItemSchema = new mongoose.Schema(
     { timestamps: true },
 );
 
-menuItemSchema.index({ location: 1, parent: 1, order: 1 });
+menuItemSchema.index({ tenantId: 1, location: 1, parent: 1, order: 1 });
+
+menuItemSchema.plugin(tenantPlugin);
 
 export const NavMenuItem = mongoose.model('NavMenuItem', menuItemSchema);

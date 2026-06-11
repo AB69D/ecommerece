@@ -1,4 +1,5 @@
 import { Schema, model } from 'mongoose';
+import { tenantPlugin } from '../tenancy/tenantPlugin.js';
 
 // A guest's saved-for-later products. Mirrors the cart's guestId-keyed model so
 // the same anonymous identity (the `guest-id` header) carries the wishlist
@@ -21,11 +22,16 @@ const wishlistItemSchema = new Schema(
 
 const wishlistSchema = new Schema(
     {
-        guestId: { type: String, required: true, unique: true, index: true },
+        guestId: { type: String, required: true, index: true },
         items: [wishlistItemSchema],
     },
     { timestamps: true },
 );
+
+wishlistSchema.plugin(tenantPlugin);
+
+// One wishlist per guest PER TENANT (was global-unique on guestId).
+wishlistSchema.index({ tenantId: 1, guestId: 1 }, { unique: true });
 
 const WishlistModel = model('Wishlist', wishlistSchema);
 

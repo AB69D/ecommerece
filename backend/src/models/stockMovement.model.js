@@ -1,4 +1,5 @@
 import { Schema, model } from 'mongoose';
+import { tenantPlugin } from '../tenancy/tenantPlugin.js';
 
 // Immutable inventory ledger. One document per stock change for one product
 // variant, so the admin can audit exactly why on-hand stock moved over time.
@@ -71,8 +72,10 @@ const stockMovementSchema = new Schema({
     timestamps: true,
 });
 
-stockMovementSchema.index({ createdAt: -1 });
-stockMovementSchema.index({ productId: 1, createdAt: -1 });
+stockMovementSchema.index({ tenantId: 1, createdAt: -1 });
+stockMovementSchema.index({ tenantId: 1, productId: 1, createdAt: -1 });
+
+stockMovementSchema.plugin(tenantPlugin);
 
 const StockMovementModel = model('StockMovement', stockMovementSchema);
 

@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { tenantPlugin } from '../tenancy/tenantPlugin.js';
 
 const weightSchema = new mongoose.Schema({
     weight: {
@@ -99,16 +100,16 @@ productSchema.index({
 
 // Fast scanner lookups by barcode / SKU (sparse-ish; blanks are filtered out
 // at query time so empty strings don't all collide on a unique index).
-productSchema.index({ 'weights.barcode': 1 });
-productSchema.index({ 'weights.sku': 1 });
+productSchema.index({ tenantId: 1, 'weights.barcode': 1 });
+productSchema.index({ tenantId: 1, 'weights.sku': 1 });
 
 // Storefront browse paths, both of which sort newest-first:
 //   - category page:  find({ category, showInEcommerce }).sort({ createdAt: -1 })
 //   - default list:   find({ showInEcommerce }).sort({ createdAt: -1 })
 // The compound index serves the category filter + sort together; the standalone
 // createdAt index serves the unfiltered newest-first listing.
-productSchema.index({ category: 1, createdAt: -1 });
-productSchema.index({ createdAt: -1 });
+productSchema.index({ tenantId: 1, category: 1, createdAt: -1 });
+productSchema.index({ tenantId: 1, createdAt: -1 });
 
 // Build a GS1 "internal use" (prefix 2) numeric barcode that any CODE128
 // reader can scan. Kept self-contained so every variant is always scannable
@@ -144,6 +145,11 @@ productSchema.pre('save', function autoCodes(next) {
     }
     next();
 });
+
+productSchema.plugin(tenantPlugin);
+// NB: the $text index above stays global; tenant isolation on search is still
+// enforced because the plugin appends { tenantId } to the query filter. A
+// compound text index ({ tenantId, ...text }) is a later perf optimization.
 
 const ProductModel = mongoose.model('product', productSchema);
 
