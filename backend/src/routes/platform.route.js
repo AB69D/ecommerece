@@ -14,6 +14,7 @@ import {
     toggleAdminActive,
     listStoreOwners,
     impersonateStoreOwner,
+    getOverview,
 } from '../controllers/platform.controller.js';
 import { requireSuperAdmin } from '../middlewares/platformAuth.middleware.js';
 
@@ -34,6 +35,9 @@ router.post('/register', registerLimiter, registerStore);
 // Everything below is platform super-admin only (env allow-list OR the DB-backed
 // isPlatformOwner flag — see requireSuperAdmin).
 router.use(requireSuperAdmin);
+
+// Platform owner home dashboard: stores + owners + order/revenue stats.
+router.get('/overview', getOverview);
 
 // Tenant fleet.
 router.get('/tenants', listTenants);

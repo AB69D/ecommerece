@@ -1,5 +1,6 @@
 import OtpModel from "../models/otp.model.js";
 import AdminModel from "../models/admin.model.js";
+import TenantModel from "../models/tenant.model.js";
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import { effectivePermissions } from '../lib/permissions.js';
@@ -11,6 +12,16 @@ const ADMIN_EMAILS = (process.env.ADMIN_EMAILS || '')
     .split(',')
     .map(e => e.trim().toLowerCase())
     .filter(Boolean);
+
+// The store (subdomain) an admin belongs to. Path-based routing puts this in the
+// URL — /<store>/admin — so login returns it (where to send them) and /auth/me
+// returns it (so the admin shell can confirm the URL matches their store). Tenant
+// is not tenant-owned, so this read is safe in any context.
+const subdomainForTenant = async (tenantId) => {
+    if (!tenantId) return null;
+    const t = await TenantModel.findById(tenantId).select('subdomain').lean();
+    return t?.subdomain || null;
+};
 
 const generateCode = () => {
     return Math.floor(100000 + Math.random() * 900000).toString();
@@ -292,12 +303,20 @@ export const login = async (request, response) => {
             { expiresIn: '12h' },
         );
 
+        // The store slug to route the owner into (/<store>/admin). Platform owners
+        // may have no store of their own — the frontend sends those to /platform.
+        const store = await subdomainForTenant(tenantId);
+
         return response.json({
             success: true,
             error: false,
             message: "Login successful",
             data: {
                 token,
+                store,
+                isPlatformOwner:
+                    ADMIN_EMAILS.includes(String(admin.email || '').toLowerCase()) ||
+                    admin.isPlatformOwner === true,
                 user: {
                     id: admin._id,
                     username: admin.username,
@@ -351,6 +370,9 @@ export const me = async (request, response) => {
                     permissions: admin.permissions || [],
                     effectivePermissions: [...effectivePermissions(admin)],
                     lastLoginAt: admin.lastLoginAt,
+                    // The store this admin belongs to (path-based routing: the URL
+                    // is /<store>/admin and the shell checks it matches).
+                    store: await subdomainForTenant(admin.tenantId),
                     // Platform owner = env ADMIN_EMAILS allow-list OR the
                     // DB-backed isPlatformOwner flag (NOT the per-store
                     // "super-admin" role). Gates the cross-tenant platform UI so
@@ -381,6 +403,13 @@ export const me = async (request, response) => {
             const perms = isEnvAdmin
                 ? new Set(['*'])
                 : effectivePermissions({ role, permissions: admin?.permissions });
+            // Their store, falling back to the primary for env owners with no
+            // store of their own.
+            let store = await subdomainForTenant(admin?.tenantId);
+            if (!store) {
+                const primary = await TenantModel.findOne({ isPrimary: true }).select('subdomain').lean();
+                store = primary?.subdomain || null;
+            }
             return response.json({
                 success: true,
                 data: {
@@ -392,6 +421,7 @@ export const me = async (request, response) => {
                     permissions: admin?.permissions || [],
                     effectivePermissions: [...perms],
                     lastLoginAt: admin?.lastLoginAt || null,
+                    store,
                     // Env owners ARE platform owners; so is any admin carrying the
                     // DB-backed isPlatformOwner flag. Gates the cross-tenant UI.
                     isPlatformOwner: isEnvAdmin || admin?.isPlatformOwner === true,

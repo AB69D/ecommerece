@@ -3,6 +3,7 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import TenantModel from '../models/tenant.model.js';
 import AdminModel from '../models/admin.model.js';
+import OrderModel from '../models/order.model.js';
 import { runAsTenant, runAsSystem } from '../tenancy/tenantContext.js';
 import { provisionTenant } from '../tenancy/provisionTenant.js';
 import { isPlatformEmail } from '../middlewares/platformAuth.middleware.js';
@@ -282,6 +283,92 @@ export const rejectTenant = async (req, res) => {
         return ok(res, `Rejected "${tenant.businessName}".`, { tenant });
     } catch (err) {
         return fail(res, 500, err.message || 'Reject failed');
+    }
+};
+
+// ---------------------------------------------------------------------------
+// GET /api/platform/overview   — the platform owner's home dashboard.
+// Every store with its owner, order count and revenue (orders aggregated across
+// all tenants in one pass), plus platform-wide totals.
+// ---------------------------------------------------------------------------
+export const getOverview = async (req, res) => {
+    try {
+        const tenants = await TenantModel.find({})
+            .select('businessName subdomain status isPrimary ownerAdminId ownerEmail billing createdAt')
+            .sort({ createdAt: -1 })
+            .lean();
+
+        // Orders are tenant-owned; group by tenantId in a single cross-tenant pass.
+        // Cancelled/returned orders count toward the order tally but not revenue.
+        const agg = await runAsSystem(() =>
+            OrderModel.aggregate([
+                {
+                    $group: {
+                        _id: '$tenantId',
+                        orders: { $sum: 1 },
+                        revenue: {
+                            $sum: {
+                                $cond: [
+                                    { $in: ['$orderStatus', ['cancelled', 'returned']] },
+                                    0,
+                                    { $ifNull: ['$totalAmount', 0] },
+                                ],
+                            },
+                        },
+                    },
+                },
+            ]).exec(),
+        );
+        const statsById = new Map(agg.map((a) => [String(a._id), a]));
+
+        const ownerIds = tenants.map((t) => t.ownerAdminId).filter(Boolean);
+        const admins = ownerIds.length
+            ? await runAsSystem(() =>
+                  AdminModel.find({ _id: { $in: ownerIds } })
+                      .select('username email isActive lastLoginAt')
+                      .lean()
+                      .exec(),
+              )
+            : [];
+        const ownerById = new Map(admins.map((a) => [String(a._id), a]));
+
+        let totalOrders = 0;
+        let totalRevenue = 0;
+        const stores = tenants.map((t) => {
+            const s = statsById.get(String(t._id)) || { orders: 0, revenue: 0 };
+            totalOrders += s.orders;
+            totalRevenue += s.revenue;
+            const a = t.ownerAdminId ? ownerById.get(String(t.ownerAdminId)) : null;
+            return {
+                tenantId: t._id,
+                businessName: t.businessName,
+                subdomain: t.subdomain,
+                status: t.status,
+                isPrimary: !!t.isPrimary,
+                orders: s.orders,
+                revenue: Math.round((s.revenue + Number.EPSILON) * 100) / 100,
+                billingStatus: t.billing?.status || 'active',
+                owner: a
+                    ? { id: a._id, username: a.username, email: a.email || t.ownerEmail || null, isActive: a.isActive !== false, lastLoginAt: a.lastLoginAt || null }
+                    : (t.ownerEmail ? { id: null, username: null, email: t.ownerEmail, isActive: false, lastLoginAt: null } : null),
+            };
+        });
+
+        const activeStores = tenants.filter((t) => t.status === 'approved').length;
+        const pendingStores = tenants.filter((t) => t.status === 'pending').length;
+
+        return ok(res, 'Overview', {
+            stores,
+            totals: {
+                stores: tenants.length,
+                activeStores,
+                pendingStores,
+                orders: totalOrders,
+                revenue: Math.round((totalRevenue + Number.EPSILON) * 100) / 100,
+            },
+        });
+    } catch (err) {
+        return fail(res, 500, err.message || 'Failed to load overview');
     }
 };
 
