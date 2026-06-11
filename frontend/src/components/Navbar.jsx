@@ -21,6 +21,12 @@ import { getWishlist, setWishlistEnabled } from "@/services/wishlist";
 function Navbar() {
     const [categories, setCategories] = useState([]);
     const [branding, setBranding] = useState({ siteName: "Ab9dEcommerce", logoUrl: "" });
+    // `brandingLoaded` flips true once site-settings resolve, so we never paint the
+    // bundled fallback logo and then swap it for the admin one (the wrong-logo flash).
+    // `logoReady` flips true once the actual <Image> has decoded — until then the
+    // navbar shows a skeleton instead of a stand-in logo.
+    const [brandingLoaded, setBrandingLoaded] = useState(false);
+    const [logoReady, setLogoReady] = useState(false);
     const [cartCount, setCartCount] = useState(0);
     const [wishlistCount, setWishlistCount] = useState(0);
     const [wishlistOn, setWishlistOn] = useState(true);
@@ -97,7 +103,11 @@ function Navbar() {
                     setWishlistOn(on);
                     setWishlistEnabled(on);
                 }
-            } catch { /* keep defaults */ }
+            } catch { /* keep defaults */ } finally {
+                // Branding settled (admin logo or bundled default) — let the navbar
+                // render the real logo over its skeleton, never a wrong-logo flash.
+                setBrandingLoaded(true);
+            }
         })();
 
         const handleCartUpdate = () => fetchCartCount();
@@ -228,21 +238,28 @@ function Navbar() {
                             </div>
                         </div>
 
-                        {/* CENTER ZONE — logo on a white pill so any brand logo stays legible on the gradient */}
+                        {/* CENTER ZONE — logo sits directly on the gradient (no white box);
+                            a skeleton holds the space until the real logo has decoded. */}
                         <div className="flex-shrink-0 px-2 sm:px-4">
                             <Link href="/" className="flex items-center" aria-label={`${branding.siteName} home`}>
-                                <div className="bg-white/95 rounded-2xl px-3 py-1.5 sm:px-4 sm:py-2 shadow-lg ring-1 ring-black/5">
-                                    <div className="w-24 sm:w-[138px] lg:w-44">
+                                <div className="relative h-9 w-28 sm:h-11 sm:w-40 lg:h-12 lg:w-48">
+                                    {(!brandingLoaded || !logoReady) && (
+                                        <div className="absolute inset-0 rounded-lg bg-white/20 animate-pulse" />
+                                    )}
+                                    {brandingLoaded && (
                                         <Image
+                                            key={branding.logoUrl || "default"}
                                             src={branding.logoUrl || "/logo.png"}
                                             alt={`${branding.siteName} Logo`}
-                                            width={240}
-                                            height={60}
-                                            className="object-contain w-full h-auto"
+                                            fill
+                                            sizes="(max-width: 640px) 112px, (max-width: 1024px) 160px, 192px"
+                                            className={`object-contain object-center transition-opacity duration-300 [filter:drop-shadow(0_1px_2px_rgba(0,0,0,0.25))] ${logoReady ? "opacity-100" : "opacity-0"}`}
                                             priority
                                             unoptimized={!!branding.logoUrl}
+                                            onLoad={() => setLogoReady(true)}
+                                            onError={() => setLogoReady(true)}
                                         />
-                                    </div>
+                                    )}
                                 </div>
                             </Link>
                         </div>
