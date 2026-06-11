@@ -23,3 +23,12 @@ export const searchProducts = async (params = {}) => {
     const res = await fetch(`${API}/search${toQuery(params)}`);
     return res.json();
 };
+
+// Autocomplete suggestions for the search box. Accepts { q, limit }; returns
+// the envelope { success, data } where data is a short list of name-matched
+// products (image + variant price only). The backend ignores queries shorter
+// than two characters.
+export const suggestProducts = async (params = {}) => {
+    const res = await fetch(`${API}/suggest${toQuery(params)}`);
+    return res.json();
+};

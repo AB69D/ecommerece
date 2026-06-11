@@ -22,6 +22,7 @@ import {
 } from "react-icons/fi";
 import { getWishlist, setWishlistEnabled } from "@/services/wishlist";
 import { useCustomerAuth } from "@/context/CustomerAuthContext";
+import SearchAutocomplete from "./SearchAutocomplete";
 
 function Navbar() {
     const [categories, setCategories] = useState([]);
@@ -37,7 +38,9 @@ function Navbar() {
     const [wishlistOn, setWishlistOn] = useState(true);
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
     const [mobileCategoriesOpen, setMobileCategoriesOpen] = useState(false);
-    const [searchQuery, setSearchQuery] = useState("");
+    // Universal search overlay (the header search icon opens this on every
+    // screen size — the mobile drawer is hidden on desktop).
+    const [searchOpen, setSearchOpen] = useState(false);
     const router = useRouter();
     const pathname = usePathname();
     const { customer, logout } = useCustomerAuth();
@@ -127,27 +130,25 @@ function Navbar() {
     }, [fetchCategories, fetchCartCount, fetchWishlistCount]);
 
     useEffect(() => {
-        if (mobileMenuOpen) {
-            document.body.style.overflow = "hidden";
-        } else {
-            document.body.style.overflow = "unset";
-        }
+        const lock = mobileMenuOpen || searchOpen;
+        document.body.style.overflow = lock ? "hidden" : "unset";
         return () => {
             document.body.style.overflow = "unset";
         };
-    }, [mobileMenuOpen]);
+    }, [mobileMenuOpen, searchOpen]);
+
+    // Close the search overlay on Escape.
+    useEffect(() => {
+        if (!searchOpen) return;
+        const onKey = (e) => {
+            if (e.key === "Escape") setSearchOpen(false);
+        };
+        document.addEventListener("keydown", onKey);
+        return () => document.removeEventListener("keydown", onKey);
+    }, [searchOpen]);
 
     // The POS terminal renders full-screen without storefront chrome.
     if (pathname?.startsWith("/pos")) return null;
-
-    const handleSearch = (e) => {
-        e.preventDefault();
-        if (searchQuery.trim()) {
-            router.push(`/search?q=${encodeURIComponent(searchQuery.trim())}`);
-            setSearchQuery("");
-            setMobileMenuOpen(false);
-        }
-    };
 
     const closeMobileMenu = () => {
         setMobileMenuOpen(false);
@@ -273,7 +274,7 @@ function Navbar() {
                         {/* RIGHT ZONE — equal flex, content pushed to the end */}
                         <div className="flex-1 flex items-center justify-end space-x-1.5 sm:space-x-3 min-w-0">
                             <button
-                                onClick={() => setMobileMenuOpen(true)}
+                                onClick={() => setSearchOpen(true)}
                                 className="p-2 opacity-90 hover:opacity-100 hover:bg-white/10 rounded-full transition-all focus:outline-none focus:ring-2 focus:ring-white/40"
                                 aria-label="Search"
                             >
@@ -372,6 +373,32 @@ function Navbar() {
                 </div>
             )}
 
+            {/* Universal search overlay — opened by the header search icon on
+                every screen size (the drawer below is mobile-only). */}
+            {searchOpen && (
+                <div className="fixed inset-0 z-[80]" role="dialog" aria-modal="true" aria-label="Search products">
+                    <div
+                        className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+                        onClick={() => setSearchOpen(false)}
+                    />
+                    <div className="relative mx-auto mt-20 sm:mt-24 w-full max-w-2xl px-4">
+                        <div className="bg-white rounded-2xl shadow-2xl p-4 sm:p-5">
+                            <div className="flex items-center justify-between mb-3">
+                                <span className="text-sm font-semibold text-gray-700">Search products</span>
+                                <button
+                                    onClick={() => setSearchOpen(false)}
+                                    className="w-8 h-8 flex items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+                                    aria-label="Close search"
+                                >
+                                    <FiX className="w-5 h-5" />
+                                </button>
+                            </div>
+                            <SearchAutocomplete autoFocus onNavigate={() => setSearchOpen(false)} />
+                        </div>
+                    </div>
+                </div>
+            )}
+
             <aside
                 className={`fixed top-0 left-0 h-full w-80 max-w-[85vw] bg-white z-[70] md:hidden transform transition-transform duration-300 ease-[cubic-bezier(0.2,0.8,0.2,1)] shadow-2xl ${
                     mobileMenuOpen ? "translate-x-0" : "-translate-x-full"
@@ -428,22 +455,7 @@ function Navbar() {
 
                     {/* Search bar */}
                     <div className="p-4 border-b border-gray-100 bg-gray-50/60">
-                        <form onSubmit={handleSearch} className="relative">
-                            <input
-                                type="text"
-                                value={searchQuery}
-                                onChange={(e) => setSearchQuery(e.target.value)}
-                                placeholder="Search products..."
-                                className="w-full pl-11 pr-4 py-3 bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-sm shadow-sm"
-                            />
-                            <button
-                                type="submit"
-                                className="absolute left-3 top-1/2 -translate-y-1/2 w-7 h-7 flex items-center justify-center text-emerald-600"
-                                aria-label="Search"
-                            >
-                                <FiSearch className="w-5 h-5" />
-                            </button>
-                        </form>
+                        <SearchAutocomplete onNavigate={closeMobileMenu} />
                     </div>
 
                     <div className="flex-1 overflow-y-auto hide-scrollbar">
