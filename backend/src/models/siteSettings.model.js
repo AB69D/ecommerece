@@ -141,6 +141,21 @@ const siteSettingsSchema = new mongoose.Schema(
             accent: { type: String, default: '#f59e0b' },
         },
 
+        // ── Online payments ────────────────────────────────────────────────
+        // SSLCommerz gateway (Bangladesh aggregator: cards + bKash/Nagad/Rocket
+        // and bank in one integration). Disabled until an admin enters store
+        // credentials and flips `enabled`. `storeId` and `storePassword` are
+        // SECRETS — the public site-settings endpoint strips both so neither ever
+        // reaches the browser; only `enabled`/`provider`/`sandbox` are exposed so
+        // the storefront knows whether to offer the "Pay online" option.
+        payment: {
+            provider: { type: String, enum: ['sslcommerz'], default: 'sslcommerz' },
+            enabled: { type: Boolean, default: false },
+            sandbox: { type: Boolean, default: true }, // sandbox creds until live
+            storeId: { type: String, default: '' },
+            storePassword: { type: String, default: '' },
+        },
+
         maintenanceMode: { type: Boolean, default: false },
     },
     { timestamps: true },

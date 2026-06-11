@@ -33,6 +33,13 @@ export const getPublicSettings = asyncHandler(async (_req, res) => {
         const { metaCapiToken, metaTestEventCode, ...analyticsPublic } = publicView.analytics;
         publicView.analytics = analyticsPublic;
     }
+    // Payment gateway credentials are secrets too. Expose only whether online
+    // payment is on (and which provider / sandbox mode) so the checkout can show
+    // the option — never the store id or password.
+    if (publicView.payment) {
+        const { storeId, storePassword, ...paymentPublic } = publicView.payment;
+        publicView.payment = paymentPublic;
+    }
     return ok(res, publicView);
 });
 

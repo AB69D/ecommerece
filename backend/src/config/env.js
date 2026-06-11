@@ -8,6 +8,11 @@ const schema = z.object({
 
     FRONTEND_URL: z.string().url().or(z.string().regex(/^https?:\/\/localhost/)).optional(),
 
+    // Public base URL of THIS API, used to build absolute gateway callback URLs
+    // (SSLCommerz success/fail/cancel/IPN). Optional: when unset we derive it
+    // from the proxied request (trust proxy is on), which is fine in most setups.
+    PUBLIC_API_URL: z.string().url().optional(),
+
     MONGODB_URI: z.string().min(1, 'MONGODB_URI is required'),
 
     JWT_SECRET: z.string().min(32, 'JWT_SECRET must be at least 32 characters'),

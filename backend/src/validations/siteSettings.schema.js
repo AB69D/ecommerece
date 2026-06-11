@@ -77,6 +77,18 @@ const whatsapp = z
     })
     .partial();
 
+// Online payment gateway credentials. Every key optional so the admin can flip
+// the toggle or update one field without resending the secret each time.
+const payment = z
+    .object({
+        provider: z.enum(['sslcommerz']),
+        enabled: z.boolean(),
+        sandbox: z.boolean(),
+        storeId: z.string().max(100),
+        storePassword: z.string().max(200),
+    })
+    .partial();
+
 // Accepts #rgb or #rrggbb (case-insensitive). Empty string is rejected so a
 // blank picker never wipes a colour to an invalid value.
 const hexColor = z.string().regex(/^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/, 'Must be a hex colour like #047857');
@@ -128,5 +140,6 @@ export const updateSiteSettingsSchema = z.object({
     analytics: analytics.optional(),
     whatsapp: whatsapp.optional(),
     theme: theme.optional(),
+    payment: payment.optional(),
     maintenanceMode: z.boolean().optional(),
 });
