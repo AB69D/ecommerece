@@ -4,7 +4,7 @@ import Image from "next/image";
 import {
     FiSettings, FiImage, FiUpload, FiTrash2, FiPlus, FiCheck, FiAlertCircle,
     FiType, FiPhone, FiShare2, FiSearch, FiLayout, FiSave, FiX,
-    FiToggleRight, FiPrinter, FiTag, FiActivity, FiDroplet, FiRotateCcw,
+    FiToggleRight, FiPrinter, FiTag, FiActivity, FiDroplet, FiRotateCcw, FiCreditCard,
 } from "react-icons/fi";
 import { getSiteSettings, updateSiteSettings, uploadSiteImage } from "@/services/siteSettings";
 import { getFooterSettings, updateFooterSettings } from "@/services/footer";
@@ -20,6 +20,7 @@ const TABS = [
     { id: "pos", label: "POS & Receipt", icon: <FiPrinter className="w-4 h-4" /> },
     { id: "barcode", label: "Barcode & Labels", icon: <FiTag className="w-4 h-4" /> },
     { id: "integrations", label: "Analytics & WhatsApp", icon: <FiActivity className="w-4 h-4" /> },
+    { id: "payments", label: "Payments", icon: <FiCreditCard className="w-4 h-4" /> },
     { id: "footer", label: "Footer", icon: <FiLayout className="w-4 h-4" /> },
 ];
 
@@ -244,6 +245,7 @@ export default function SettingsPage() {
     const setPos = (patch) => setSettings((p) => ({ ...p, pos: { ...(p.pos || {}), ...patch } }));
     const setAnalytics = (patch) => setSettings((p) => ({ ...p, analytics: { ...(p.analytics || {}), ...patch } }));
     const setWhatsapp = (patch) => setSettings((p) => ({ ...p, whatsapp: { ...(p.whatsapp || {}), ...patch } }));
+    const setPayment = (patch) => setSettings((p) => ({ ...p, payment: { ...(p.payment || {}), ...patch } }));
     const setTheme = (patch) => setSettings((p) => ({ ...p, theme: { ...(p.theme || {}), ...patch } }));
     const resetTheme = () => setSettings((p) => ({ ...p, theme: { ...THEME_DEFAULTS } }));
 
@@ -306,6 +308,13 @@ export default function SettingsPage() {
                     notifyOnStatusChange: settings.whatsapp?.notifyOnStatusChange !== false,
                     orderTemplate: settings.whatsapp?.orderTemplate || "",
                     statusTemplate: settings.whatsapp?.statusTemplate || "",
+                },
+                payment: {
+                    provider: "sslcommerz",
+                    enabled: !!settings.payment?.enabled,
+                    sandbox: settings.payment?.sandbox !== false,
+                    storeId: settings.payment?.storeId || "",
+                    storePassword: settings.payment?.storePassword || "",
                 },
                 theme: sanitizeTheme(settings.theme),
                 maintenanceMode: !!settings.maintenanceMode,
@@ -714,6 +723,39 @@ export default function SettingsPage() {
                             <Field label="Status message template" hint="Placeholders: {{name}} {{orderId}} {{status}}.">
                                 <textarea rows={2} className={inputCls} value={settings.whatsapp?.statusTemplate || ""} onChange={(e) => setWhatsapp({ statusTemplate: e.target.value })} />
                             </Field>
+                        </div>
+                    </>
+                )}
+
+                {tab === "payments" && (
+                    <>
+                        <div className="bg-gray-50 border border-gray-100 rounded-xl p-4 space-y-3">
+                            <h3 className="text-sm font-semibold text-gray-700">Online payment (SSLCommerz)</h3>
+                            <p className="text-xs text-gray-500 -mt-1">
+                                Accept cards, bKash, Nagad, Rocket and bank payments through SSLCommerz.
+                                Enter your merchant Store credentials below. Cash on Delivery stays available
+                                regardless of this setting.
+                            </p>
+                            <Toggle
+                                label="Enable online payment at checkout"
+                                checked={!!settings.payment?.enabled}
+                                onChange={(v) => setPayment({ enabled: v })}
+                            />
+                            <Toggle
+                                label="Sandbox (test) mode"
+                                checked={settings.payment?.sandbox !== false}
+                                onChange={(v) => setPayment({ sandbox: v })}
+                            />
+                            <Field label="Store ID" hint="From your SSLCommerz merchant panel. Sandbox and live stores have different IDs.">
+                                <input className={inputCls} autoComplete="off" value={settings.payment?.storeId || ""} onChange={(e) => setPayment({ storeId: e.target.value })} placeholder="yourstore0live" />
+                            </Field>
+                            <Field label="Store password" hint="The Store Password (API key) from SSLCommerz. Kept secret — never sent to the storefront.">
+                                <input type="password" autoComplete="new-password" className={inputCls} value={settings.payment?.storePassword || ""} onChange={(e) => setPayment({ storePassword: e.target.value })} placeholder="••••••••" />
+                            </Field>
+                            <p className="text-xs text-gray-500">
+                                Turn off <strong>Sandbox</strong> only after switching to your live Store credentials.
+                                Shoppers will then see a <strong>Pay Online</strong> option alongside Cash on Delivery.
+                            </p>
                         </div>
                     </>
                 )}

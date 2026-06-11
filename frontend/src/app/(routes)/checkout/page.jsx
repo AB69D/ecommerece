@@ -9,6 +9,7 @@ import { useWhatsApp } from "@/hooks/useWhatsApp";
 import { PiWhatsappLogoBold } from "react-icons/pi";
 import { useCustomerAuth } from "@/context/CustomerAuthContext";
 import { customerFetch } from "@/services/api";
+import { useSiteSettings } from "@/hooks/useSiteSettings";
 
 export default function CheckoutPage() {
     const wa = useWhatsApp();
@@ -34,6 +35,13 @@ export default function CheckoutPage() {
     const [savedAddresses, setSavedAddresses] = useState([]);
     const [selectedAddressId, setSelectedAddressId] = useState("");
     const prefilledRef = useRef(false);
+
+    // Online payment availability comes from admin site-settings; when off, only
+    // Cash on Delivery is offered. A failed gateway hand-off leaves a note on the
+    // confirmation screen (the order is still placed, just unpaid).
+    const settings = useSiteSettings();
+    const onlinePaymentEnabled = Boolean(settings?.payment?.enabled);
+    const [onlineNote, setOnlineNote] = useState("");
 
     const getGuestId = () => {
         if (typeof window === 'undefined') return null;
@@ -231,32 +239,73 @@ export default function CheckoutPage() {
             const data = await res.json();
 
             if (data.success) {
+                const placedOrder = data.data;
+
+                // The server cleared the cart for this guestId. For a signed-in
+                // shopper, keep their account guestId so the (now empty) cart stays
+                // bound to the account; for a guest, mint a fresh anonymous id so the
+                // next order starts clean. For ONLINE payment this is deferred to the
+                // result page (so the gateway round-trip can still match this guest).
+                const resetGuestSession = () => {
+                    if (customer?.guestId) {
+                        localStorage.setItem('guestId', customer.guestId);
+                    } else {
+                        localStorage.removeItem('guestId');
+                        localStorage.setItem('guestId', `guest_${Date.now()}`);
+                    }
+                    if (typeof window !== 'undefined') window.dispatchEvent(new Event('cart-updated'));
+                };
+
+                // ── Online payment: hand the placed order off to the gateway. ──
+                // The order already exists (stock committed) exactly like COD; we
+                // just need it paid. Defer the Purchase pixel + guest reset to the
+                // result page, which fires them only once the gateway confirms.
+                if (formData.paymentMethod === 'online' && onlinePaymentEnabled) {
+                    try {
+                        const initRes = await fetch(`/api/client/payment/init`, {
+                            method: 'POST',
+                            headers,
+                            body: JSON.stringify({ orderId: placedOrder?.orderId }),
+                        });
+                        const initData = await initRes.json();
+                        if (initData.success && initData.data?.gatewayUrl) {
+                            // Leaving the storefront for the gateway; keep the button
+                            // disabled (don't reset guest/cart here).
+                            window.location.href = initData.data.gatewayUrl;
+                            return;
+                        }
+                        setOnlineNote(
+                            initData.message ||
+                                "We couldn't start online payment. Your order is placed — you can pay on delivery.",
+                        );
+                    } catch {
+                        setOnlineNote(
+                            "We couldn't start online payment. Your order is placed — you can pay on delivery.",
+                        );
+                    }
+                    // Gateway hand-off failed: show the confirmation screen (unpaid).
+                    // No Purchase pixel — the payment didn't complete.
+                    setOrderPlaced(true);
+                    setOrderData(placedOrder);
+                    resetGuestSession();
+                    return;
+                }
+
+                // ── Cash on Delivery (and any non-online method): finalize now. ──
                 // Meta Pixel "Purchase" (browser + server-side). Customer
                 // email/phone are hashed server-side for better match quality.
                 trackPurchase({
                     items,
-                    value: data.data?.totalAmount ?? totalAmount,
+                    value: placedOrder?.totalAmount ?? totalAmount,
                     currency: code,
-                    orderId: data.data?.orderId,
+                    orderId: placedOrder?.orderId,
                     email: formData.customerEmail,
                     phone: formData.customerPhone,
                     firstName: formData.customerName,
                 });
                 setOrderPlaced(true);
-                setOrderData(data.data);
-
-                // The server cleared the cart for this guestId. For a signed-in
-                // shopper, keep their account guestId so the (now empty) cart stays
-                // bound to the account; for a guest, mint a fresh anonymous id so the
-                // next order starts clean.
-                if (customer?.guestId) {
-                    localStorage.setItem('guestId', customer.guestId);
-                } else {
-                    localStorage.removeItem('guestId');
-                    const newGuestId = `guest_${Date.now()}`;
-                    localStorage.setItem('guestId', newGuestId);
-                }
-                if (typeof window !== 'undefined') window.dispatchEvent(new Event('cart-updated'));
+                setOrderData(placedOrder);
+                resetGuestSession();
             } else {
                 alert(data.message || 'Failed to place order');
             }
@@ -289,6 +338,11 @@ export default function CheckoutPage() {
                 </div>
                 <h1 className="text-2xl sm:text-3xl font-bold text-gray-800 mb-2">Order Successfully Placed!</h1>
                 <p className="text-gray-600 mb-2">Your order is waiting for confirmation.</p>
+                {onlineNote && (
+                    <p className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-4 py-2 mb-4 max-w-md">
+                        {onlineNote}
+                    </p>
+                )}
                 <div className="bg-gray-50 rounded-lg p-4 mb-6">
                     <p className="text-sm text-gray-500 mb-1">Your Order ID</p>
                     <p className="font-mono text-xl font-bold text-emerald-700">{orderData.orderId}</p>
@@ -481,12 +535,67 @@ export default function CheckoutPage() {
                             </div>
                         </div>
 
+                        <div className="bg-white border rounded-lg p-4 sm:p-6">
+                            <h2 className="text-lg font-bold text-gray-800 mb-4">Payment Method</h2>
+                            <div className="space-y-3">
+                                <label
+                                    className={`flex items-start gap-3 rounded-xl border p-4 cursor-pointer transition-all ${
+                                        formData.paymentMethod === 'cash_on_delivery'
+                                            ? 'border-emerald-500 ring-1 ring-emerald-500 bg-emerald-50/50'
+                                            : 'border-gray-200 hover:border-emerald-300'
+                                    }`}
+                                >
+                                    <input
+                                        type="radio"
+                                        name="paymentMethod"
+                                        value="cash_on_delivery"
+                                        checked={formData.paymentMethod === 'cash_on_delivery'}
+                                        onChange={handleChange}
+                                        className="mt-1 accent-emerald-600"
+                                    />
+                                    <span>
+                                        <span className="block text-sm font-semibold text-gray-800">Cash on Delivery</span>
+                                        <span className="block text-xs text-gray-500 mt-0.5">Pay in cash when your order is delivered.</span>
+                                    </span>
+                                </label>
+
+                                {onlinePaymentEnabled && (
+                                    <label
+                                        className={`flex items-start gap-3 rounded-xl border p-4 cursor-pointer transition-all ${
+                                            formData.paymentMethod === 'online'
+                                                ? 'border-emerald-500 ring-1 ring-emerald-500 bg-emerald-50/50'
+                                                : 'border-gray-200 hover:border-emerald-300'
+                                        }`}
+                                    >
+                                        <input
+                                            type="radio"
+                                            name="paymentMethod"
+                                            value="online"
+                                            checked={formData.paymentMethod === 'online'}
+                                            onChange={handleChange}
+                                            className="mt-1 accent-emerald-600"
+                                        />
+                                        <span>
+                                            <span className="block text-sm font-semibold text-gray-800">Pay Online</span>
+                                            <span className="block text-xs text-gray-500 mt-0.5">
+                                                Card, bKash, Nagad, Rocket &amp; more — securely via SSLCommerz. You&apos;ll be redirected to complete payment.
+                                            </span>
+                                        </span>
+                                    </label>
+                                )}
+                            </div>
+                        </div>
+
                         <button
                             type="submit"
                             disabled={placingOrder}
                             className="w-full bg-emerald-600 text-white font-bold py-3 rounded-lg hover:bg-emerald-700 disabled:opacity-50"
                         >
-                            {placingOrder ? 'Placing Order...' : `Place Order - ${symbol}${totalAmount}`}
+                            {placingOrder
+                                ? (formData.paymentMethod === 'online' ? 'Starting payment…' : 'Placing Order...')
+                                : (formData.paymentMethod === 'online'
+                                    ? `Pay Online - ${symbol}${totalAmount}`
+                                    : `Place Order - ${symbol}${totalAmount}`)}
                         </button>
                     </form>
                 </div>
