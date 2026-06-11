@@ -3,10 +3,12 @@ import { authFetch } from "@/services/api";
 import React, { useState, useEffect } from "react";
 import { FiSearch, FiPlus, FiMinus, FiAlertCircle, FiTrendingUp, FiPackage } from "react-icons/fi";
 import { useAdminAuth } from "@/context/AdminAuthContext";
+import { useCurrency } from "@/context/CurrencyContext.jsx";
 
 export default function StockManagementPage() {
     const { can } = useAdminAuth();
     const canWrite = can("inventory:write");
+    const { symbol } = useCurrency();
 
     const [stockData, setStockData] = useState([]);
     const [summary, setSummary] = useState({ totalProducts: 0, totalItemsInStock: 0, totalInventoryValue: 0 });
@@ -126,7 +128,7 @@ export default function StockManagementPage() {
                     <div className="flex items-center justify-between">
                         <div>
                             <p className="text-purple-100 text-sm">Inventory Value</p>
-                            <p className="text-3xl font-bold mt-1">${summary.totalInventoryValue.toLocaleString()}</p>
+                            <p className="text-3xl font-bold mt-1">{symbol}{summary.totalInventoryValue.toLocaleString()}</p>
                         </div>
                         <FiAlertCircle className="w-10 h-10 text-purple-200 opacity-50" />
                     </div>
@@ -182,7 +184,7 @@ export default function StockManagementPage() {
                                         <div key={index} className="bg-white border border-gray-100 rounded-lg p-3">
                                             <div className="flex items-center justify-between mb-2">
                                                 <span className="font-medium text-gray-700">{weight.weight}</span>
-                                                <span className="text-emerald-600 font-semibold">${weight.price}</span>
+                                                <span className="text-emerald-600 font-semibold">{symbol}{weight.price}</span>
                                             </div>
                                             <div className="flex items-center justify-between">
                                                 <span className={`px-2 py-1 rounded-full text-xs font-medium ${

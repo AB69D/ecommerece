@@ -331,6 +331,14 @@ export default function SettingsPage() {
                 if (r1.data) setSettings(r1.data);
                 if (r2.data) setFooter(r2.data);
                 setMsg({ type: "success", text: "Settings saved successfully" });
+                // Broadcast the (possibly new) currency so every surface in this tab
+                // — admin tables, POS, storefront — re-renders the symbol live,
+                // without waiting for a full page reload.
+                if (typeof window !== "undefined") {
+                    window.dispatchEvent(new CustomEvent("currency-updated", {
+                        detail: { symbol: sPayload.currencySymbol, code: sPayload.currencyCode },
+                    }));
+                }
             } else {
                 setMsg({ type: "error", text: r1?.message || r2?.message || "Failed to save settings" });
             }

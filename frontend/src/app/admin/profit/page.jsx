@@ -6,8 +6,8 @@ import {
 } from "react-icons/fi";
 import { getProfitReport } from "@/services/analytics";
 import { AreaLineChart, HBarList } from "@/components/admin/Charts";
+import { useMoney } from "@/context/CurrencyContext.jsx";
 
-const money = (v) => `$${Number(v || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
 const pctText = (v) => `${Number(v || 0).toFixed(1)}%`;
 
 const RANGES = [
@@ -47,6 +47,7 @@ export default function ProfitReportPage() {
     const [loading, setLoading] = useState(true);
     const [denied, setDenied] = useState(false);
     const [disabled, setDisabled] = useState(false);
+    const money = useMoney();
 
     const load = useCallback(async () => {
         setLoading(true);

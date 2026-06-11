@@ -5,6 +5,7 @@ import Link from "next/link";
 import { FiEdit, FiTrash2, FiSearch, FiX, FiImage } from "react-icons/fi";
 import { useRouter } from "next/navigation";
 import { useAdminAuth } from "@/context/AdminAuthContext";
+import { useCurrency } from "@/context/CurrencyContext.jsx";
 
 // Mirror of the backend GS1 (prefix 2) barcode generator for in-form previews.
 const genBarcodePreview = (index = 0) => {
@@ -18,6 +19,7 @@ export default function AllProductsPage() {
     const { can } = useAdminAuth();
     const canWrite = can("product:write");
     const canDelete = can("product:delete");
+    const { symbol } = useCurrency();
 
     const [products, setProducts] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -249,7 +251,7 @@ export default function AllProductsPage() {
                                                 {product.category?.category_name || 'N/A'}
                                             </td>
                                             <td className="px-4 py-3 text-sm text-gray-600">
-                                                ${minPrice} - ${maxPrice}
+                                                {symbol}{minPrice} - {symbol}{maxPrice}
                                             </td>
                                             <td className="px-4 py-3">
                                                 <span className={`px-2 py-1 rounded-full text-xs font-medium ${totalStock > 10 ? 'bg-green-100 text-green-700' : totalStock > 0 ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700'}`}>

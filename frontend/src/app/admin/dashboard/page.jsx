@@ -3,8 +3,10 @@ import { authFetch } from "@/services/api";
 import { useState, useEffect } from "react";
 import { FiPackage, FiShoppingCart, FiDollarSign, FiTrendingUp, FiUsers, FiTruck, FiCheck, FiX, FiClock, FiActivity, FiGrid, FiArchive } from "react-icons/fi";
 import Link from "next/link";
+import { useCurrency } from "@/context/CurrencyContext.jsx";
 
 export default function DashboardPage() {
+    const { symbol } = useCurrency();
     const [stats, setStats] = useState(null);
     const [loading, setLoading] = useState(true);
     const [recentOrders, setRecentOrders] = useState([]);
@@ -150,7 +152,7 @@ export default function DashboardPage() {
                     <div className="flex items-center justify-between">
                         <div>
                             <p className="text-indigo-100 text-sm">Revenue</p>
-                            <p className="text-3xl font-bold mt-1">${stats?.totalRevenue || 0}</p>
+                            <p className="text-3xl font-bold mt-1">{symbol}{stats?.totalRevenue || 0}</p>
                         </div>
                         <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center">
                             <FiDollarSign className="w-6 h-6" />
@@ -240,7 +242,7 @@ export default function DashboardPage() {
                                             <span className="text-sm text-gray-600">{order.items?.length || 0} items</span>
                                         </td>
                                         <td className="px-5 py-4">
-                                            <span className="font-bold text-gray-800">${order.totalAmount}</span>
+                                            <span className="font-bold text-gray-800">{symbol}{order.totalAmount}</span>
                                         </td>
                                         <td className="px-5 py-4">
                                             <span className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(order.orderStatus).bg}`}>

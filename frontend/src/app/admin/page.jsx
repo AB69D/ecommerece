@@ -8,6 +8,7 @@ import {
 import { authFetch } from "@/services/api";
 import { getDashboardOverview } from "@/services/analytics";
 import { AreaLineChart, BarChart, DonutChart, HBarList } from "@/components/admin/Charts";
+import { useMoney } from "@/context/CurrencyContext.jsx";
 
 const STATUS_META = {
     pending: { label: "Pending", color: "#f59e0b" },
@@ -27,7 +28,6 @@ const RANGES = [
     { label: "90d", value: 90 },
 ];
 
-const money = (v) => `$${Number(v || 0).toLocaleString()}`;
 const statusBadge = (s) => {
     const m = STATUS_META[s] || STATUS_META.unknown;
     return { label: m.label, color: m.color };
@@ -62,6 +62,7 @@ export default function DashboardPage() {
     const [recentOrders, setRecentOrders] = useState([]);
     const [loading, setLoading] = useState(true);
     const [denied, setDenied] = useState(false);
+    const money = useMoney();
 
     const load = useCallback(async () => {
         setLoading(true);
