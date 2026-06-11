@@ -78,6 +78,18 @@ export const registerStore = async (req, res) => {
         const taken = await TenantModel.findOne({ subdomain }).select('_id').lean();
         if (taken) return fail(res, 409, `Subdomain "${subdomain}" is already taken.`);
 
+        // Owner credentials are GLOBAL-unique across every store (the shared
+        // domain identifies an owner by username alone — see admin.model.js).
+        // This handler runs in system context, so this find is cross-tenant; the
+        // global unique index is the race backstop, this is the friendly message.
+        const dupe = await AdminModel.findOne({ $or: [{ username }, { email }] })
+            .select('username email')
+            .lean();
+        if (dupe) {
+            const which = dupe.username === username ? 'username' : 'email';
+            return fail(res, 409, `That ${which} is already in use. Please choose another.`);
+        }
+
         // ── Create tenant (pending) ──────────────────────────────────────────
         const tenant = await TenantModel.create({
             businessName,

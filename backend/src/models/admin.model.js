@@ -56,12 +56,16 @@ const adminSchema = new mongoose.Schema(
 
 adminSchema.plugin(tenantPlugin);
 
-// Auth identifiers are unique PER TENANT (were global-unique pre-multi-tenancy).
-// email uses a partial filter so multiple admins MAY omit an email per tenant,
-// while any email that IS set stays unique within the tenant.
-adminSchema.index({ tenantId: 1, username: 1 }, { unique: true });
+// Auth identifiers are GLOBAL-unique (across every tenant). On the shared domain
+// there is no subdomain to identify the store before login, so a store owner is
+// found by username alone — which therefore must be unique across all stores.
+// (Subdomains come later; until then the username IS the cross-store identity.)
+// email keeps a partial filter so an admin MAY omit an email, while any email
+// that IS set stays unique platform-wide. tenantId still carries its own
+// (non-unique) index from the plugin for scoped reads.
+adminSchema.index({ username: 1 }, { unique: true });
 adminSchema.index(
-    { tenantId: 1, email: 1 },
+    { email: 1 },
     { unique: true, partialFilterExpression: { email: { $type: 'string' } } },
 );
 

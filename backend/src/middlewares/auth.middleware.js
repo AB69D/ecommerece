@@ -4,6 +4,7 @@ import { ApiError } from '../lib/ApiError.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import AdminModel from '../models/admin.model.js';
 import { effectivePermissions, setHasPermission } from '../lib/permissions.js';
+import { setRequestTenant } from '../tenancy/tenantContext.js';
 
 const extractToken = (req) => {
     const header = req.headers.authorization;
@@ -35,6 +36,21 @@ export const requireAuth = asyncHandler(async (req, _res, next) => {
 
     const decoded = verify(token);
     req.admin = decoded; // raw JWT payload (backward compatible)
+
+    // ── Bind this request to the token's store (keystone) ────────────────────
+    // On the shared domain there is no subdomain, so withTenant left the context
+    // on the default (primary) store. The token carries the tenant the owner
+    // actually belongs to — re-bind to it so the admin lookup below AND every
+    // downstream query (products, orders, POS, …) scope to that store.
+    //   • If a subdomain already resolved a host tenant (future), the token MUST
+    //     match it — otherwise it's a session minted for a different store.
+    //   • If the token predates multi-tenancy (no tenantId), leave the default.
+    const tokenTenantId = decoded.tenantId ? String(decoded.tenantId) : null;
+    const hostTenantId = req.tenant?._id ? String(req.tenant._id) : null;
+    if (hostTenantId && tokenTenantId && hostTenantId !== tokenTenantId) {
+        throw ApiError.forbidden('This session belongs to a different store.');
+    }
+    if (tokenTenantId) setRequestTenant(tokenTenantId);
 
     // Tokens minted by the username/password flow carry `sub` = admin id.
     if (decoded.sub) {

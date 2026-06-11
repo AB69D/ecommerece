@@ -3,6 +3,7 @@ import { env } from '../config/env.js';
 import { ApiError } from '../lib/ApiError.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import CustomerModel from '../models/customer.model.js';
+import { setRequestTenant } from '../tenancy/tenantContext.js';
 
 const extractToken = (req) => {
     const header = req.headers.authorization;
@@ -30,6 +31,20 @@ const decodeCustomer = (token) => {
     return decoded;
 };
 
+// Bind the request to the store the customer belongs to (keystone). On the
+// shared domain there is no subdomain, so the context sits on the default store;
+// the token's tenantId moves it to the customer's own store so the re-load below
+// AND every downstream query (cart, orders, …) scope correctly. If a subdomain
+// already resolved a host tenant (future), the token must match it.
+const bindCustomerTenant = (req, decoded) => {
+    const tokenTenantId = decoded.tenantId ? String(decoded.tenantId) : null;
+    const hostTenantId = req.tenant?._id ? String(req.tenant._id) : null;
+    if (hostTenantId && tokenTenantId && hostTenantId !== tokenTenantId) {
+        throw ApiError.forbidden('This session belongs to a different store.');
+    }
+    if (tokenTenantId) setRequestTenant(tokenTenantId);
+};
+
 // Re-loads the live customer record so a deactivation or deletion takes effect
 // immediately (no stale-token access).
 const loadCustomer = async (decoded) => {
@@ -44,6 +59,7 @@ export const requireCustomer = asyncHandler(async (req, _res, next) => {
     const token = extractToken(req);
     if (!token) throw ApiError.unauthorized('Please sign in to continue.');
     const decoded = decodeCustomer(token);
+    bindCustomerTenant(req, decoded);
     req.customer = await loadCustomer(decoded);
     next();
 });
@@ -56,6 +72,7 @@ export const optionalCustomer = asyncHandler(async (req, _res, next) => {
     if (!token) return next();
     try {
         const decoded = decodeCustomer(token);
+        bindCustomerTenant(req, decoded);
         req.customer = await loadCustomer(decoded);
     } catch {
         // Treat an invalid/expired token as an anonymous guest rather than failing.

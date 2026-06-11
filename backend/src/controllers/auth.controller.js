@@ -5,7 +5,7 @@ import bcrypt from 'bcryptjs';
 import { effectivePermissions } from '../lib/permissions.js';
 import { writeAudit } from '../lib/audit.js';
 import { sendEmail } from '../lib/mailer.js';
-import { getEffectiveTenantId } from '../tenancy/tenantContext.js';
+import { getEffectiveTenantId, runAsSystem, runAsTenant, setRequestTenant } from '../tenancy/tenantContext.js';
 
 const ADMIN_EMAILS = (process.env.ADMIN_EMAILS || '')
     .split(',')
@@ -208,8 +208,15 @@ export const login = async (request, response) => {
         }
 
         const normalized = String(username).toLowerCase().trim();
-        const admin = await AdminModel.findOne({ username: normalized, isActive: true })
-            .select('+passwordHash');
+
+        // Global-unique usernames: on the shared domain there is no subdomain to
+        // tell us which store this owner belongs to, so look them up across ALL
+        // tenants (system context) by their globally-unique username, then bind
+        // the session to their store via the tenantId claim below. (Uniqueness is
+        // enforced by the global index in admin.model.js.)
+        const admin = await runAsSystem(() =>
+            AdminModel.findOne({ username: normalized, isActive: true }).select('+passwordHash'),
+        );
 
         if (!admin) {
             return response.status(401).json({
@@ -219,9 +226,13 @@ export const login = async (request, response) => {
             });
         }
 
+        // The store this owner belongs to. Audit entries are written under it so
+        // each store's audit trail stays self-contained.
+        const tenantId = admin.tenantId || null;
+
         const ok = await bcrypt.compare(String(password), admin.passwordHash);
         if (!ok) {
-            await writeAudit({
+            await runAsTenant(tenantId, () => writeAudit({
                 actor: { id: admin._id, username: admin.username, role: admin.role },
                 action: 'auth.login_failed',
                 resource: 'Admin',
@@ -233,7 +244,7 @@ export const login = async (request, response) => {
                 userAgent: (request.headers['user-agent'] || '').slice(0, 300),
                 message: `Failed login for "${admin.username}" (bad password)`,
                 success: false,
-            });
+            }));
             return response.status(401).json({
                 success: false,
                 error: true,
@@ -241,10 +252,12 @@ export const login = async (request, response) => {
             });
         }
 
+        // Document .save() updates by _id (no query-filter middleware), so this
+        // persists regardless of the request's default tenant context.
         admin.lastLoginAt = new Date();
         await admin.save();
 
-        await writeAudit({
+        await runAsTenant(tenantId, () => writeAudit({
             actor: { id: admin._id, username: admin.username, role: admin.role },
             action: 'auth.login',
             resource: 'Admin',
@@ -256,7 +269,7 @@ export const login = async (request, response) => {
             userAgent: (request.headers['user-agent'] || '').slice(0, 300),
             message: `"${admin.username}" logged in`,
             success: true,
-        });
+        }));
 
         const token = jwt.sign(
             {
@@ -264,10 +277,11 @@ export const login = async (request, response) => {
                 username: admin.username,
                 role: admin.role,
                 email: admin.email || undefined,
-                // Bind the admin session to its tenant. The scoped lookup in
-                // requireAuth already rejects a cross-tenant id (it won't be
-                // found under the resolved tenant); this claim is explicit + audit.
-                tenantId: admin.tenantId ? admin.tenantId.toString() : undefined,
+                // Bind the admin session to its store. requireAuth reads this
+                // claim and re-scopes the whole request to this tenant — the only
+                // way to identify the owner's store on the shared domain (no
+                // subdomain yet). Once subdomains land it must also match the host.
+                tenantId: tenantId ? tenantId.toString() : undefined,
             },
             process.env.JWT_SECRET,
             { expiresIn: '12h' },
@@ -308,6 +322,12 @@ export const me = async (request, response) => {
         }
         const token = authHeader.slice(7);
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+        // Bind to the token's store before any lookup. /auth/me runs its own
+        // decode (not requireAuth), so on the shared domain the admin record
+        // would otherwise be searched under the default/primary tenant and a
+        // non-primary owner would look "removed". Mirrors requireAuth.
+        if (decoded.tenantId) setRequestTenant(decoded.tenantId);
 
         // Username/password flow — JWT carries `sub` = admin id.
         if (decoded.sub) {

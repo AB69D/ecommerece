@@ -65,3 +65,19 @@ export const withTenant = (req, _res, next) => {
     const tenantId = (req.tenant && req.tenant._id) || req.tenantId || null;
     tenantStore.run({ tenantId, system: false }, () => next());
 };
+
+// Re-bind the CURRENT request to a specific tenant AFTER its context was created
+// — used once auth has decoded the JWT's tenantId. On the shared domain there is
+// no subdomain, so withTenant leaves tenantId null and the plugin falls back to
+// the default (primary) store; this is how an authenticated owner is moved OFF
+// that default and ONTO their own store, scoping every later query in the same
+// request. Mutates the active store object in place (AsyncLocalStorage propagates
+// the mutation to all later reads in this async continuation). No-op if there is
+// no active store (e.g. outside the HTTP request path).
+export const setRequestTenant = (tenantId) => {
+    const store = tenantStore.getStore();
+    if (!store) return false;
+    store.tenantId = tenantId || null;
+    store.system = false;
+    return true;
+};
