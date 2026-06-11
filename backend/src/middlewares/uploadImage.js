@@ -1,9 +1,22 @@
 import multer from "multer";
 import cloudinary from "../config/cloudinary.js";
+import { ApiError } from "../lib/ApiError.js";
 
-// 1. Configure multer to use memory storage instead of uploading directly
+// 1. Configure multer to use memory storage instead of uploading directly.
+//    Bound every upload: cap file size and count (memoryStorage buffers the
+//    whole file in RAM, so unbounded uploads are a DoS vector) and reject any
+//    non-image MIME type up front before it ever reaches Cloudinary.
 const storage = multer.memoryStorage();
-const cloudinary_upload = multer({ storage });
+const IMAGE_MIME = /^image\/(jpe?g|png|webp|gif|avif|heic|heif)$/i;
+const MAX_FILE_BYTES = 8 * 1024 * 1024; // 8 MB per file
+const cloudinary_upload = multer({
+    storage,
+    limits: { fileSize: MAX_FILE_BYTES, files: 12 },
+    fileFilter: (req, file, cb) => {
+        if (IMAGE_MIME.test(file.mimetype)) cb(null, true);
+        else cb(ApiError.badRequest(`Unsupported file type "${file.mimetype}". Please upload an image (JPEG, PNG, WebP, GIF, AVIF).`));
+    },
+});
 
 // 2. Upload middleware
 export const processAndUploadImages = async (req, res, next) => {

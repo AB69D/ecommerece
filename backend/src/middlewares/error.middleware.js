@@ -3,7 +3,17 @@ import { ApiError } from '../lib/ApiError.js';
 import { logger } from '../lib/logger.js';
 import { env } from '../config/env.js';
 
-const fromMongoose = (err) => {
+const normalizeKnownError = (err) => {
+    // multer rejections (file too large / too many files / wrong field) arrive
+    // here as MulterError — surface them as clean 400s instead of opaque 500s.
+    if (err?.name === 'MulterError') {
+        const messages = {
+            LIMIT_FILE_SIZE: 'File too large. Each image must be 8 MB or smaller.',
+            LIMIT_FILE_COUNT: 'Too many files. Please upload fewer images.',
+            LIMIT_UNEXPECTED_FILE: 'Unexpected file field in the upload.',
+        };
+        return ApiError.badRequest(messages[err.code] || 'File upload failed.');
+    }
     if (err instanceof mongoose.Error.ValidationError) {
         const details = Object.values(err.errors).map((e) => ({
             path: e.path,
@@ -23,7 +33,7 @@ const fromMongoose = (err) => {
 };
 
 export const errorHandler = (err, req, res, _next) => {
-    const normalized = err instanceof ApiError ? err : fromMongoose(err) || err;
+    const normalized = err instanceof ApiError ? err : normalizeKnownError(err) || err;
     const statusCode = normalized.statusCode || 500;
     const isOperational = normalized instanceof ApiError;
 

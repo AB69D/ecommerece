@@ -29,9 +29,10 @@ function TrackOrderContent() {
     const [reviewPreviews, setReviewPreviews] = useState([]);
 
     useEffect(() => {
-        if (phone && !selectedOrder) {
-            trackByPhone();
+        if (phone && orderId && !selectedOrder) {
+            trackOrder();
         }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     useEffect(() => {
@@ -43,8 +44,8 @@ function TrackOrderContent() {
         setReviewPreviews([]);
     }, [selectedOrder]);
 
-    const trackByPhone = async () => {
-        if (!phone) return;
+    const trackOrder = async () => {
+        if (!phone || !orderId) return;
         setLoading(true);
         setError(null);
         setSelectedOrder(null);
@@ -52,17 +53,19 @@ function TrackOrderContent() {
             const res = await fetch(`/api/client/order/track`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ phone })
+                body: JSON.stringify({ phone: phone.trim(), orderId: orderId.trim() })
             });
             const data = await res.json();
             if (data.success && data.data.length > 0) {
                 setOrders(data.data);
+                // Lookups now return a single order — jump straight to its detail.
+                if (data.data.length === 1) setSelectedOrder(data.data[0]);
             } else {
-                setError("No orders found for this phone number");
+                setError("No order matches that ID and phone number. Please check and try again.");
                 setOrders([]);
             }
         } catch (err) {
-            setError("Failed to load orders");
+            setError("Failed to load order");
         } finally {
             setLoading(false);
         }
@@ -199,9 +202,24 @@ function TrackOrderContent() {
             <div className="max-w-2xl mx-auto">
                 <h1 className="text-2xl font-bold text-gray-800 mb-6 text-center">Track Your Order</h1>
 
-                {/* Search Form */}
+                {/* Search Form — requires BOTH the order ID and the phone it was
+                    placed with, so a phone number alone can't reveal someone's
+                    orders (name, address, items). */}
                 <div className="bg-white border rounded-lg p-6 mb-6">
                     <div className="flex flex-col gap-4">
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                                <FiPackage className="inline w-4 h-4 mr-1" />
+                                Order ID
+                            </label>
+                            <input
+                                type="text"
+                                value={orderId}
+                                onChange={(e) => setOrderId(e.target.value)}
+                                placeholder="e.g. GG-XXXXXXXX"
+                                className="w-full px-4 py-3 border border-gray-300 rounded-lg font-mono"
+                            />
+                        </div>
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-1">
                                 <FiPhone className="inline w-4 h-4 mr-1" />
@@ -211,18 +229,21 @@ function TrackOrderContent() {
                                 type="tel"
                                 value={phone}
                                 onChange={(e) => setPhone(e.target.value)}
-                                placeholder="Enter your phone number"
+                                placeholder="Phone number used at checkout"
                                 className="w-full px-4 py-3 border border-gray-300 rounded-lg"
                             />
                         </div>
                         <button
-                            onClick={trackByPhone}
-                            disabled={loading || !phone}
+                            onClick={trackOrder}
+                            disabled={loading || !phone || !orderId}
                             className="w-full bg-emerald-600 text-white px-4 py-3 rounded-lg hover:bg-emerald-700 disabled:opacity-50 flex items-center justify-center gap-2"
                         >
                             <FiSearch className="w-5 h-5" />
                             {loading ? 'Searching...' : 'Track Order'}
                         </button>
+                        <p className="text-xs text-gray-400 text-center">
+                            Enter the Order ID from your confirmation and the phone number you ordered with.
+                        </p>
                     </div>
                 </div>
 

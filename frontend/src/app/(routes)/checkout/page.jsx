@@ -22,6 +22,9 @@ export default function CheckoutPage() {
     const { symbol, code } = useCurrency();
     const router = useRouter();
     const checkoutTracked = useRef(false);
+    // Stable per-attempt idempotency key so a retried/double-tapped submit can't
+    // create a duplicate order (the server returns the original instead).
+    const idempotencyKeyRef = useRef(null);
 
     const getGuestId = () => {
         if (typeof window === 'undefined') return null;
@@ -147,13 +150,23 @@ export default function CheckoutPage() {
         e.preventDefault();
         setPlacingOrder(true);
 
+        // Generate the idempotency key once and reuse it across retries of this
+        // same checkout, so a network retry or double-tap can't duplicate the order.
+        if (!idempotencyKeyRef.current) {
+            idempotencyKeyRef.current =
+                (typeof crypto !== "undefined" && crypto.randomUUID)
+                    ? crypto.randomUUID()
+                    : `idem_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+        }
+
         try {
             const guestId = getGuestId();
             const res = await fetch(`/api/client/order/create`, {
                 method: 'POST',
-                headers: { 
+                headers: {
                     'Content-Type': 'application/json',
-                    'guest-id': guestId
+                    'guest-id': guestId,
+                    'idempotency-key': idempotencyKeyRef.current
                 },
                 body: JSON.stringify({ ...formData, couponCode: appliedCoupon?.code || "" })
             });

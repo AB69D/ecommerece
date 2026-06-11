@@ -62,6 +62,22 @@ clientOrderRouter.post('/create', async (req, res) => {
             });
         }
 
+        // Idempotency: if the client supplied a key and we already created an
+        // order for it, return that order instead of placing a duplicate (guards
+        // against a double-tapped "Place Order" or a network retry).
+        const idempotencyKey = String(req.headers['idempotency-key'] || req.body.idempotencyKey || '').trim() || null;
+        if (idempotencyKey) {
+            const existingByKey = await OrderModel.findOne({ idempotencyKey });
+            if (existingByKey) {
+                return res.json({
+                    message: "Order placed successfully",
+                    data: existingByKey,
+                    error: false,
+                    success: true
+                });
+            }
+        }
+
         // Snapshot each variant's cost price (for profit reporting) by loading the
         // referenced products once — the cart only stores the sell price.
         const cartProductIds = [...new Set(cart.items.map((it) => it.productId).filter(Boolean))];
@@ -114,7 +130,38 @@ clientOrderRouter.post('/create', async (req, res) => {
         const random = Math.random().toString(36).substring(2, 7).toUpperCase();
         const orderId = `GG-${timestamp}${random}`;
 
-        const order = new OrderModel({
+        // Draw down stock with a GUARDED decrement BEFORE persisting the order,
+        // so two shoppers can't both buy the last unit (no oversell). Each line
+        // only succeeds while that variant still has enough stock; if any line
+        // loses the race we roll back every decrement already applied and abort
+        // without creating an order.
+        const appliedDecrements = [];
+        for (const item of orderItems) {
+            const idx = item.weightIndex;
+            if (idx === undefined || idx === null) continue;
+            const result = await ProductModel.updateOne(
+                { _id: item.productId, [`weights.${idx}.stock`]: { $gte: item.quantity } },
+                { $inc: { [`weights.${idx}.stock`]: -item.quantity } }
+            );
+            if (result.modifiedCount !== 1) {
+                for (const done of appliedDecrements) {
+                    await ProductModel.updateOne(
+                        { _id: done.productId },
+                        { $inc: { [`weights.${done.weightIndex}.stock`]: done.quantity } }
+                    );
+                }
+                return res.status(409).json({
+                    message: `Sorry, "${item.productName}" just sold out or no longer has enough stock. Please review your cart and try again.`,
+                    error: true,
+                    success: false
+                });
+            }
+            appliedDecrements.push(item);
+        }
+
+        // Persist the order. Attach the idempotency key when present so a retried
+        // submit can't create a duplicate (enforced by the partial unique index).
+        const orderDoc = {
             orderId,
             guestId,
             customerName,
@@ -130,9 +177,34 @@ clientOrderRouter.post('/create', async (req, res) => {
             totalAmount,
             paymentMethod,
             notes
-        });
+        };
+        if (idempotencyKey) orderDoc.idempotencyKey = idempotencyKey;
 
-        await order.save();
+        const order = new OrderModel(orderDoc);
+        try {
+            await order.save();
+        } catch (e) {
+            // A concurrent retry with the same idempotency key won the race:
+            // hand back the stock we just decremented and return their order.
+            if (e?.code === 11000 && idempotencyKey) {
+                for (const done of appliedDecrements) {
+                    await ProductModel.updateOne(
+                        { _id: done.productId },
+                        { $inc: { [`weights.${done.weightIndex}.stock`]: done.quantity } }
+                    );
+                }
+                const existing = await OrderModel.findOne({ idempotencyKey });
+                if (existing) {
+                    return res.json({
+                        message: "Order placed successfully",
+                        data: existing,
+                        error: false,
+                        success: true
+                    });
+                }
+            }
+            throw e;
+        }
 
         // Count the redemption (best-effort, non-fatal).
         if (couponDoc) {
@@ -140,16 +212,6 @@ clientOrderRouter.post('/create', async (req, res) => {
                 await CouponModel.updateOne({ _id: couponDoc._id }, { $inc: { usedCount: 1 } });
             } catch {
                 // ignore
-            }
-        }
-
-        // Decrease stock for each item
-        for (const item of orderItems) {
-            if (item.weightIndex !== undefined && item.weightIndex !== null) {
-                await ProductModel.updateOne(
-                    { _id: item.productId },
-                    { $inc: { [`weights.${item.weightIndex}.stock`]: -item.quantity } }
-                );
             }
         }
 
@@ -227,23 +289,29 @@ clientOrderRouter.get('/list', async (req, res) => {
     }
 });
 
-// Track order by phone number (for customers)
+// Track an order (for customers). Requires BOTH the order ID and the phone it
+// was placed with — phone alone used to return every order for that number,
+// leaking names/addresses/items to anyone who guessed a phone. Order IDs are
+// random, so requiring the pair makes the lookup a capability check, not an
+// enumeration. Returns an array (0 or 1) to keep the client rendering simple.
 clientOrderRouter.post('/track', async (req, res) => {
     try {
-        const { phone } = req.body;
+        const phone = String(req.body.phone || '').trim();
+        const orderId = String(req.body.orderId || '').trim();
 
-        if (!phone) {
+        if (!phone || !orderId) {
             return res.status(400).json({
-                message: "Phone number is required",
+                message: "Order ID and phone number are required",
                 error: true,
                 success: false
             });
         }
 
-        const orders = await OrderModel.find({ customerPhone: phone }).sort({ createdAt: -1 });
+        const order = await OrderModel.findOne({ orderId, customerPhone: phone });
+        const orders = order ? [order] : [];
 
         res.json({
-            message: "Orders found",
+            message: orders.length ? "Orders found" : "No order matches that ID and phone number",
             data: orders,
             error: false,
             success: true

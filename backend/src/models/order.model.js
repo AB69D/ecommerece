@@ -174,10 +174,25 @@ const orderSchema = new Schema({
     adminNotes: {
         type: String,
         default: ''
+    },
+    // Optional client-supplied key that makes storefront checkout idempotent: a
+    // retried/double-tapped submit carrying the same key returns the original
+    // order instead of creating a duplicate. Absent on POS and legacy orders;
+    // uniqueness is enforced only when present (partial index below).
+    idempotencyKey: {
+        type: String
     }
 }, {
     timestamps: true
 });
+
+// Enforce idempotency-key uniqueness only for orders that actually carry one
+// (storefront checkouts). POS/legacy orders without the field are unaffected,
+// so this avoids the "duplicate null" collision a plain unique index would hit.
+orderSchema.index(
+    { idempotencyKey: 1 },
+    { unique: true, partialFilterExpression: { idempotencyKey: { $type: 'string' } } }
+);
 
 const OrderModel = model('Order', orderSchema);
 
