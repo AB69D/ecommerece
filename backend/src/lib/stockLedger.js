@@ -1,6 +1,32 @@
 import StockMovementModel from '../models/stockMovement.model.js';
+import ProductModel from '../models/product.model.js';
 import { isFeatureEnabled } from './siteSettings.js';
 import { logger } from './logger.js';
+
+// Apply a batch of UNCONDITIONAL stock adjustments in a single round trip
+// (one bulkWrite instead of N sequential updateOne calls).
+//
+// Use this ONLY for adjustments that cannot lose a race: restocks on cancel /
+// return, and trusted admin decrements where oversell isn't a concern. It does
+// a plain $inc per line with NO `$gte` guard, so it must NOT replace the
+// storefront / POS checkout draw-down — those keep their guarded, sequential
+// decrement so two shoppers can't both buy the last unit.
+//
+//   entries: [{ productId, weightIndex, delta }]
+//            delta is signed: -n draws stock down, +n puts it back.
+export const applyStockDeltas = async (entries) => {
+    if (!Array.isArray(entries) || entries.length === 0) return;
+    const ops = entries
+        .filter((e) => e && e.productId != null && e.weightIndex != null && Number(e.delta) !== 0)
+        .map((e) => ({
+            updateOne: {
+                filter: { _id: e.productId },
+                update: { $inc: { [`weights.${Number(e.weightIndex)}.stock`]: Number(e.delta) } },
+            },
+        }));
+    if (ops.length === 0) return;
+    await ProductModel.bulkWrite(ops, { ordered: false });
+};
 
 // Record one or more inventory movements into the stock ledger.
 //

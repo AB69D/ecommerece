@@ -201,6 +201,15 @@ orderSchema.index(
     { unique: true, partialFilterExpression: { idempotencyKey: { $type: 'string' } } }
 );
 
+// Hot read paths. Each is compound so the index serves the equality filter AND
+// the `createdAt: -1` sort in a single scan (no in-memory sort):
+//   - guest order history:  OrderModel.find({ guestId }).sort({ createdAt: -1 })
+//   - track-order by phone:  OrderModel.find({ customerPhone }).sort({ createdAt: -1 })
+// Without these, every order lookup is a full collection scan that degrades
+// linearly as the orders collection grows.
+orderSchema.index({ guestId: 1, createdAt: -1 });
+orderSchema.index({ customerPhone: 1, createdAt: -1 });
+
 const OrderModel = model('Order', orderSchema);
 
 export default OrderModel;

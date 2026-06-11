@@ -1,6 +1,6 @@
 import OrderModel from "../models/order.model.js";
 import ProductModel from "../models/product.model.js";
-import { recordStockMovements, actorFromReq } from "../lib/stockLedger.js";
+import { recordStockMovements, applyStockDeltas, actorFromReq } from "../lib/stockLedger.js";
 
 export const createOrderController = async (request, response) => {
     try {
@@ -31,14 +31,13 @@ export const createOrderController = async (request, response) => {
 
         await order.save();
 
-        for (const item of items) {
-            if (item.weightIndex !== undefined) {
-                await ProductModel.updateOne(
-                    { _id: item.productId },
-                    { $inc: { [`weights.${item.weightIndex}.stock`]: -item.quantity } }
-                );
-            }
-        }
+        // Admin-created order: trusted decrement, no oversell race to guard
+        // against, so apply all lines in a single bulkWrite.
+        await applyStockDeltas(
+            items
+                .filter((i) => i.weightIndex !== undefined)
+                .map((i) => ({ productId: i.productId, weightIndex: i.weightIndex, delta: -i.quantity }))
+        );
 
         await recordStockMovements(
             items.map((i) => ({
@@ -94,14 +93,12 @@ export const updateOrderStatusController = async (request, response) => {
         await order.save();
 
         if ((orderStatus === 'cancelled' || orderStatus === 'failed') && (previousStatus !== 'cancelled' && previousStatus !== 'failed')) {
-            for (const item of order.items) {
-                if (item.weightIndex !== undefined) {
-                    await ProductModel.updateOne(
-                        { _id: item.productId },
-                        { $inc: { [`weights.${item.weightIndex}.stock`]: item.quantity } }
-                    );
-                }
-            }
+            // Restock is unconditional (+qty back to each line) — single bulkWrite.
+            await applyStockDeltas(
+                order.items
+                    .filter((i) => i.weightIndex !== undefined)
+                    .map((i) => ({ productId: i.productId, weightIndex: i.weightIndex, delta: i.quantity }))
+            );
 
             await recordStockMovements(
                 order.items.map((i) => ({

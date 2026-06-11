@@ -102,6 +102,14 @@ productSchema.index({
 productSchema.index({ 'weights.barcode': 1 });
 productSchema.index({ 'weights.sku': 1 });
 
+// Storefront browse paths, both of which sort newest-first:
+//   - category page:  find({ category, showInEcommerce }).sort({ createdAt: -1 })
+//   - default list:   find({ showInEcommerce }).sort({ createdAt: -1 })
+// The compound index serves the category filter + sort together; the standalone
+// createdAt index serves the unfiltered newest-first listing.
+productSchema.index({ category: 1, createdAt: -1 });
+productSchema.index({ createdAt: -1 });
+
 // Build a GS1 "internal use" (prefix 2) numeric barcode that any CODE128
 // reader can scan. Kept self-contained so every variant is always scannable
 // even if the admin never types one in.

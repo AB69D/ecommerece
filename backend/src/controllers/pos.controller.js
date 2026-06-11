@@ -19,7 +19,7 @@ import { ok, created } from '../lib/ApiResponse.js';
 import { setHasPermission } from '../lib/permissions.js';
 import { evaluateCoupon } from '../lib/coupon.js';
 import { getSettings } from '../lib/siteSettings.js';
-import { recordStockMovements, actorFromReq } from '../lib/stockLedger.js';
+import { recordStockMovements, applyStockDeltas, actorFromReq } from '../lib/stockLedger.js';
 
 // Net unit price for a product weight after its own discount.
 const retailUnitPrice = (w) => {
@@ -363,15 +363,12 @@ export const returnPosSale = asyncHandler(async (req, res) => {
         throw ApiError.conflict('This sale has already been returned');
     }
 
-    // Put the stock back.
-    for (const item of order.items) {
-        if (item.weightIndex !== undefined && item.weightIndex !== null) {
-            await ProductModel.updateOne(
-                { _id: item.productId },
-                { $inc: { [`weights.${item.weightIndex}.stock`]: item.quantity } },
-            );
-        }
-    }
+    // Put the stock back — unconditional restock, single bulkWrite.
+    await applyStockDeltas(
+        order.items
+            .filter((i) => i.weightIndex !== undefined && i.weightIndex !== null)
+            .map((i) => ({ productId: i.productId, weightIndex: i.weightIndex, delta: i.quantity }))
+    );
 
     order.orderStatus = 'returned';
     order.paymentStatus = 'refunded';

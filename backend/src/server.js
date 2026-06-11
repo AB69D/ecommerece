@@ -1,4 +1,5 @@
 import express from 'express';
+import mongoose from 'mongoose';
 import cors from 'cors';
 import helmet from 'helmet';
 import hpp from 'hpp';
@@ -81,7 +82,7 @@ app.use(
             if (res.statusCode >= 400) return 'warn';
             return 'info';
         },
-        autoLogging: { ignore: (req) => req.url === '/healthz' },
+        autoLogging: { ignore: (req) => req.url === '/healthz' || req.url === '/readyz' },
     }),
 );
 
@@ -101,7 +102,26 @@ const authLimiter = rateLimit({
     message: { success: false, message: 'Too many auth attempts, please try again later.' },
 });
 
+// Liveness: proves only that the process is up and serving HTTP.
 app.get('/healthz', (_req, res) => res.json({ status: 'ok', uptime: process.uptime() }));
+
+// Readiness: "ready" only when the Mongo connection is live AND answers a ping,
+// so an orchestrator / uptime check won't route traffic to an instance that
+// can't reach the database. Returns 503 (not 500) so probes treat it as
+// "temporarily unavailable" rather than a hard failure.
+app.get('/readyz', async (_req, res) => {
+    if (mongoose.connection?.readyState !== 1) {
+        return res
+            .status(503)
+            .json({ status: 'not-ready', db: 'disconnected', readyState: mongoose.connection?.readyState ?? null });
+    }
+    try {
+        await mongoose.connection.db.admin().ping();
+        return res.json({ status: 'ready', db: 'connected', uptime: process.uptime() });
+    } catch {
+        return res.status(503).json({ status: 'not-ready', db: 'ping-failed' });
+    }
+});
 
 app.get('/', (_req, res) =>
     res.json({ success: true, message: 'Ab9dEcommerce API', env: env.NODE_ENV }),
