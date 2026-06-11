@@ -175,6 +175,13 @@ const orderSchema = new Schema({
         type: String,
         default: ''
     },
+    // Set when a signed-in customer places the order, linking it to their
+    // account for order history. Null for guest and POS orders.
+    customerId: {
+        type: String,
+        default: null,
+        index: true
+    },
     // Optional client-supplied key that makes storefront checkout idempotent: a
     // retried/double-tapped submit carrying the same key returns the original
     // order instead of creating a duplicate. Absent on POS and legacy orders;

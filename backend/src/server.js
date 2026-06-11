@@ -23,6 +23,7 @@ import clientProductRouter from './routes/clientProduct.route.js';
 import clientCartRouter from './routes/clientCart.route.js';
 import clientWishlistRouter from './routes/clientWishlist.route.js';
 import clientOrderRouter from './routes/clientOrder.route.js';
+import clientAuthRouter from './routes/clientAuth.route.js';
 import orderRouter from './routes/order.route.js';
 import contactMessageRouter from './routes/contactMessage.route.js';
 import reviewRouter from './routes/review.route.js';
@@ -135,6 +136,7 @@ app.use('/api/admin/page', requireAuth, pageRouter.admin);
 app.use('/api/admin/nav-menu', requireAuth, navMenuRouter.admin);
 
 // Public/client routes
+app.use('/api/client/auth', clientAuthRouter);
 app.use('/api/client/header', clientHeaderRouter);
 app.use('/api/client/product', clientProductRouter);
 app.use('/api/client/cart', clientCartRouter);

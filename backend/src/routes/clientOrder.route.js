@@ -6,6 +6,7 @@ import CheckoutLeadModel from '../models/checkoutLead.model.js';
 import CouponModel from '../models/coupon.model.js';
 import { evaluateCoupon } from '../lib/coupon.js';
 import { recordStockMovements } from '../lib/stockLedger.js';
+import { optionalCustomer } from '../middlewares/clientAuth.middleware.js';
 
 const clientOrderRouter = Router();
 
@@ -13,7 +14,7 @@ const getGuestId = (req) => {
     return req.headers['guest-id'] || null;
 };
 
-clientOrderRouter.post('/create', async (req, res) => {
+clientOrderRouter.post('/create', optionalCustomer, async (req, res) => {
     try {
         const { 
             customerName, 
@@ -179,6 +180,8 @@ clientOrderRouter.post('/create', async (req, res) => {
             notes
         };
         if (idempotencyKey) orderDoc.idempotencyKey = idempotencyKey;
+        // Link the order to the signed-in customer (if any) for order history.
+        if (req.customer) orderDoc.customerId = req.customer._id.toString();
 
         const order = new OrderModel(orderDoc);
         try {
