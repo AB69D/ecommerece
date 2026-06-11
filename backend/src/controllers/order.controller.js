@@ -1,6 +1,7 @@
 import OrderModel from "../models/order.model.js";
 import ProductModel from "../models/product.model.js";
 import { recordStockMovements, applyStockDeltas, actorFromReq } from "../lib/stockLedger.js";
+import { sendOrderStatusEmail } from "../lib/orderEmail.js";
 
 export const createOrderController = async (request, response) => {
     try {
@@ -110,6 +111,16 @@ export const updateOrderStatusController = async (request, response) => {
                 })),
                 { reason: 'cancel', channel: 'admin', orderId, actor: actorFromReq(request), note: `Order ${orderStatus}` }
             );
+        }
+
+        // Keep the customer informed when their order reaches a milestone
+        // (shipped / delivered / cancelled / returned). Only on a real status
+        // change — re-saving the same status shouldn't re-email — and only for
+        // statuses with customer-facing copy (sendOrderStatusEmail no-ops on the
+        // rest). Fire-and-forget + best-effort so it never delays or breaks the
+        // admin response.
+        if (previousStatus !== orderStatus) {
+            sendOrderStatusEmail(order).catch(() => {});
         }
 
         return response.json({
