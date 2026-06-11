@@ -214,8 +214,13 @@ export const login = async (request, response) => {
         // tenants (system context) by their globally-unique username, then bind
         // the session to their store via the tenantId claim below. (Uniqueness is
         // enforced by the global index in admin.model.js.)
-        const admin = await runAsSystem(() =>
-            AdminModel.findOne({ username: normalized, isActive: true }).select('+passwordHash'),
+        //
+        // NOTE: the query MUST be awaited INSIDE runAsSystem. Mongoose runs query
+        // pre-hooks at execution time, so returning an un-awaited Query here would
+        // let the scoping hook fire after the system context has been popped — and
+        // the lookup would be (wrongly) scoped to the default/primary tenant.
+        const admin = await runAsSystem(async () =>
+            AdminModel.findOne({ username: normalized, isActive: true }).select('+passwordHash').exec(),
         );
 
         if (!admin) {
