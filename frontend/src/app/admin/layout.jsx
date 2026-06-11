@@ -5,7 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import {
     FiGrid, FiPackage, FiLayout, FiList, FiTruck, FiMenu, FiX, FiSettings,
     FiHome, FiPercent, FiStar, FiLogOut, FiUsers, FiShield, FiFileText, FiUser,
-    FiShoppingBag, FiTag, FiBarChart2,
+    FiShoppingBag, FiTag, FiBarChart2, FiGlobe,
 } from "react-icons/fi";
 import { isAuthenticated, logout, fetchMe } from "@/services/adminAuth";
 import { AdminAuthContext, buildCan } from "@/context/AdminAuthContext";
@@ -120,6 +120,17 @@ export default function AdminLayout({ children }) {
                 { name: 'My Account', path: '/admin/account', icon: <FiUser className="w-5 h-5" />, perms: [] },
             ],
         },
+        // Platform (cross-tenant) tools — visible ONLY to platform owners (the env
+        // ADMIN_EMAILS allow-list, surfaced as me.isPlatformOwner). A store owner
+        // holds the "super-admin" role for THEIR store but is not a platform owner,
+        // so this whole group is hidden from them (and /api/platform 403s anyway).
+        {
+            title: 'Platform',
+            requirePlatform: true,
+            items: [
+                { name: 'Stores', path: '/admin/stores', icon: <FiGlobe className="w-5 h-5" />, perms: [] },
+            ],
+        },
     ];
 
     const ctxValue = { me, loading: false, can: buildCan(me), refresh: loadMe };
@@ -173,6 +184,8 @@ export default function AdminLayout({ children }) {
 
                         <div className="flex-1 overflow-y-auto p-4 space-y-4">
                             {menuGroups.map((group) => {
+                                // Platform-only groups are hidden from store owners.
+                                if (group.requirePlatform && !me?.isPlatformOwner) return null;
                                 const visible = group.items.filter((it) => hasAnyPermission(me, it.perms));
                                 if (visible.length === 0) return null;
                                 return (
