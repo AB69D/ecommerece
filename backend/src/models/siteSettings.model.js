@@ -116,6 +116,31 @@ const siteSettingsSchema = new mongoose.Schema(
             },
         },
 
+        // ── Storefront appearance / theme ──────────────────────────────────
+        // Admin-selectable colours applied across the storefront via CSS custom
+        // properties injected server-side in the root layout. Navbar and footer
+        // are ALWAYS rendered as gradients (three stops each); the home page gets
+        // a soft background wash. `primary`/`accent` drive buttons, links and the
+        // gold highlights. Defaults reproduce the original emerald/amber brand so
+        // nothing changes visually until an admin customises it.
+        theme: {
+            // Navbar gradient (left → right) + a legible text/icon colour on top.
+            navbarFrom: { type: String, default: '#065f46' },
+            navbarVia: { type: String, default: '#047857' },
+            navbarTo: { type: String, default: '#064e3b' },
+            navbarText: { type: String, default: '#ecfdf5' },
+            // Footer gradient (top → bottom).
+            footerFrom: { type: String, default: '#064e3b' },
+            footerVia: { type: String, default: '#065f46' },
+            footerTo: { type: String, default: '#022c22' },
+            // Home / storefront background wash (top tint → base).
+            homeFrom: { type: String, default: '#ecfdf5' },
+            homeTo: { type: String, default: '#ffffff' },
+            // Brand accents reused across the UI.
+            primary: { type: String, default: '#047857' },
+            accent: { type: String, default: '#f59e0b' },
+        },
+
         maintenanceMode: { type: Boolean, default: false },
     },
     { timestamps: true },

@@ -77,6 +77,29 @@ const whatsapp = z
     })
     .partial();
 
+// Accepts #rgb or #rrggbb (case-insensitive). Empty string is rejected so a
+// blank picker never wipes a colour to an invalid value.
+const hexColor = z.string().regex(/^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/, 'Must be a hex colour like #047857');
+
+// Storefront appearance. Every colour is optional so the admin can change one
+// swatch at a time; the flatten-for-set update merges it without clobbering the
+// rest of the theme.
+const theme = z
+    .object({
+        navbarFrom: hexColor,
+        navbarVia: hexColor,
+        navbarTo: hexColor,
+        navbarText: hexColor,
+        footerFrom: hexColor,
+        footerVia: hexColor,
+        footerTo: hexColor,
+        homeFrom: hexColor,
+        homeTo: hexColor,
+        primary: hexColor,
+        accent: hexColor,
+    })
+    .partial();
+
 export const updateSiteSettingsSchema = z.object({
     siteName: z.string().min(1).max(100).optional(),
     tagline: z.string().max(200).optional(),
@@ -104,5 +127,6 @@ export const updateSiteSettingsSchema = z.object({
     pos: pos.optional(),
     analytics: analytics.optional(),
     whatsapp: whatsapp.optional(),
+    theme: theme.optional(),
     maintenanceMode: z.boolean().optional(),
 });

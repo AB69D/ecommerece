@@ -43,7 +43,7 @@ export default function Showcase() {
 
     if (loading) {
         return (
-            <div className="mt-4 lg:mt-8 relative w-full aspect-[16/10] sm:aspect-[2/1] lg:!h-[62vh] overflow-hidden bg-gradient-to-r from-gray-100 via-gray-200 to-gray-100 animate-pulse" />
+            <div className="mt-4 lg:mt-8 relative w-full aspect-[16/10] sm:aspect-[2/1] lg:!h-[62vh] overflow-hidden rounded-2xl sm:rounded-3xl bg-gradient-to-r from-gray-100 via-gray-200 to-gray-100 animate-pulse" />
         );
     }
 
@@ -64,7 +64,17 @@ export default function Showcase() {
     }
 
     return (
-        <div className="mt-4 lg:mt-8 relative w-full aspect-[16/10] sm:aspect-[2/1] lg:!h-[62vh] overflow-hidden bg-gray-100">
+        <div className="relative isolate mt-4 lg:mt-8">
+            {/* Soft brand glow radiating behind the hero for a premium framed look */}
+            <div
+                aria-hidden
+                className="pointer-events-none absolute inset-0 -z-10 blur-3xl opacity-70"
+                style={{
+                    background:
+                        "radial-gradient(55% 60% at 18% 12%, color-mix(in srgb, var(--theme-primary) 38%, transparent), transparent 70%), radial-gradient(50% 55% at 88% 92%, color-mix(in srgb, var(--theme-accent) 32%, transparent), transparent 70%)",
+                }}
+            />
+            <div className="relative w-full aspect-[16/10] sm:aspect-[2/1] lg:!h-[62vh] overflow-hidden rounded-2xl sm:rounded-3xl bg-gray-100 shadow-2xl shadow-emerald-900/15 ring-1 ring-black/5">
             <div
                 ref={sliderRef}
                 className="flex h-full transition-transform duration-700 ease-in-out"
@@ -97,25 +107,28 @@ export default function Showcase() {
                 ))}
             </div>
 
+            {/* Permanent inset frame + bottom vignette for a premium, legible hero */}
+            <div aria-hidden className="pointer-events-none absolute inset-0 rounded-2xl sm:rounded-3xl ring-1 ring-inset ring-white/10" />
+            <div aria-hidden className="pointer-events-none absolute bottom-0 left-0 w-full h-24 bg-gradient-to-t from-black/45 via-black/10 to-transparent" />
+
             {headers.length > 1 && (
-                <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-2 z-10">
+                <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-2 z-10 px-3 py-1.5 rounded-full bg-black/20 backdrop-blur-sm ring-1 ring-white/15">
                     {headers.map((_, index) => (
                         <button
                             key={index}
                             onClick={() => goTo(index)}
                             aria-label={`Go to slide ${index + 1}`}
-                            className={`rounded-full transition-all duration-300 focus:outline-none ${index === current
-                                    ? "w-6 h-3 bg-emerald-600 shadow-md"
-                                    : "w-3 h-3 bg-white/60 hover:bg-white/90"
-                                }`}
+                            className="rounded-full transition-all duration-300 focus:outline-none"
+                            style={
+                                index === current
+                                    ? { width: "1.75rem", height: "0.6rem", backgroundColor: "var(--theme-accent)", boxShadow: "0 1px 6px rgba(0,0,0,0.35)" }
+                                    : { width: "0.6rem", height: "0.6rem", backgroundColor: "rgba(255,255,255,0.7)" }
+                            }
                         />
                     ))}
                 </div>
             )}
-
-            {headers.length > 1 && (
-                <div className="absolute bottom-0 left-0 w-full h-20 bg-gradient-to-t from-black/40 to-transparent pointer-events-none" />
-            )}
+            </div>
         </div>
     );
 }

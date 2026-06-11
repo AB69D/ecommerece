@@ -53,7 +53,11 @@ export default function AllProducts() {
     if (loading) {
         return (
             <div className="w-full py-8 px-4">
-                <h2 className="text-xl sm:text-2xl font-bold text-gray-800 text-center mb-6">All Products</h2>
+                <div className="flex flex-col items-center text-center mb-6">
+                <span className="text-[11px] sm:text-xs font-semibold uppercase tracking-[0.2em]" style={{ color: "var(--theme-accent)" }}>Shop All</span>
+                <h2 className="text-2xl sm:text-3xl font-extrabold text-gray-900 tracking-tight">All Products</h2>
+                <span className="mt-2 h-1 w-14 rounded-full" style={{ background: "linear-gradient(to right, var(--theme-primary), var(--theme-accent))" }} />
+            </div>
                 <ProductGridSkeleton count={10} />
             </div>
         );
@@ -77,7 +81,11 @@ export default function AllProducts() {
 
     return (
         <div className="w-full py-8 px-4">
-            <h2 className="text-xl sm:text-2xl font-bold text-gray-800 text-center mb-6">All Products</h2>
+            <div className="flex flex-col items-center text-center mb-6">
+                <span className="text-[11px] sm:text-xs font-semibold uppercase tracking-[0.2em]" style={{ color: "var(--theme-accent)" }}>Shop All</span>
+                <h2 className="text-2xl sm:text-3xl font-extrabold text-gray-900 tracking-tight">All Products</h2>
+                <span className="mt-2 h-1 w-14 rounded-full" style={{ background: "linear-gradient(to right, var(--theme-primary), var(--theme-accent))" }} />
+            </div>
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4 max-w-7xl mx-auto fade-in-stagger">
                 {products.map((product) => {
                     const productImage = product.cover_image || (product.weights && product.weights[0]?.images?.[0]) || null;

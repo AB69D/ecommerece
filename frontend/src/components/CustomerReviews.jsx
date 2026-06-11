@@ -328,7 +328,11 @@ export default function CustomerReviews() {
                 }
             `}</style>
 
-            <h2 className="rv-heading">What Our Customers Say</h2>
+            <div className="flex flex-col items-center text-center mb-6 sm:mb-7">
+                <span className="text-[11px] sm:text-xs font-semibold uppercase tracking-[0.2em]" style={{ color: "var(--theme-accent)" }}>Testimonials</span>
+                <h2 className="text-2xl sm:text-3xl font-extrabold text-gray-900 tracking-tight m-0">What Our Customers Say</h2>
+                <span className="mt-2 h-1 w-14 rounded-full" style={{ background: "linear-gradient(to right, var(--theme-primary), var(--theme-accent))" }} />
+            </div>
 
             <div className="rv-wrapper">
                 <div className="rv-card">

@@ -4,7 +4,7 @@ import Image from "next/image";
 import {
     FiSettings, FiImage, FiUpload, FiTrash2, FiPlus, FiCheck, FiAlertCircle,
     FiType, FiPhone, FiShare2, FiSearch, FiLayout, FiSave, FiX,
-    FiToggleRight, FiPrinter, FiTag, FiActivity,
+    FiToggleRight, FiPrinter, FiTag, FiActivity, FiDroplet, FiRotateCcw,
 } from "react-icons/fi";
 import { getSiteSettings, updateSiteSettings, uploadSiteImage } from "@/services/siteSettings";
 import { getFooterSettings, updateFooterSettings } from "@/services/footer";
@@ -13,6 +13,7 @@ import { SITE_PAGES, PAGE_BY_PATH } from "@/lib/sitePages";
 
 const TABS = [
     { id: "branding", label: "Branding", icon: <FiType className="w-4 h-4" /> },
+    { id: "appearance", label: "Appearance", icon: <FiDroplet className="w-4 h-4" /> },
     { id: "contact", label: "Contact & Social", icon: <FiPhone className="w-4 h-4" /> },
     { id: "seo", label: "SEO & Currency", icon: <FiSearch className="w-4 h-4" /> },
     { id: "features", label: "Features", icon: <FiToggleRight className="w-4 h-4" /> },
@@ -68,6 +69,26 @@ const CURRENCIES = [
     { code: "NPR", symbol: "Rs", name: "Nepalese Rupee" },
 ];
 
+// Storefront theme defaults — mirror the backend model so "Reset to brand
+// defaults" and any missing swatch fall back to the original emerald/amber look.
+const THEME_DEFAULTS = {
+    navbarFrom: "#065f46", navbarVia: "#047857", navbarTo: "#064e3b", navbarText: "#ecfdf5",
+    footerFrom: "#064e3b", footerVia: "#065f46", footerTo: "#022c22",
+    homeFrom: "#ecfdf5", homeTo: "#ffffff",
+    primary: "#047857", accent: "#f59e0b",
+};
+const HEX_RE = /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/;
+// Guarantee every colour sent to the API is a valid hex so one bad field can
+// never 422 the whole settings save; invalid/blank values revert to default.
+const sanitizeTheme = (t = {}) => {
+    const out = {};
+    for (const k of Object.keys(THEME_DEFAULTS)) {
+        const v = (t[k] || "").trim();
+        out[k] = HEX_RE.test(v) ? v : THEME_DEFAULTS[k];
+    }
+    return out;
+};
+
 function Field({ label, hint, children }) {
     return (
         <label className="block">
@@ -79,6 +100,36 @@ function Field({ label, hint, children }) {
 }
 
 const inputCls = "w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500";
+
+// A swatch + hex input pair for picking a theme colour. The native colour input
+// needs a 6-digit hex; the text field lets the admin paste any value (sanitised
+// on save). Both edit the same value.
+function ColorField({ label, value, onChange, hint }) {
+    const safe = HEX_RE.test((value || "").trim()) && (value || "").length === 7 ? value : (value || "#000000");
+    return (
+        <div>
+            <span className="block text-sm font-medium text-gray-700 mb-1">{label}</span>
+            <div className="flex items-center gap-2">
+                <input
+                    type="color"
+                    value={safe}
+                    onChange={(e) => onChange(e.target.value)}
+                    className="h-10 w-12 shrink-0 rounded-lg border border-gray-200 bg-white p-1 cursor-pointer"
+                    aria-label={`${label} colour picker`}
+                />
+                <input
+                    type="text"
+                    value={value || ""}
+                    onChange={(e) => onChange(e.target.value)}
+                    placeholder="#047857"
+                    maxLength={7}
+                    className={`${inputCls} font-mono uppercase`}
+                />
+            </div>
+            {hint && <span className="block text-xs text-gray-400 mt-1">{hint}</span>}
+        </div>
+    );
+}
 
 // Footer link picker: choose one of the site's fixed pages (path is locked to
 // that page) or "Custom" to type any internal path / external URL by hand.
@@ -193,6 +244,8 @@ export default function SettingsPage() {
     const setPos = (patch) => setSettings((p) => ({ ...p, pos: { ...(p.pos || {}), ...patch } }));
     const setAnalytics = (patch) => setSettings((p) => ({ ...p, analytics: { ...(p.analytics || {}), ...patch } }));
     const setWhatsapp = (patch) => setSettings((p) => ({ ...p, whatsapp: { ...(p.whatsapp || {}), ...patch } }));
+    const setTheme = (patch) => setSettings((p) => ({ ...p, theme: { ...(p.theme || {}), ...patch } }));
+    const resetTheme = () => setSettings((p) => ({ ...p, theme: { ...THEME_DEFAULTS } }));
 
     const save = async () => {
         setSaving(true); setMsg({ type: "", text: "" });
@@ -254,6 +307,7 @@ export default function SettingsPage() {
                     orderTemplate: settings.whatsapp?.orderTemplate || "",
                     statusTemplate: settings.whatsapp?.statusTemplate || "",
                 },
+                theme: sanitizeTheme(settings.theme),
                 maintenanceMode: !!settings.maintenanceMode,
             };
             const fPayload = {
@@ -301,6 +355,10 @@ export default function SettingsPage() {
         (c) => c.code === (settings.currencyCode || "").toUpperCase() && c.symbol === settings.currencySymbol,
     );
     const showCustomCurrency = customCurrency || !knownCurrency;
+
+    // Resolved palette for the Appearance tab (saved overrides on top of brand
+    // defaults) — drives both the colour pickers and the live preview.
+    const theme = { ...THEME_DEFAULTS, ...(settings.theme || {}) };
 
     return (
         <div className="max-w-3xl">
@@ -353,6 +411,87 @@ export default function SettingsPage() {
                         </Field>
                         <ImageUpload label="Company logo" value={settings.logoUrl} onChange={(url) => setS({ logoUrl: url })} hint="PNG or SVG, transparent background recommended." />
                         <ImageUpload label="Favicon" value={settings.faviconUrl} onChange={(url) => setS({ faviconUrl: url })} hint="Small square icon shown in the browser tab." />
+                    </>
+                )}
+
+                {tab === "appearance" && (
+                    <>
+                        <div className="flex items-start justify-between gap-3">
+                            <p className="text-xs text-gray-500">
+                                Choose the storefront colours. The navbar and footer are always shown as
+                                gradients; the home page gets a soft background wash. Changes go live within a
+                                minute of saving.
+                            </p>
+                            <button
+                                type="button"
+                                onClick={resetTheme}
+                                className="inline-flex items-center gap-1.5 shrink-0 text-xs font-medium text-gray-500 hover:text-indigo-600"
+                            >
+                                <FiRotateCcw className="w-3.5 h-3.5" /> Reset to brand
+                            </button>
+                        </div>
+
+                        {/* Live preview */}
+                        <div className="rounded-2xl border border-gray-200 overflow-hidden shadow-sm">
+                            <div
+                                className="h-14 flex items-center justify-between px-4"
+                                style={{ backgroundImage: `linear-gradient(to right, ${theme.navbarFrom}, ${theme.navbarVia}, ${theme.navbarTo})` }}
+                            >
+                                <span className="text-sm font-semibold" style={{ color: theme.navbarText }}>Navbar preview</span>
+                                <span className="flex items-center gap-2">
+                                    <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: theme.accent }} />
+                                    <span className="text-xs" style={{ color: theme.navbarText }}>Cart · Search</span>
+                                </span>
+                            </div>
+                            <div className="px-4 py-5 text-center text-xs text-gray-500" style={{ backgroundImage: `linear-gradient(180deg, ${theme.homeFrom}, ${theme.homeTo})` }}>
+                                <span className="inline-flex items-center gap-2">
+                                    <span className="px-3 py-1.5 rounded-lg text-white text-xs font-semibold shadow" style={{ backgroundColor: theme.primary }}>Primary button</span>
+                                    <span className="px-3 py-1.5 rounded-lg text-xs font-semibold shadow" style={{ backgroundColor: theme.accent, color: "#3b2f00" }}>Accent</span>
+                                </span>
+                                <p className="mt-2">Home background wash</p>
+                            </div>
+                            <div
+                                className="h-14 flex items-center px-4"
+                                style={{ backgroundImage: `linear-gradient(to bottom, ${theme.footerFrom}, ${theme.footerVia}, ${theme.footerTo})` }}
+                            >
+                                <span className="text-sm font-semibold text-emerald-50">Footer preview</span>
+                            </div>
+                        </div>
+
+                        <div className="bg-gray-50 border border-gray-100 rounded-xl p-4 space-y-3">
+                            <h3 className="text-sm font-semibold text-gray-700 flex items-center gap-2"><FiLayout className="w-4 h-4" /> Navbar gradient</h3>
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                <ColorField label="From" value={theme.navbarFrom} onChange={(v) => setTheme({ navbarFrom: v })} />
+                                <ColorField label="Middle" value={theme.navbarVia} onChange={(v) => setTheme({ navbarVia: v })} />
+                                <ColorField label="To" value={theme.navbarTo} onChange={(v) => setTheme({ navbarTo: v })} />
+                            </div>
+                            <ColorField label="Text & icon colour" value={theme.navbarText} onChange={(v) => setTheme({ navbarText: v })} hint="Use a light colour so links stay readable on the gradient." />
+                        </div>
+
+                        <div className="bg-gray-50 border border-gray-100 rounded-xl p-4 space-y-3">
+                            <h3 className="text-sm font-semibold text-gray-700 flex items-center gap-2"><FiLayout className="w-4 h-4" /> Footer gradient</h3>
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                <ColorField label="From (top)" value={theme.footerFrom} onChange={(v) => setTheme({ footerFrom: v })} />
+                                <ColorField label="Middle" value={theme.footerVia} onChange={(v) => setTheme({ footerVia: v })} />
+                                <ColorField label="To (bottom)" value={theme.footerTo} onChange={(v) => setTheme({ footerTo: v })} />
+                            </div>
+                        </div>
+
+                        <div className="bg-gray-50 border border-gray-100 rounded-xl p-4 space-y-3">
+                            <h3 className="text-sm font-semibold text-gray-700">Home page background</h3>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                <ColorField label="Top tint" value={theme.homeFrom} onChange={(v) => setTheme({ homeFrom: v })} hint="A soft colour that fades down the page." />
+                                <ColorField label="Base" value={theme.homeTo} onChange={(v) => setTheme({ homeTo: v })} hint="The main page colour (white keeps it clean)." />
+                            </div>
+                        </div>
+
+                        <div className="bg-gray-50 border border-gray-100 rounded-xl p-4 space-y-3">
+                            <h3 className="text-sm font-semibold text-gray-700">Brand accents</h3>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                <ColorField label="Primary" value={theme.primary} onChange={(v) => setTheme({ primary: v })} hint="Buttons, section underlines, highlights." />
+                                <ColorField label="Accent (gold)" value={theme.accent} onChange={(v) => setTheme({ accent: v })} hint="Top strips, badges, secondary highlights." />
+                            </div>
+                        </div>
                     </>
                 )}
 

@@ -153,14 +153,17 @@ function Navbar() {
 
     return (
         <>
-            <nav className="sticky top-0 z-50 bg-white/95 backdrop-blur-md shadow-sm border-b border-gray-100">
+            <nav
+                className="sticky top-0 z-50 shadow-md border-b border-white/10 text-[color:var(--theme-nav-text)]"
+                style={{ backgroundImage: "linear-gradient(to right, var(--theme-nav-from), var(--theme-nav-via), var(--theme-nav-to))" }}
+            >
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                     <div className="flex items-center h-16 sm:h-20">
                         {/* LEFT ZONE — equal flex so the centre logo is mathematically centred */}
                         <div className="flex-1 flex items-center justify-start min-w-0">
                             <button
                                 onClick={() => setMobileMenuOpen(true)}
-                                className="md:hidden p-2 text-gray-600 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2"
+                                className="md:hidden p-2 opacity-90 hover:opacity-100 hover:bg-white/10 rounded-lg transition-all focus:outline-none focus:ring-2 focus:ring-white/40"
                                 aria-label="Open menu"
                             >
                                 <FiMenu className="w-6 h-6" />
@@ -171,15 +174,18 @@ function Navbar() {
                                     <Link
                                         key={l.href}
                                         href={l.href}
-                                        className="relative text-gray-700 hover:text-emerald-700 font-medium transition-colors group"
+                                        className="relative font-medium opacity-90 hover:opacity-100 transition-opacity group"
                                     >
                                         {l.label}
-                                        <span className="absolute -bottom-1 left-0 right-0 h-0.5 bg-gradient-to-r from-emerald-500 to-amber-400 scale-x-0 group-hover:scale-x-100 origin-left transition-transform duration-300" />
+                                        <span
+                                            className="absolute -bottom-1 left-0 right-0 h-0.5 rounded-full scale-x-0 group-hover:scale-x-100 origin-left transition-transform duration-300"
+                                            style={{ backgroundColor: "var(--theme-accent)" }}
+                                        />
                                     </Link>
                                 ))}
 
                                 <div className="relative group">
-                                    <button className="flex items-center text-gray-700 hover:text-emerald-700 font-medium transition-colors py-2 focus:outline-none">
+                                    <button className="flex items-center font-medium opacity-90 hover:opacity-100 transition-opacity py-2 focus:outline-none">
                                         All Categories
                                         <svg
                                             className="ml-1 w-4 h-4 transition-transform group-hover:rotate-180"
@@ -192,7 +198,7 @@ function Navbar() {
                                     </button>
 
                                     <div className="absolute left-0 mt-0 w-52 bg-white border border-gray-100 rounded-xl shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-300 transform translate-y-2 group-hover:translate-y-0 z-50 overflow-hidden">
-                                        <div className="h-1 bg-gradient-to-r from-emerald-500 to-amber-400" />
+                                        <div className="h-1" style={{ background: "linear-gradient(to right, var(--theme-primary), var(--theme-accent))" }} />
                                         <div className="py-2">
                                             {categories.length > 0 ? (
                                                 categories.map((category) => (
@@ -214,7 +220,7 @@ function Navbar() {
 
                                 <Link
                                     href="/track-order"
-                                    className="flex items-center gap-1 text-gray-700 hover:text-emerald-700 font-medium transition-colors"
+                                    className="flex items-center gap-1 font-medium opacity-90 hover:opacity-100 transition-opacity"
                                 >
                                     <FiTruck className="w-4 h-4" />
                                     Track Order
@@ -222,19 +228,21 @@ function Navbar() {
                             </div>
                         </div>
 
-                        {/* CENTER ZONE — logo, sits in the visual centre on every breakpoint */}
-                        <div className="flex-shrink-0 px-3 sm:px-4">
+                        {/* CENTER ZONE — logo on a white pill so any brand logo stays legible on the gradient */}
+                        <div className="flex-shrink-0 px-2 sm:px-4">
                             <Link href="/" className="flex items-center" aria-label={`${branding.siteName} home`}>
-                                <div className="w-28 sm:w-[150px] lg:w-48">
-                                    <Image
-                                        src={branding.logoUrl || "/logo.png"}
-                                        alt={`${branding.siteName} Logo`}
-                                        width={240}
-                                        height={60}
-                                        className="object-contain w-full h-auto"
-                                        priority
-                                        unoptimized={!!branding.logoUrl}
-                                    />
+                                <div className="bg-white/95 rounded-2xl px-3 py-1.5 sm:px-4 sm:py-2 shadow-lg ring-1 ring-black/5">
+                                    <div className="w-24 sm:w-[138px] lg:w-44">
+                                        <Image
+                                            src={branding.logoUrl || "/logo.png"}
+                                            alt={`${branding.siteName} Logo`}
+                                            width={240}
+                                            height={60}
+                                            className="object-contain w-full h-auto"
+                                            priority
+                                            unoptimized={!!branding.logoUrl}
+                                        />
+                                    </div>
                                 </div>
                             </Link>
                         </div>
@@ -243,7 +251,7 @@ function Navbar() {
                         <div className="flex-1 flex items-center justify-end space-x-1.5 sm:space-x-3 min-w-0">
                             <button
                                 onClick={() => setMobileMenuOpen(true)}
-                                className="p-2 text-gray-600 hover:text-emerald-600 hover:bg-emerald-50 rounded-full transition-all focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2"
+                                className="p-2 opacity-90 hover:opacity-100 hover:bg-white/10 rounded-full transition-all focus:outline-none focus:ring-2 focus:ring-white/40"
                                 aria-label="Search"
                             >
                                 <FiSearch className="w-5 h-5 sm:w-6 sm:h-6" />
@@ -252,7 +260,7 @@ function Navbar() {
                             {wishlistOn && (
                                 <Link href="/wishlist" className="relative" aria-label="Wishlist">
                                     <button
-                                        className="p-2 text-gray-600 hover:text-rose-500 hover:bg-rose-50 rounded-full transition-all focus:outline-none focus:ring-2 focus:ring-rose-400 focus:ring-offset-2"
+                                        className="p-2 opacity-90 hover:opacity-100 hover:bg-white/10 rounded-full transition-all focus:outline-none focus:ring-2 focus:ring-white/40"
                                         aria-label="Wishlist"
                                     >
                                         <FiHeart className="w-5 h-5 sm:w-6 sm:h-6" />
@@ -267,7 +275,7 @@ function Navbar() {
 
                             <Link href="/cart" className="relative" aria-label="Cart">
                                 <button
-                                    className="p-2 text-gray-600 hover:text-emerald-600 hover:bg-emerald-50 rounded-full transition-all focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2"
+                                    className="p-2 opacity-90 hover:opacity-100 hover:bg-white/10 rounded-full transition-all focus:outline-none focus:ring-2 focus:ring-white/40"
                                     aria-label="Cart"
                                 >
                                     <FiShoppingCart className="w-5 h-5 sm:w-6 sm:h-6" />
@@ -303,8 +311,11 @@ function Navbar() {
                 <div className="flex flex-col h-full">
                     {/* Drawer header — deep emerald gradient + gold strip */}
                     <div className="relative overflow-hidden">
-                        <div className="h-1.5 w-full bg-gradient-to-r from-amber-300 via-amber-400 to-amber-300" />
-                        <div className="relative bg-gradient-to-br from-[#064e3b] via-[#065f46] to-[#047857] p-5">
+                        <div className="h-1.5 w-full" style={{ backgroundColor: "var(--theme-accent)" }} />
+                        <div
+                            className="relative p-5"
+                            style={{ backgroundImage: "linear-gradient(to bottom right, var(--theme-nav-from), var(--theme-nav-via), var(--theme-nav-to))" }}
+                        >
                             <div
                                 aria-hidden
                                 className="absolute inset-0 opacity-[0.10] pointer-events-none"
@@ -453,7 +464,10 @@ function Navbar() {
                     </div>
 
                     {/* Footer CTA inside drawer */}
-                    <div className="p-4 border-t border-gray-100 bg-gradient-to-br from-[#064e3b] to-[#022c22] text-emerald-50">
+                    <div
+                        className="p-4 border-t border-gray-100 text-emerald-50"
+                        style={{ backgroundImage: "linear-gradient(to bottom right, var(--theme-footer-from), var(--theme-footer-to))" }}
+                    >
                         <p className="text-[11px] uppercase tracking-[0.18em] text-amber-300 font-semibold mb-2">
                             Need help?
                         </p>

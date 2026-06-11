@@ -116,9 +116,12 @@ export default function Footer() {
 
     return (
         <footer className="relative mt-16 text-emerald-50 overflow-hidden">
-            <div className="h-1.5 w-full bg-gradient-to-r from-amber-300 via-amber-400 to-amber-300" />
+            <div className="h-1.5 w-full" style={{ backgroundColor: "var(--theme-accent)" }} />
 
-            <div className="relative bg-gradient-to-b from-[#064e3b] via-[#065f46] to-[#022c22]">
+            <div
+                className="relative"
+                style={{ backgroundImage: "linear-gradient(to bottom, var(--theme-footer-from), var(--theme-footer-via), var(--theme-footer-to))" }}
+            >
                 <div
                     aria-hidden
                     className="absolute inset-0 opacity-[0.08] pointer-events-none"

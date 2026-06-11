@@ -100,7 +100,11 @@ export default function NewArraivals() {
             <div className="w-full py-8 px-4 overflow-hidden">
                 <div className="flex items-center justify-between mb-6 max-w-7xl mx-auto">
                     <div className="w-9 h-9 rounded-full bg-gray-100" />
-                    <h2 className="text-xl sm:text-2xl font-bold text-gray-800 text-center">New Arrivals</h2>
+                    <div className="flex flex-col items-center text-center px-2">
+                    <span className="text-[11px] sm:text-xs font-semibold uppercase tracking-[0.2em]" style={{ color: "var(--theme-accent)" }}>Just In</span>
+                    <h2 className="text-2xl sm:text-3xl font-extrabold text-gray-900 tracking-tight">New Arrivals</h2>
+                    <span className="mt-2 h-1 w-14 rounded-full" style={{ background: "linear-gradient(to right, var(--theme-primary), var(--theme-accent))" }} />
+                </div>
                     <div className="w-9 h-9 rounded-full bg-gray-100" />
                 </div>
                 <div className="max-w-7xl mx-auto grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
@@ -139,7 +143,11 @@ export default function NewArraivals() {
                 >
                     <FiArrowLeft className="w-5 h-5 text-gray-700" />
                 </button>
-                <h2 className="text-xl sm:text-2xl font-bold text-gray-800 text-center">New Arrivals</h2>
+                <div className="flex flex-col items-center text-center px-2">
+                    <span className="text-[11px] sm:text-xs font-semibold uppercase tracking-[0.2em]" style={{ color: "var(--theme-accent)" }}>Just In</span>
+                    <h2 className="text-2xl sm:text-3xl font-extrabold text-gray-900 tracking-tight">New Arrivals</h2>
+                    <span className="mt-2 h-1 w-14 rounded-full" style={{ background: "linear-gradient(to right, var(--theme-primary), var(--theme-accent))" }} />
+                </div>
                 <button
                     onClick={() => scroll('right')}
                     disabled={!canScrollRight}

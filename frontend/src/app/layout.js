@@ -79,9 +79,42 @@ export async function generateMetadata() {
   };
 }
 
-export const viewport = {
-  themeColor: "#0f766e",
+// Brand-aligned theme defaults. The admin panel overrides any of these from the
+// Appearance tab; everything missing falls back here so the storefront always
+// has a complete, legible palette.
+const THEME_DEFAULTS = {
+  navbarFrom: "#065f46",
+  navbarVia: "#047857",
+  navbarTo: "#064e3b",
+  navbarText: "#ecfdf5",
+  footerFrom: "#064e3b",
+  footerVia: "#065f46",
+  footerTo: "#022c22",
+  homeFrom: "#ecfdf5",
+  homeTo: "#ffffff",
+  primary: "#047857",
+  accent: "#f59e0b",
 };
+
+const resolveTheme = (settings) => ({ ...THEME_DEFAULTS, ...(settings?.theme || {}) });
+
+// Server-rendered CSS variables — no flash of the wrong colour on first paint.
+// Navbar/Footer/home components read these via var(--theme-*). The body carries
+// the soft home-background wash (top tint fading to the base colour); admin and
+// POS paint their own opaque backgrounds on top, so they are unaffected.
+const themeCss = (t) => `:root{
+--theme-nav-from:${t.navbarFrom};--theme-nav-via:${t.navbarVia};--theme-nav-to:${t.navbarTo};--theme-nav-text:${t.navbarText};
+--theme-footer-from:${t.footerFrom};--theme-footer-via:${t.footerVia};--theme-footer-to:${t.footerTo};
+--theme-home-from:${t.homeFrom};--theme-home-to:${t.homeTo};
+--theme-primary:${t.primary};--theme-accent:${t.accent};
+}
+body{background-color:var(--theme-home-to);background-image:linear-gradient(180deg,var(--theme-home-from),var(--theme-home-to) 720px);background-repeat:no-repeat;}`;
+
+export async function generateViewport() {
+  const settings = await fetchSiteSettings();
+  // Match the mobile browser chrome to the top of the navbar gradient.
+  return { themeColor: settings?.theme?.navbarFrom || THEME_DEFAULTS.navbarFrom };
+}
 
 export default async function RootLayout({ children }) {
   const settings = await fetchSiteSettings();
@@ -91,12 +124,16 @@ export default async function RootLayout({ children }) {
   const analyticsEnabled = settings?.features?.analytics !== false;
   const analytics = settings?.analytics || {};
   const siteJsonLd = buildSiteJsonLd(settings || {});
+  const theme = resolveTheme(settings);
   return (
     <html
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
+        {/* Server-rendered theme variables — first in the body so colours are set
+            before any content paints (no flash of the default palette). */}
+        <style id="theme-vars" dangerouslySetInnerHTML={{ __html: themeCss(theme) }} />
         <Analytics
           enabled={analyticsEnabled}
           gtmId={analytics.gtmId}
