@@ -6,6 +6,7 @@ import { env } from '../config/env.js';
 import { logger } from '../lib/logger.js';
 import { optionalCustomer } from '../middlewares/clientAuth.middleware.js';
 import { initSession, validateTransaction, verifyIpnHash } from '../lib/sslcommerz.js';
+import { sendOrderConfirmationEmail } from '../lib/orderEmail.js';
 
 const clientPaymentRouter = Router();
 
@@ -107,7 +108,7 @@ const settlePaid = async ({ tranId, valId, body, cfg, source }) => {
     await payment.save();
 
     // Credit + confirm the order (guarded so a late duplicate can't double-write).
-    await OrderModel.updateOne(
+    const upd = await OrderModel.updateOne(
         { orderId: payment.orderId, paymentStatus: { $ne: 'paid' } },
         {
             $set: {
@@ -117,6 +118,15 @@ const settlePaid = async ({ tranId, valId, body, cfg, source }) => {
             },
         },
     );
+
+    // Only the first settle actually flips the order to paid (modifiedCount===1);
+    // email the receipt exactly once, off the response path. Redirect + IPN both
+    // call settlePaid, so this guard prevents a duplicate confirmation email.
+    if (upd.modifiedCount === 1) {
+        OrderModel.findOne({ orderId: payment.orderId })
+            .then((ord) => (ord ? sendOrderConfirmationEmail(ord) : null))
+            .catch(() => {});
+    }
 
     logger.info({ tranId, orderId: payment.orderId, source }, 'Payment settled');
     return { ok: true, payment };

@@ -4,9 +4,7 @@ import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import { effectivePermissions } from '../lib/permissions.js';
 import { writeAudit } from '../lib/audit.js';
-
-const BREVO_API = 'https://api.brevo.com/v3/smtp/email';
-const BREVO_KEY = process.env.API_KEY || process.env.SMTP_KEY;
+import { sendEmail } from '../lib/mailer.js';
 
 const ADMIN_EMAILS = (process.env.ADMIN_EMAILS || '')
     .split(',')
@@ -53,46 +51,32 @@ export const sendCode = async (request, response) => {
         });
         await otp.save();
 
-        try {
-            const emailRes = await fetch(BREVO_API, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'api-key': BREVO_KEY
-                },
-                body: JSON.stringify({
-                    sender: {
-                        name: process.env.MAIL_FROM_NAME,
-                        email: process.env.MAIL_FROM_ADDRESS
-                    },
-                    to: [{ email: normalizedEmail }],
-                    subject: 'Ab9dEcommerce Admin - Login Code',
-                    htmlContent: `
-                        <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto; padding: 24px;">
-                            <h2 style="color: #1a1a1a; margin-bottom: 16px;">Admin Login Code</h2>
-                            <p style="color: #666; font-size: 14px; line-height: 1.6;">
-                                Use the following code to log in to your Ab9dEcommerce admin panel.
-                                This code expires in 3 hours.
-                            </p>
-                            <div style="background: #f5f5f5; border-radius: 8px; padding: 20px; text-align: center; margin: 20px 0;">
-                                <span style="font-size: 32px; font-weight: bold; letter-spacing: 8px; color: #1a1a1a;">${code}</span>
-                            </div>
-                            <p style="color: #999; font-size: 12px;">
-                                If you did not request this code, please ignore this email.
-                            </p>
-                        </div>
-                    `
-                })
-            });
+        const sent = await sendEmail({
+            to: normalizedEmail,
+            subject: 'Ab9dEcommerce Admin - Login Code',
+            html: `
+                <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto; padding: 24px;">
+                    <h2 style="color: #1a1a1a; margin-bottom: 16px;">Admin Login Code</h2>
+                    <p style="color: #666; font-size: 14px; line-height: 1.6;">
+                        Use the following code to log in to your Ab9dEcommerce admin panel.
+                        This code expires in 3 hours.
+                    </p>
+                    <div style="background: #f5f5f5; border-radius: 8px; padding: 20px; text-align: center; margin: 20px 0;">
+                        <span style="font-size: 32px; font-weight: bold; letter-spacing: 8px; color: #1a1a1a;">${code}</span>
+                    </div>
+                    <p style="color: #999; font-size: 12px;">
+                        If you did not request this code, please ignore this email.
+                    </p>
+                </div>
+            `,
+        });
 
-            if (!emailRes.ok) {
-                const errBody = await emailRes.json().catch(() => ({}));
-                throw new Error(errBody.message || `Brevo API error: ${emailRes.status}`);
-            }
-        } catch (emailError) {
+        // OTP delivery must succeed — if the mail didn't go out, drop the code so
+        // the user can retry cleanly rather than wait for an email that won't come.
+        if (!sent.ok) {
             await OtpModel.deleteOne({ _id: otp._id });
             return response.status(500).json({
-                message: "Failed to send email. " + emailError.message,
+                message: "Failed to send email. " + (sent.error || sent.reason || ''),
                 error: true,
                 success: false
             });

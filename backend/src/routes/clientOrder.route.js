@@ -6,6 +6,7 @@ import CheckoutLeadModel from '../models/checkoutLead.model.js';
 import CouponModel from '../models/coupon.model.js';
 import { evaluateCoupon } from '../lib/coupon.js';
 import { recordStockMovements } from '../lib/stockLedger.js';
+import { sendOrderConfirmationEmail } from '../lib/orderEmail.js';
 import { optionalCustomer } from '../middlewares/clientAuth.middleware.js';
 
 const clientOrderRouter = Router();
@@ -243,6 +244,15 @@ clientOrderRouter.post('/create', optionalCustomer, async (req, res) => {
             );
         } catch {
             // non-fatal
+        }
+
+        // Email the shopper their confirmation. COD orders are confirmed on the
+        // spot, so send now; online orders get theirs once the payment is
+        // confirmed (see settlePaid in clientPayment.route.js), so we don't email
+        // an unpaid "online" order here. Fire-and-forget + best-effort so it never
+        // delays or breaks the checkout response.
+        if (order.paymentMethod === 'cash_on_delivery') {
+            sendOrderConfirmationEmail(order).catch(() => {});
         }
 
         res.json({
