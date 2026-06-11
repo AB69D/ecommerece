@@ -50,6 +50,7 @@ import clientCheckoutRouter from './routes/clientCheckout.route.js';
 import posRouter from './routes/pos.route.js';
 import couponRouter from './routes/coupon.route.js';
 import stockRouter from './routes/stock.route.js';
+import platformRouter from './routes/platform.route.js';
 
 const app = express();
 
@@ -129,6 +130,14 @@ app.get('/readyz', async (_req, res) => {
 app.get('/', (_req, res) =>
     res.json({ success: true, message: 'Ab9dEcommerce API', env: env.NODE_ENV }),
 );
+
+// ── Platform (super-admin) API — Phase 3/4 ──────────────────────────────────
+// Tenant onboarding (public register) + fleet management (super-admin). Mounted
+// BEFORE the per-tenant resolver below and wrapped in a SYSTEM context, so these
+// routes are intentionally cross-tenant (they create/manage tenants and must see
+// all of them) rather than scoped to one store. The super-admin guard inside the
+// router protects everything except public store registration.
+app.use('/api/platform', (req, _res, next) => runAsSystem(() => next()), platformRouter);
 
 // ── Tenant resolution + async context (Phase 2) ─────────────────────────────
 // Resolve the tenant (X-Tenant header / subdomain / custom domain) and bind the
