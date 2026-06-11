@@ -15,7 +15,8 @@ import { notFound } from './middlewares/notFound.middleware.js';
 import requireAuth from './middlewares/auth.middleware.js';
 import { auditMutations } from './lib/audit.js';
 import AdminModel from './models/admin.model.js';
-import { runAsSystem } from './tenancy/tenantContext.js';
+import { runAsSystem, withTenant } from './tenancy/tenantContext.js';
+import { resolveTenant } from './tenancy/resolveTenant.js';
 import { bootstrapTenancy } from './tenancy/bootstrapTenancy.js';
 
 import categoryRouter from './routes/category.route.js';
@@ -66,7 +67,7 @@ app.use(
     cors({
         origin: env.FRONTEND_URL ? [env.FRONTEND_URL, env.FRONTEND_URL.replace(/\/$/, '')] : true,
         methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-        allowedHeaders: ['Content-Type', 'guest-id', 'Authorization'],
+        allowedHeaders: ['Content-Type', 'guest-id', 'Authorization', 'X-Tenant'],
         credentials: true,
     }),
 );
@@ -128,6 +129,15 @@ app.get('/readyz', async (_req, res) => {
 app.get('/', (_req, res) =>
     res.json({ success: true, message: 'Ab9dEcommerce API', env: env.NODE_ENV }),
 );
+
+// ── Tenant resolution + async context (Phase 2) ─────────────────────────────
+// Resolve the tenant (X-Tenant header / subdomain / custom domain) and bind the
+// rest of the request to it via AsyncLocalStorage, BEFORE any route runs — so
+// the scoping plugin filters every query (including the admin-auth login lookup,
+// which is now per-tenant). Health checks live outside /api and are untouched.
+// In the single-tenant interim (no signal) this resolves nothing and the
+// plugin's default tenant takes over, so behaviour is unchanged.
+app.use('/api', resolveTenant, withTenant);
 
 // Auth (stricter rate limit)
 app.use('/api/admin/auth', authLimiter, authRouter);

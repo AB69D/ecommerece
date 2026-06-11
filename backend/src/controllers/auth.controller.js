@@ -5,6 +5,7 @@ import bcrypt from 'bcryptjs';
 import { effectivePermissions } from '../lib/permissions.js';
 import { writeAudit } from '../lib/audit.js';
 import { sendEmail } from '../lib/mailer.js';
+import { getEffectiveTenantId } from '../tenancy/tenantContext.js';
 
 const ADMIN_EMAILS = (process.env.ADMIN_EMAILS || '')
     .split(',')
@@ -129,8 +130,14 @@ export const verifyCode = async (request, response) => {
         otp.verified = true;
         await otp.save();
 
+        const effectiveTenantId = getEffectiveTenantId();
         const token = jwt.sign(
-            { email: normalizedEmail },
+            {
+                email: normalizedEmail,
+                // Legacy OTP/owner flow: stamp the tenant in context (the resolved
+                // store, or the primary in the single-tenant interim).
+                tenantId: effectiveTenantId ? effectiveTenantId.toString() : undefined,
+            },
             process.env.JWT_SECRET,
             { expiresIn: '3h' }
         );
@@ -257,6 +264,10 @@ export const login = async (request, response) => {
                 username: admin.username,
                 role: admin.role,
                 email: admin.email || undefined,
+                // Bind the admin session to its tenant. The scoped lookup in
+                // requireAuth already rejects a cross-tenant id (it won't be
+                // found under the resolved tenant); this claim is explicit + audit.
+                tenantId: admin.tenantId ? admin.tenantId.toString() : undefined,
             },
             process.env.JWT_SECRET,
             { expiresIn: '12h' },

@@ -23,7 +23,15 @@ const TOKEN_TTL = '30d';
 
 const signToken = (customer) =>
     jwt.sign(
-        { sub: customer._id.toString(), type: 'customer', email: customer.email },
+        {
+            sub: customer._id.toString(),
+            type: 'customer',
+            email: customer.email,
+            // Bind the session to the tenant that owns this customer. Enforcement
+            // is primarily the scoped re-load in requireCustomer (a cross-tenant
+            // id simply won't be found); this claim makes the binding explicit.
+            tenantId: customer.tenantId ? customer.tenantId.toString() : undefined,
+        },
         env.JWT_SECRET,
         { expiresIn: TOKEN_TTL },
     );
