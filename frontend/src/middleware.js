@@ -43,6 +43,23 @@ function tenantFromHost(rawHost) {
     return RESERVED.has(label) ? '' : label;
 }
 
+// True for a first path segment that is a real store (not an infra/platform word).
+const isStoreSeg = (seg) => !!seg && !ROOT_RESERVED.has(seg) && !RESERVED.has(seg) && isValidStore(seg);
+
+// The store of the PAGE that issued a client API call, read from its Referer. This
+// is the source of truth for scoping /api/client/* because it's per-request — two
+// browser tabs on different stores each carry their own page URL, so they never
+// bleed into each other the way a single shared cookie can.
+function storeFromReferer(referer) {
+    if (!referer) return '';
+    try {
+        const seg = new URL(referer).pathname.split('/')[1] || '';
+        return isStoreSeg(seg) ? seg : '';
+    } catch {
+        return '';
+    }
+}
+
 export function middleware(request) {
     const { pathname } = request.nextUrl;
     const seg = pathname.split('/')[1] || '';
@@ -51,8 +68,13 @@ export function middleware(request) {
     if (seg === 'api') {
         let tenant = tenantFromHost(request.headers.get('host'));
         if (!tenant && pathname.startsWith('/api/client/')) {
-            const cookieStore = request.cookies.get(STORE_COOKIE)?.value;
-            if (isValidStore(cookieStore)) tenant = cookieStore;
+            // Referer (the calling page) is authoritative and multi-tab safe; the
+            // cookie is only a fallback for when the Referer is stripped.
+            tenant = storeFromReferer(request.headers.get('referer'));
+            if (!tenant) {
+                const cookieStore = request.cookies.get(STORE_COOKIE)?.value;
+                if (isValidStore(cookieStore)) tenant = cookieStore;
+            }
         }
         const headers = new Headers(request.headers);
         headers.delete('x-tenant'); // never trust an inbound value
@@ -62,7 +84,7 @@ export function middleware(request) {
 
     // 2) A store page (/<store>/...): remember the slug for client-side API calls.
     //    Skip infra labels (admin/api/…) — they're never a store.
-    if (seg && !ROOT_RESERVED.has(seg) && !RESERVED.has(seg) && isValidStore(seg)) {
+    if (isStoreSeg(seg)) {
         const res = NextResponse.next();
         res.cookies.set(STORE_COOKIE, seg, {
             path: '/',
