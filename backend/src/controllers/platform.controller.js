@@ -191,6 +191,54 @@ export const getTenant = async (req, res) => {
 };
 
 // ---------------------------------------------------------------------------
+// GET /api/platform/tenants/:id/users   (super-admin)
+// Every staff account (owner, admins, moderators, POS sellers) belonging to a
+// store — so the platform owner can maintain a store's users without having to
+// impersonate. Password reset / activate-deactivate use the shared
+// /admins/:id/* endpoints.
+// ---------------------------------------------------------------------------
+export const getTenantUsers = async (req, res) => {
+    try {
+        const { id } = req.params;
+        if (!mongoose.isValidObjectId(id)) return fail(res, 400, 'Invalid tenant id');
+
+        const tenant = await TenantModel.findById(id).select('businessName subdomain ownerAdminId').lean();
+        if (!tenant) return fail(res, 404, 'Tenant not found');
+
+        // Platform routes run in system context, so this explicit tenantId filter
+        // (cast from the route param) returns exactly that store's staff.
+        const users = await runAsSystem(() =>
+            AdminModel.find({ tenantId: id })
+                .select('username email fullName role isActive isPlatformOwner lastLoginAt createdAt')
+                .sort({ createdAt: 1 })
+                .lean()
+                .exec(),
+        );
+
+        const ownerId = tenant.ownerAdminId ? String(tenant.ownerAdminId) : null;
+        const rows = users.map((u) => ({
+            id: u._id,
+            username: u.username,
+            email: u.email || null,
+            fullName: u.fullName || '',
+            role: u.role,
+            isActive: u.isActive !== false,
+            isPlatformOwner: !!u.isPlatformOwner,
+            isOwner: ownerId === String(u._id),
+            lastLoginAt: u.lastLoginAt || null,
+        }));
+
+        return ok(res, 'Tenant users', {
+            tenant: { id: tenant._id, businessName: tenant.businessName, subdomain: tenant.subdomain },
+            users: rows,
+            count: rows.length,
+        });
+    } catch (err) {
+        return fail(res, 500, err.message || 'Failed to load store users');
+    }
+};
+
+// ---------------------------------------------------------------------------
 // POST /api/platform/tenants/:id/approve   (super-admin)
 // Approve -> activate owner login -> provision (subscription + provisionedAt).
 // ---------------------------------------------------------------------------

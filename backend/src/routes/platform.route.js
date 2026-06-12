@@ -7,6 +7,7 @@ import {
     approveTenant,
     suspendTenant,
     rejectTenant,
+    getTenantUsers,
     listOwners,
     createOwner,
     revokeOwner,
@@ -42,6 +43,7 @@ router.get('/overview', getOverview);
 // Tenant fleet.
 router.get('/tenants', listTenants);
 router.get('/tenants/:id', getTenant);
+router.get('/tenants/:id/users', getTenantUsers);
 router.post('/tenants/:id/approve', approveTenant);
 router.post('/tenants/:id/suspend', suspendTenant);
 router.post('/tenants/:id/reject', rejectTenant);

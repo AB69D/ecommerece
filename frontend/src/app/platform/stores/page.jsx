@@ -2,11 +2,19 @@
 import { useEffect, useMemo, useState } from "react";
 import {
     FiGlobe, FiCheck, FiX, FiAlertCircle, FiSlash, FiPause, FiPlay,
-    FiEye, FiRefreshCw, FiClock, FiUser, FiExternalLink,
+    FiEye, FiRefreshCw, FiClock, FiUser, FiExternalLink, FiUsers, FiKey, FiShield,
 } from "react-icons/fi";
 import {
-    listTenants, getTenant, approveTenant, suspendTenant, rejectTenant,
+    listTenants, getTenant, listTenantUsers, approveTenant, suspendTenant, rejectTenant,
+    resetAdminPassword, toggleAdminActive,
 } from "@/services/platform";
+
+const genPassword = () => {
+    const chars = "abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789@#$%";
+    let s = "";
+    for (let i = 0; i < 14; i++) s += chars[Math.floor(Math.random() * chars.length)];
+    return s;
+};
 import { useAdminAuth } from "@/context/AdminAuthContext";
 
 const STATUS_TABS = [
@@ -78,6 +86,7 @@ export default function StoresPage() {
 
     const [detail, setDetail] = useState(null); // { tenant, owner }
     const [detailLoading, setDetailLoading] = useState(false);
+    const [users, setUsers] = useState(null); // store staff for the open detail
 
     const isPlatformOwner = !!me?.isPlatformOwner;
 
@@ -134,15 +143,48 @@ export default function StoresPage() {
     const openDetail = async (id) => {
         setDetail({ loading: true });
         setDetailLoading(true);
+        setUsers(null);
         try {
-            const res = await getTenant(id);
+            const [res, ures] = await Promise.all([getTenant(id), listTenantUsers(id)]);
             if (res?.success) setDetail(res.data);
             else { flash("error", res?.message || "Failed to load store"); setDetail(null); }
+            if (ures?.success) setUsers(ures.data?.users || []);
         } catch {
             flash("error", "Could not load store details.");
             setDetail(null);
         } finally {
             setDetailLoading(false);
+        }
+    };
+
+    // Reload just the store-users list (after a reset / toggle).
+    const reloadUsers = async (id) => {
+        const ures = await listTenantUsers(id).catch(() => null);
+        if (ures?.success) setUsers(ures.data?.users || []);
+    };
+
+    // Reset a store user's password to a freshly generated one (shown once so the
+    // platform owner can hand it over).
+    const resetUserPw = async (user) => {
+        const pw = genPassword();
+        try {
+            const res = await resetAdminPassword(user.id, pw);
+            if (!res?.success) throw new Error(res?.message || "Reset failed");
+            flash("success", `New password for @${user.username}: ${pw}  (copy it now)`);
+        } catch (e) {
+            flash("error", e.message);
+        }
+    };
+
+    // Activate / deactivate a store user (the backend blocks self + env owners).
+    const toggleUser = async (user, tenantId) => {
+        try {
+            const res = await toggleAdminActive(user.id);
+            if (!res?.success) throw new Error(res?.message || "Update failed");
+            flash("success", res.message || "Done");
+            await reloadUsers(tenantId);
+        } catch (e) {
+            flash("error", e.message);
         }
     };
 
@@ -352,6 +394,41 @@ export default function StoresPage() {
                                                 <Row k="Last login" v={fmtDateTime(detail.owner.lastLoginAt)} />
                                             </dl>
                                         ) : <p className="text-sm text-gray-400">No owner record.</p>}
+                                    </Section>
+
+                                    <Section title="Store users" icon={FiUsers}>
+                                        {users === null ? (
+                                            <p className="text-sm text-gray-400">Loading…</p>
+                                        ) : users.length === 0 ? (
+                                            <p className="text-sm text-gray-400">No users yet.</p>
+                                        ) : (
+                                            <div className="space-y-1.5">
+                                                {users.map((u) => (
+                                                    <div key={u.id} className="flex items-center justify-between gap-2 rounded-lg border border-gray-100 px-3 py-2">
+                                                        <div className="min-w-0">
+                                                            <div className="text-sm font-medium text-gray-800 flex items-center gap-1.5 flex-wrap">
+                                                                @{u.username}
+                                                                <span className="text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded bg-gray-100 text-gray-500 border border-gray-200">{u.role}</span>
+                                                                {u.isOwner && <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-600 border border-indigo-100">OWNER</span>}
+                                                                {u.isPlatformOwner && <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-purple-50 text-purple-700 border border-purple-200 inline-flex items-center gap-0.5"><FiShield className="w-2.5 h-2.5" />PLATFORM</span>}
+                                                                {!u.isActive && <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-gray-100 text-gray-500 border border-gray-200">DISABLED</span>}
+                                                            </div>
+                                                            <div className="text-xs text-gray-400 truncate">{u.email || "—"} · last login {fmtDateTime(u.lastLoginAt)}</div>
+                                                        </div>
+                                                        <div className="flex items-center gap-1 shrink-0">
+                                                            <button onClick={() => resetUserPw(u)} title="Reset password" className="p-2 rounded-lg text-gray-400 hover:text-indigo-600 hover:bg-indigo-50">
+                                                                <FiKey className="w-4 h-4" />
+                                                            </button>
+                                                            {!u.isPlatformOwner && (
+                                                                <button onClick={() => toggleUser(u, detail.tenant._id)} title={u.isActive ? "Deactivate" : "Activate"} className={`p-2 rounded-lg ${u.isActive ? "text-orange-600 hover:bg-orange-50" : "text-emerald-600 hover:bg-emerald-50"}`}>
+                                                                    {u.isActive ? <FiPause className="w-4 h-4" /> : <FiPlay className="w-4 h-4" />}
+                                                                </button>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
                                     </Section>
 
                                     {(detail.tenant.contact?.phone || detail.tenant.contact?.address) && (

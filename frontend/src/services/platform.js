@@ -34,6 +34,9 @@ export const listTenants = (status = "") => {
 
 export const getTenant = (id) => authFetch(`${BASE}/tenants/${id}`).then(json);
 
+// Every staff account belonging to a store (owner + admins + POS sellers).
+export const listTenantUsers = (id) => authFetch(`${BASE}/tenants/${id}/users`).then(json);
+
 export const approveTenant = (id) =>
     authFetch(`${BASE}/tenants/${id}/approve`, { method: "POST" }).then(json);
 
