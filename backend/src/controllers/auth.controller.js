@@ -268,6 +268,26 @@ export const login = async (request, response) => {
             });
         }
 
+        // A store that isn't live (suspended / rejected / still pending) locks out
+        // its staff. Platform owners (env list or DB flag) are exempt — they sign
+        // in to run the whole platform regardless of any single store's status.
+        const isPlatformOwner =
+            ADMIN_EMAILS.includes(String(admin.email || '').toLowerCase()) ||
+            admin.isPlatformOwner === true;
+        if (!isPlatformOwner && tenantId) {
+            const t = await TenantModel.findById(tenantId).select('status').lean();
+            if (t && t.status !== 'approved') {
+                return response.status(403).json({
+                    success: false,
+                    error: true,
+                    message:
+                        t.status === 'suspended'
+                            ? 'This store is suspended. Please contact the platform administrator.'
+                            : 'This store is not active yet. Please contact the platform administrator.',
+                });
+            }
+        }
+
         // Document .save() updates by _id (no query-filter middleware), so this
         // persists regardless of the request's default tenant context.
         admin.lastLoginAt = new Date();

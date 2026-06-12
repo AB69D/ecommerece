@@ -6,6 +6,7 @@ import AdminModel from '../models/admin.model.js';
 import OrderModel from '../models/order.model.js';
 import { runAsTenant, runAsSystem } from '../tenancy/tenantContext.js';
 import { provisionTenant } from '../tenancy/provisionTenant.js';
+import { clearTenantCache } from '../tenancy/resolveTenant.js';
 import { isPlatformEmail } from '../middlewares/platformAuth.middleware.js';
 import { sendEmail } from '../lib/mailer.js';
 import { logger } from '../lib/logger.js';
@@ -264,6 +265,11 @@ export const approveTenant = async (req, res) => {
 
         await provisionTenant(tenant); // saves the tenant (subscription + provisionedAt)
 
+        // Status changed — drop the tenant resolver's cached entry so the
+        // storefront goes live immediately (otherwise it 404s for up to the 60s
+        // cache TTL after approval).
+        clearTenantCache();
+
         notifyApproval({ businessName: tenant.businessName, subdomain: tenant.subdomain, email: tenant.ownerEmail }).catch(
             (err) => logger.warn({ err }, 'platform.approve: notification failed'),
         );
@@ -295,6 +301,7 @@ export const suspendTenant = async (req, res) => {
             tenant.suspendedAt = undefined;
             if (tenant.billing) tenant.billing.status = 'active';
             await tenant.save();
+            clearTenantCache(); // resume -> storefront live again now
             return ok(res, `Resumed "${tenant.businessName}".`, { tenant });
         }
 
@@ -302,6 +309,7 @@ export const suspendTenant = async (req, res) => {
         tenant.suspendedAt = new Date();
         if (req.body?.reason) tenant.notes = String(req.body.reason).slice(0, 1000);
         await tenant.save();
+        clearTenantCache(); // suspend -> storefront blocked now
         logger.info({ tenantId: String(tenant._id) }, 'platform.suspend');
         return ok(res, `Suspended "${tenant.businessName}".`, { tenant });
     } catch (err) {
@@ -322,6 +330,7 @@ export const rejectTenant = async (req, res) => {
         tenant.status = 'rejected';
         if (req.body?.reason) tenant.notes = String(req.body.reason).slice(0, 1000);
         await tenant.save();
+        clearTenantCache(); // status changed -> drop resolver cache
 
         // Keep the (inactive) owner login disabled.
         if (tenant.ownerAdminId) {
