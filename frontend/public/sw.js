@@ -1,59 +1,32 @@
 /* Service worker for the storefront + POS PWA.
  *
- * Strategy:
- *  - App shell (the /pos terminal + icons): precached so the terminal opens
- *    even with no network.
- *  - Next.js hashed static assets (/_next/static/...): cache-first — they are
- *    immutable, so once cached they never need a refetch.
- *  - Navigations: network-first, falling back to the cached shell when offline.
- *  - POS catalog + public site settings: network-first with a cache fallback so
- *    the product grid still renders offline (the actual offline *sales* are
- *    queued in IndexedDB by the app, not here).
- *  - Everything else (incl. all POST/PUT/DELETE): passed straight through.
+ * MULTI-TENANT SAFETY: this worker caches ONLY immutable, tenant-AGNOSTIC assets
+ * (Next.js hashed static files + icons). It deliberately does NOT cache API
+ * responses or page HTML, because those are per-store — caching them keyed by URL
+ * alone (as a previous version did for /api/admin/pos/products and
+ * /api/client/site-settings) serves one store's data to another. All navigations
+ * and /api/* calls now pass straight through to the network, so each store always
+ * renders its own fresh data. Offline *sales* are queued in IndexedDB by the app,
+ * not here.
+ *
+ * Bumping VERSION purges every older cache on activate, clearing any cross-store
+ * data the previous worker may have stored.
  */
-const VERSION = "v1";
-const SHELL_CACHE = `shell-${VERSION}`;
-const RUNTIME_CACHE = `runtime-${VERSION}`;
+const VERSION = "v2";
+const STATIC_CACHE = `static-${VERSION}`;
 
-const SHELL_ASSETS = [
-    "/pos",
-    "/manifest.webmanifest",
-    "/icons/icon-192.png",
-    "/icons/icon-512.png",
-    "/icons/maskable-512.png",
-];
-
-// Runtime-cacheable GET endpoints (matched by pathname, ignoring query string).
-const RUNTIME_PATHS = ["/api/admin/pos/products", "/api/client/site-settings"];
-
-self.addEventListener("install", (event) => {
-    event.waitUntil(
-        caches
-            .open(SHELL_CACHE)
-            // addAll is atomic; use individual best-effort puts so one bad
-            // response (e.g. a transient 5xx on /pos) doesn't abort install.
-            .then((cache) =>
-                Promise.all(
-                    SHELL_ASSETS.map((url) =>
-                        fetch(url, { credentials: "same-origin" })
-                            .then((res) => (res.ok ? cache.put(url, res) : null))
-                            .catch(() => null),
-                    ),
-                ),
-            )
-            .then(() => self.skipWaiting()),
-    );
+self.addEventListener("install", () => {
+    // Nothing tenant-specific to precache — take over as soon as possible.
+    self.skipWaiting();
 });
 
 self.addEventListener("activate", (event) => {
     event.waitUntil(
         (async () => {
+            // Drop every cache from older worker versions (they may hold stale,
+            // cross-store data such as another store's POS catalog or settings).
             const keys = await caches.keys();
-            await Promise.all(
-                keys
-                    .filter((k) => k !== SHELL_CACHE && k !== RUNTIME_CACHE)
-                    .map((k) => caches.delete(k)),
-            );
+            await Promise.all(keys.filter((k) => k !== STATIC_CACHE).map((k) => caches.delete(k)));
             await self.clients.claim();
         })(),
     );
@@ -62,23 +35,6 @@ self.addEventListener("activate", (event) => {
 self.addEventListener("message", (event) => {
     if (event.data === "SKIP_WAITING") self.skipWaiting();
 });
-
-async function networkFirst(request, cacheName, fallbackUrl) {
-    const cache = await caches.open(cacheName);
-    try {
-        const res = await fetch(request);
-        if (res && res.ok) cache.put(request, res.clone());
-        return res;
-    } catch (err) {
-        const cached = await cache.match(request);
-        if (cached) return cached;
-        if (fallbackUrl) {
-            const fb = await cache.match(fallbackUrl);
-            if (fb) return fb;
-        }
-        throw err;
-    }
-}
 
 async function cacheFirst(request, cacheName) {
     const cache = await caches.open(cacheName);
@@ -96,18 +52,10 @@ self.addEventListener("fetch", (event) => {
     const url = new URL(request.url);
     if (url.origin !== self.location.origin) return;
 
-    if (request.mode === "navigate") {
-        event.respondWith(networkFirst(request, SHELL_CACHE, "/pos"));
-        return;
-    }
-
+    // ONLY immutable, tenant-agnostic static assets are cached. Everything else —
+    // navigations and every /api/* call — goes to the network untouched so each
+    // store gets its own data and nothing leaks between stores.
     if (url.pathname.startsWith("/_next/static/") || url.pathname.startsWith("/icons/")) {
-        event.respondWith(cacheFirst(request, SHELL_CACHE));
-        return;
-    }
-
-    if (RUNTIME_PATHS.includes(url.pathname)) {
-        event.respondWith(networkFirst(request, RUNTIME_CACHE));
-        return;
+        event.respondWith(cacheFirst(request, STATIC_CACHE));
     }
 });

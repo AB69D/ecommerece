@@ -60,12 +60,14 @@ export default function AdminLayout({ children }) {
                 router.replace('/login');
                 return;
             }
-            // This is /<store>/admin — confirm the signed-in owner belongs to
+            // This is /<store>/admin — confirm the signed-in user belongs to
             // <store>. A platform owner who used "Log in as" holds a token for THIS
-            // store, so they pass; anyone on the wrong store URL is redirected to
-            // their own store, and a store-less platform owner to the console.
-            if (data.store && store && data.store !== store) {
-                router.replace(`/${data.store}/admin`);
+            // store, so they pass. Anyone on a store that isn't theirs is sent
+            // away — a PLATFORM OWNER to the console (they manage other stores via
+            // "Log in as", never by typing a URL, so we must NOT drop them into the
+            // primary store's admin), and a store owner to their own store.
+            if (store && data.store !== store) {
+                router.replace(data.isPlatformOwner ? '/platform' : (data.store ? `/${data.store}/admin` : '/login'));
                 return;
             }
             if (!data.store && data.isPlatformOwner) {
