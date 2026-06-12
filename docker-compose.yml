@@ -40,6 +40,10 @@ services:
       API_KEY: ${BREVO_API_KEY}
       MAIL_FROM_NAME: ${MAIL_FROM_NAME}
       MAIL_FROM_ADDRESS: ${MAIL_FROM_ADDRESS}
+      UPLOADS_DIR: /app/uploads
+    volumes:
+      # Persistent store for uploaded/compressed images (survives rebuilds).
+      - uploads:/app/uploads
     networks:
       - app
 
@@ -93,6 +97,7 @@ volumes:
   mongo-config:
   caddy-data:
   caddy-config:
+  uploads:
 
 networks:
   app:

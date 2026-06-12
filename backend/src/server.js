@@ -140,6 +140,23 @@ app.get('/', (_req, res) =>
     res.json({ success: true, message: 'Ab9dEcommerce API', env: env.NODE_ENV }),
 );
 
+// ── Uploaded images (persistent volume) ─────────────────────────────────────
+// Store images live on a VPS volume in per-tenant folders and are served
+// read-only here, BEFORE tenant resolution / rate limiting (static assets must
+// not be scoped or throttled). The storefront (HTTPS on Vercel) reaches them
+// through its /api proxy, so the URLs stay relative and need no backend domain.
+const UPLOADS_DIR = process.env.UPLOADS_DIR || '/app/uploads';
+app.use(
+    '/api/uploads',
+    express.static(UPLOADS_DIR, {
+        maxAge: '30d',
+        immutable: true,
+        index: false,
+        fallthrough: false, // a missing file 404s here instead of hitting the API
+        setHeaders: (res) => res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin'),
+    }),
+);
+
 // ── Platform (super-admin) API — Phase 3/4 ──────────────────────────────────
 // Tenant onboarding (public register) + fleet management (super-admin). Mounted
 // BEFORE the per-tenant resolver below and wrapped in a SYSTEM context, so these
