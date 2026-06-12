@@ -3,10 +3,11 @@ import { useEffect, useMemo, useState } from "react";
 import {
     FiGlobe, FiCheck, FiX, FiAlertCircle, FiSlash, FiPause, FiPlay,
     FiEye, FiRefreshCw, FiClock, FiUser, FiExternalLink, FiUsers, FiKey, FiShield,
+    FiCreditCard, FiLock,
 } from "react-icons/fi";
 import {
     listTenants, getTenant, listTenantUsers, approveTenant, suspendTenant, rejectTenant,
-    resetAdminPassword, toggleAdminActive,
+    resetAdminPassword, toggleAdminActive, listPlans, assignPlan, setBilling,
 } from "@/services/platform";
 
 const genPassword = () => {
@@ -87,6 +88,7 @@ export default function StoresPage() {
     const [detail, setDetail] = useState(null); // { tenant, owner }
     const [detailLoading, setDetailLoading] = useState(false);
     const [users, setUsers] = useState(null); // store staff for the open detail
+    const [plans, setPlans] = useState([]); // plans available to assign
 
     const isPlatformOwner = !!me?.isPlatformOwner;
 
@@ -109,6 +111,12 @@ export default function StoresPage() {
         if (isPlatformOwner) load();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [tab, isPlatformOwner]);
+
+    // Plans rarely change; load once so the detail modal can offer them.
+    useEffect(() => {
+        if (!isPlatformOwner) return;
+        listPlans().then((res) => { if (res?.success) setPlans(res.data?.plans || []); }).catch(() => {});
+    }, [isPlatformOwner]);
 
     const counts = useMemo(() => {
         const c = {};
@@ -440,13 +448,14 @@ export default function StoresPage() {
                                         </Section>
                                     )}
 
-                                    <Section title="Billing">
-                                        <dl className="grid grid-cols-3 gap-y-1.5 text-sm">
-                                            <Row k="Status" v={detail.tenant.billing?.status || "active"} />
-                                            <Row k="Period sales" v={detail.tenant.billing?.currentPeriodSales ?? 0} />
-                                            <Row k="Balance due" v={detail.tenant.billing?.balanceDue ?? 0} />
-                                        </dl>
-                                    </Section>
+                                    {!detail.tenant.isPrimary && (
+                                        <BillingPanel
+                                            tenant={detail.tenant}
+                                            plans={plans}
+                                            flash={flash}
+                                            onSaved={async () => { await openDetail(detail.tenant._id); load(); }}
+                                        />
+                                    )}
 
                                     <Section title="Timeline" icon={FiClock}>
                                         <dl className="grid grid-cols-3 gap-y-1.5 text-sm">
@@ -493,5 +502,178 @@ function Row({ k, v }) {
             <dt className="text-gray-400 col-span-1">{k}</dt>
             <dd className="text-gray-800 col-span-2 break-words">{String(v)}</dd>
         </>
+    );
+}
+
+// Highlighted segmented-control class for the active billing status (static
+// classes so Tailwind keeps them in the build).
+const segCls = (active, key) => {
+    if (!active) return "bg-white text-gray-600 border-gray-200 hover:border-gray-300";
+    return {
+        active: "bg-emerald-600 text-white border-emerald-600",
+        past_due: "bg-amber-500 text-white border-amber-500",
+        locked: "bg-red-600 text-white border-red-600",
+    }[key];
+};
+
+const STATUS_OPTS = [
+    { key: "active", label: "Active" },
+    { key: "past_due", label: "Past due" },
+    { key: "locked", label: "Locked" },
+];
+
+// Plan + billing controls for one store, inside the detail modal. Owns local
+// draft state; calls back onSaved() (which reloads the detail + list) after a
+// successful change so the saved values flow back in as fresh props.
+function BillingPanel({ tenant, plans, flash, onSaved }) {
+    const currentPlanId = tenant.planId ? String(tenant.planId) : "";
+    const savedStatus = tenant.billing?.status || "active";
+    const savedBalance = tenant.billing?.balanceDue ?? 0;
+    const savedReason = tenant.billing?.lockedReason || "";
+
+    const [planChoice, setPlanChoice] = useState(currentPlanId);
+    const [status, setStatus] = useState(savedStatus);
+    const [balanceDue, setBalanceDue] = useState(savedBalance);
+    const [lockedReason, setLockedReason] = useState(savedReason);
+    const [busyPlan, setBusyPlan] = useState(false);
+    const [busyBilling, setBusyBilling] = useState(false);
+
+    const planById = useMemo(() => {
+        const m = {};
+        plans.forEach((p) => { m[String(p._id)] = p; });
+        return m;
+    }, [plans]);
+    const currentPlan = planById[currentPlanId];
+    const currency = (planById[planChoice] || currentPlan)?.currency || "BDT";
+
+    const planDirty = planChoice !== currentPlanId;
+    const billingDirty =
+        status !== savedStatus ||
+        Number(balanceDue) !== Number(savedBalance) ||
+        lockedReason !== savedReason;
+
+    const savePlan = async () => {
+        if (!planChoice) return;
+        setBusyPlan(true);
+        try {
+            const res = await assignPlan(tenant._id, planChoice);
+            if (!res?.success) throw new Error(res?.message || "Could not assign plan");
+            flash("success", res.message || "Plan assigned.");
+            await onSaved();
+        } catch (e) {
+            flash("error", e.message);
+        } finally {
+            setBusyPlan(false);
+        }
+    };
+
+    const saveBilling = async () => {
+        setBusyBilling(true);
+        try {
+            const payload = { status, balanceDue: Number(balanceDue) || 0 };
+            if (status === "locked") payload.lockedReason = lockedReason;
+            const res = await setBilling(tenant._id, payload);
+            if (!res?.success) throw new Error(res?.message || "Could not update billing");
+            flash("success", res.message || "Billing updated.");
+            await onSaved();
+        } catch (e) {
+            flash("error", e.message);
+        } finally {
+            setBusyBilling(false);
+        }
+    };
+
+    return (
+        <Section title="Plan & billing" icon={FiCreditCard}>
+            <div className="space-y-4">
+                <div>
+                    <label className="block text-xs text-gray-500 mb-1">Plan</label>
+                    {plans.length === 0 ? (
+                        <p className="text-sm text-gray-400">
+                            No plans yet — create one under <span className="font-medium text-gray-600">Plans</span> to assign it here.
+                        </p>
+                    ) : (
+                        <div className="flex items-center gap-2">
+                            <select
+                                value={planChoice}
+                                onChange={(e) => setPlanChoice(e.target.value)}
+                                className="flex-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                            >
+                                <option value="">— No plan —</option>
+                                {plans.map((p) => (
+                                    <option key={p._id} value={String(p._id)}>
+                                        {p.name} · {Number(p.price) > 0 ? `${p.price} ${p.currency}/${p.billingInterval}` : "Free"}
+                                    </option>
+                                ))}
+                            </select>
+                            <button
+                                onClick={savePlan}
+                                disabled={!planDirty || !planChoice || busyPlan}
+                                className="px-3 py-2 text-sm font-medium rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50 inline-flex items-center gap-1.5"
+                            >
+                                {busyPlan && <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />} Assign
+                            </button>
+                        </div>
+                    )}
+                    {currentPlan && <p className="mt-1 text-[11px] text-gray-400">Current: {currentPlan.name}</p>}
+                </div>
+
+                <div>
+                    <label className="block text-xs text-gray-500 mb-1">Billing status</label>
+                    <div className="flex flex-wrap gap-1.5">
+                        {STATUS_OPTS.map((o) => (
+                            <button
+                                key={o.key}
+                                onClick={() => setStatus(o.key)}
+                                className={`px-3 py-1.5 text-sm font-medium rounded-lg border transition-colors ${segCls(status === o.key, o.key)}`}
+                            >
+                                {o.label}
+                            </button>
+                        ))}
+                    </div>
+                    {status === "locked" && (
+                        <p className="mt-1.5 text-[11px] text-red-500 flex items-center gap-1">
+                            <FiLock className="w-3 h-3" /> Locking freezes the store owner&apos;s admin access.
+                        </p>
+                    )}
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                    <div>
+                        <label className="block text-xs text-gray-500 mb-1">Balance due ({currency})</label>
+                        <input
+                            type="number" min={0} value={balanceDue}
+                            onChange={(e) => setBalanceDue(e.target.value)}
+                            className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-xs text-gray-500 mb-1">Period sales</label>
+                        <div className="px-3 py-2 bg-gray-100 border border-gray-200 rounded-lg text-sm text-gray-600">{tenant.billing?.currentPeriodSales ?? 0}</div>
+                    </div>
+                </div>
+
+                {status === "locked" && (
+                    <div>
+                        <label className="block text-xs text-gray-500 mb-1">Reason shown to the store</label>
+                        <input
+                            value={lockedReason} onChange={(e) => setLockedReason(e.target.value)} maxLength={300}
+                            placeholder="e.g. Invoice #1024 unpaid"
+                            className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        />
+                    </div>
+                )}
+
+                <div className="flex justify-end">
+                    <button
+                        onClick={saveBilling}
+                        disabled={!billingDirty || busyBilling}
+                        className="px-4 py-2 text-sm font-medium rounded-lg bg-gray-800 text-white hover:bg-gray-900 disabled:opacity-50 inline-flex items-center gap-1.5"
+                    >
+                        {busyBilling && <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />} Save billing
+                    </button>
+                </div>
+            </div>
+        </Section>
     );
 }

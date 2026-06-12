@@ -17,6 +17,10 @@ import {
     impersonateStoreOwner,
     impersonateBySubdomain,
     getOverview,
+    listPlans,
+    createPlan,
+    assignPlan,
+    setBilling,
 } from '../controllers/platform.controller.js';
 import { requireSuperAdmin } from '../middlewares/platformAuth.middleware.js';
 
@@ -55,6 +59,12 @@ router.post('/stores/:subdomain/impersonate', impersonateBySubdomain);
 router.get('/owners', listOwners);
 router.post('/owners', createOwner);
 router.post('/owners/:id/revoke', revokeOwner);
+
+// Plans & billing.
+router.get('/plans', listPlans);
+router.post('/plans', createPlan);
+router.post('/tenants/:id/plan', assignPlan);
+router.post('/tenants/:id/billing', setBilling);
 
 // Store owners (the per-tenant owner accounts).
 router.get('/store-owners', listStoreOwners);

@@ -4,6 +4,8 @@ import jwt from 'jsonwebtoken';
 import TenantModel from '../models/tenant.model.js';
 import AdminModel from '../models/admin.model.js';
 import OrderModel from '../models/order.model.js';
+import PlanModel from '../models/plan.model.js';
+import SubscriptionModel from '../models/subscription.model.js';
 import { runAsTenant, runAsSystem } from '../tenancy/tenantContext.js';
 import { provisionTenant } from '../tenancy/provisionTenant.js';
 import { clearTenantCache } from '../tenancy/resolveTenant.js';
@@ -427,6 +429,110 @@ export const getOverview = async (req, res) => {
         });
     } catch (err) {
         return fail(res, 500, err.message || 'Failed to load overview');
+    }
+};
+
+// ═══════════════════════════════════════════════════════════════════════════
+// PLANS & BILLING (super-admin)
+// ═══════════════════════════════════════════════════════════════════════════
+
+// GET /api/platform/plans — every plan the platform offers.
+export const listPlans = async (req, res) => {
+    try {
+        const plans = await PlanModel.find({}).sort({ price: 1 }).lean();
+        return ok(res, 'Plans', { plans, count: plans.length });
+    } catch (err) {
+        return fail(res, 500, err.message || 'Failed to list plans');
+    }
+};
+
+// POST /api/platform/plans — create a plan.
+export const createPlan = async (req, res) => {
+    try {
+        const b = req.body || {};
+        const name = String(b.name || '').trim();
+        const slug = String(b.slug || '').trim().toLowerCase();
+        if (!name) return fail(res, 400, 'Plan name is required.');
+        if (!slug || !/^[a-z0-9-]+$/.test(slug)) return fail(res, 400, 'Slug must be lowercase letters, numbers and hyphens.');
+        const dupe = await PlanModel.findOne({ slug }).select('_id').lean();
+        if (dupe) return fail(res, 409, `A plan with slug "${slug}" already exists.`);
+        const plan = await PlanModel.create({
+            name,
+            slug,
+            description: String(b.description || '').trim(),
+            price: Math.max(0, Number(b.price) || 0),
+            currency: String(b.currency || env.PLATFORM_CURRENCY || 'BDT').toUpperCase(),
+            billingInterval: ['monthly', 'yearly'].includes(b.interval) ? b.interval : 'monthly',
+            salesLimit: Math.max(0, Number(b.salesLimit) || 0),
+            limits: {
+                maxProducts: Math.max(0, Number(b.maxProducts) || 0),
+                maxStaff: Math.max(0, Number(b.maxStaff) || 0),
+                maxCategories: Math.max(0, Number(b.maxCategories) || 0),
+                maxOrdersPerMonth: Math.max(0, Number(b.maxOrdersPerMonth) || 0),
+            },
+        });
+        return ok(res, `Plan "${name}" created.`, { plan });
+    } catch (err) {
+        return fail(res, 500, err.message || 'Failed to create plan');
+    }
+};
+
+// POST /api/platform/tenants/:id/plan  { planId } — put a store on a plan.
+export const assignPlan = async (req, res) => {
+    try {
+        const { id } = req.params;
+        if (!mongoose.isValidObjectId(id)) return fail(res, 400, 'Invalid store id');
+        const { planId } = req.body || {};
+        if (!mongoose.isValidObjectId(planId)) return fail(res, 400, 'Invalid plan id');
+
+        const [tenant, plan] = await Promise.all([
+            TenantModel.findById(id),
+            PlanModel.findById(planId).lean(),
+        ]);
+        if (!tenant) return fail(res, 404, 'Store not found');
+        if (!plan) return fail(res, 404, 'Plan not found');
+
+        tenant.planId = plan._id;
+        await tenant.save();
+        await SubscriptionModel.updateOne(
+            { tenantId: tenant._id },
+            { $set: { planId: plan._id, interval: plan.billingInterval || 'monthly' } },
+            { upsert: false },
+        );
+        logger.info({ tenantId: id, planId: String(plan._id), by: req.platformAdmin?.email }, 'platform.assignPlan');
+        return ok(res, `"${tenant.businessName}" is now on the ${plan.name} plan.`, { tenant });
+    } catch (err) {
+        return fail(res, 500, err.message || 'Failed to assign plan');
+    }
+};
+
+// POST /api/platform/tenants/:id/billing  { status?, balanceDue?, lockedReason? }
+// Drives enforcement: 'active' normal, 'past_due' warned, 'locked' admin locked.
+export const setBilling = async (req, res) => {
+    try {
+        const { id } = req.params;
+        if (!mongoose.isValidObjectId(id)) return fail(res, 400, 'Invalid store id');
+        const { status, balanceDue, lockedReason } = req.body || {};
+        if (status && !['active', 'past_due', 'locked'].includes(status)) {
+            return fail(res, 400, 'Status must be active, past_due or locked.');
+        }
+        const tenant = await TenantModel.findById(id);
+        if (!tenant) return fail(res, 404, 'Store not found');
+
+        if (!tenant.billing) tenant.billing = {};
+        if (status) tenant.billing.status = status;
+        if (balanceDue != null) tenant.billing.balanceDue = Math.max(0, Number(balanceDue) || 0);
+        if (lockedReason != null) tenant.billing.lockedReason = String(lockedReason).slice(0, 300);
+        await tenant.save();
+
+        if (status) {
+            const subStatus = status === 'active' ? 'active' : 'past_due';
+            await SubscriptionModel.updateOne({ tenantId: tenant._id }, { $set: { status: subStatus } });
+        }
+        logger.info({ tenantId: id, status, by: req.platformAdmin?.email }, 'platform.setBilling');
+        return ok(res, `Billing updated for "${tenant.businessName}".`, { billing: tenant.billing });
+    } catch (err) {
+        return fail(res, 500, err.message || 'Failed to update billing');
     }
 };
 

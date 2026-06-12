@@ -65,6 +65,36 @@ export const impersonateStore = (id) =>
 export const impersonateStoreBySubdomain = (subdomain) =>
     authFetch(`${BASE}/stores/${subdomain}/impersonate`, { method: "POST" }).then(json);
 
+// ── Plans & billing (super-admin) ────────────────────────────────────────────
+// Every plan the platform offers (sorted by price).
+export const listPlans = () => authFetch(`${BASE}/plans`).then(json);
+
+// Create a plan. payload: { name, slug, description?, price?, currency?, interval?,
+//   salesLimit?, maxProducts?, maxStaff?, maxCategories?, maxOrdersPerMonth? }
+export const createPlan = (payload) =>
+    authFetch(`${BASE}/plans`, {
+        method: "POST",
+        headers: jsonHeaders,
+        body: JSON.stringify(payload),
+    }).then(json);
+
+// Put a store on a plan.
+export const assignPlan = (id, planId) =>
+    authFetch(`${BASE}/tenants/${id}/plan`, {
+        method: "POST",
+        headers: jsonHeaders,
+        body: JSON.stringify({ planId }),
+    }).then(json);
+
+// Set a store's billing state. payload: { status?: 'active'|'past_due'|'locked',
+//   balanceDue?, lockedReason? }. 'locked' freezes the store's admin.
+export const setBilling = (id, payload) =>
+    authFetch(`${BASE}/tenants/${id}/billing`, {
+        method: "POST",
+        headers: jsonHeaders,
+        body: JSON.stringify(payload),
+    }).then(json);
+
 // ── Owner management ─────────────────────────────────────────────────────────
 // Platform owners (cross-tenant super-admins).
 export const listOwners = () => authFetch(`${BASE}/owners`).then(json);

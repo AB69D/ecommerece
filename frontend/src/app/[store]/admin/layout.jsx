@@ -5,7 +5,7 @@ import { usePathname, useRouter, useParams } from "next/navigation";
 import {
     FiGrid, FiPackage, FiLayout, FiList, FiTruck, FiMenu, FiX, FiSettings,
     FiHome, FiPercent, FiStar, FiLogOut, FiUsers, FiShield, FiFileText, FiUser,
-    FiShoppingBag, FiTag, FiBarChart2,
+    FiShoppingBag, FiTag, FiBarChart2, FiCreditCard,
 } from "react-icons/fi";
 import { isAuthenticated, logout, fetchMe } from "@/services/adminAuth";
 import { AdminAuthContext, buildCan } from "@/context/AdminAuthContext";
@@ -154,6 +154,9 @@ export default function AdminLayout({ children }) {
                 { name: 'Users & Roles', path: '/admin/admins', icon: <FiUsers className="w-5 h-5" />, perms: ['user:read'] },
                 { name: 'POS Sellers', path: '/admin/pos-sellers', icon: <FiShoppingBag className="w-5 h-5" />, perms: ['user:read'] },
                 { name: 'Audit Logs', path: '/admin/audit-logs', icon: <FiFileText className="w-5 h-5" />, perms: ['audit:read'] },
+                // Plan, usage & balance — owner-only (settings:manage is held by the
+                // store owner / super-admin alone, not staff admins).
+                { name: 'Billing & Plan', path: '/admin/billing', icon: <FiCreditCard className="w-5 h-5" />, perms: ['settings:manage'] },
                 { name: 'My Account', path: '/admin/account', icon: <FiUser className="w-5 h-5" />, perms: [] },
             ],
         },
