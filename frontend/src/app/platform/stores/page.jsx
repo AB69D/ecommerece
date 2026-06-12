@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
     FiGlobe, FiCheck, FiX, FiAlertCircle, FiSlash, FiPause, FiPlay,
     FiEye, FiRefreshCw, FiClock, FiUser, FiExternalLink, FiUsers, FiKey, FiShield,
-    FiCreditCard, FiLock,
+    FiCreditCard, FiLock, FiCopy, FiRotateCw, FiCheckCircle,
 } from "react-icons/fi";
 import {
     listTenants, getTenant, listTenantUsers, approveTenant, suspendTenant, rejectTenant,
@@ -89,6 +89,7 @@ export default function StoresPage() {
     const [detailLoading, setDetailLoading] = useState(false);
     const [users, setUsers] = useState(null); // store staff for the open detail
     const [plans, setPlans] = useState([]); // plans available to assign
+    const [pwTarget, setPwTarget] = useState(null); // { id, username } for the reset-password modal
 
     const isPlatformOwner = !!me?.isPlatformOwner;
 
@@ -171,18 +172,10 @@ export default function StoresPage() {
         if (ures?.success) setUsers(ures.data?.users || []);
     };
 
-    // Reset a store user's password to a freshly generated one (shown once so the
-    // platform owner can hand it over).
-    const resetUserPw = async (user) => {
-        const pw = genPassword();
-        try {
-            const res = await resetAdminPassword(user.id, pw);
-            if (!res?.success) throw new Error(res?.message || "Reset failed");
-            flash("success", `New password for @${user.username}: ${pw}  (copy it now)`);
-        } catch (e) {
-            flash("error", e.message);
-        }
-    };
+    // Open the reset-password support modal for a store user (owner or staff).
+    // The modal sets a new password and reveals it once so the platform owner can
+    // hand it to the store. Existing passwords are hashed and can never be shown.
+    const openPwReset = (user) => setPwTarget({ id: user.id || user._id, username: user.username });
 
     // Activate / deactivate a store user (the backend blocks self + env owners).
     const toggleUser = async (user, tenantId) => {
@@ -394,13 +387,24 @@ export default function StoresPage() {
 
                                     <Section title="Owner" icon={FiUser}>
                                         {detail.owner ? (
-                                            <dl className="grid grid-cols-3 gap-y-1.5 text-sm">
-                                                <Row k="Name" v={detail.owner.fullName || "—"} />
-                                                <Row k="Username" v={`@${detail.owner.username}`} />
-                                                <Row k="Email" v={detail.owner.email || "—"} />
-                                                <Row k="Login" v={detail.owner.isActive ? "Active" : "Disabled"} />
-                                                <Row k="Last login" v={fmtDateTime(detail.owner.lastLoginAt)} />
-                                            </dl>
+                                            <>
+                                                <dl className="grid grid-cols-3 gap-y-1.5 text-sm">
+                                                    <Row k="Name" v={detail.owner.fullName || "—"} />
+                                                    <Row k="Username" v={`@${detail.owner.username}`} />
+                                                    <Row k="Email" v={detail.owner.email || "—"} />
+                                                    <Row k="Login" v={detail.owner.isActive ? "Active" : "Disabled"} />
+                                                    <Row k="Last login" v={fmtDateTime(detail.owner.lastLoginAt)} />
+                                                </dl>
+                                                <div className="mt-3 flex items-center gap-2">
+                                                    <button
+                                                        onClick={() => openPwReset(detail.owner)}
+                                                        className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-lg bg-indigo-50 text-indigo-700 hover:bg-indigo-100"
+                                                    >
+                                                        <FiKey className="w-4 h-4" /> Reset owner password
+                                                    </button>
+                                                    <span className="text-[11px] text-gray-400">For support — set a new password and read it back to the owner.</span>
+                                                </div>
+                                            </>
                                         ) : <p className="text-sm text-gray-400">No owner record.</p>}
                                     </Section>
 
@@ -424,7 +428,7 @@ export default function StoresPage() {
                                                             <div className="text-xs text-gray-400 truncate">{u.email || "—"} · last login {fmtDateTime(u.lastLoginAt)}</div>
                                                         </div>
                                                         <div className="flex items-center gap-1 shrink-0">
-                                                            <button onClick={() => resetUserPw(u)} title="Reset password" className="p-2 rounded-lg text-gray-400 hover:text-indigo-600 hover:bg-indigo-50">
+                                                            <button onClick={() => openPwReset(u)} title="Reset password" className="p-2 rounded-lg text-gray-400 hover:text-indigo-600 hover:bg-indigo-50">
                                                                 <FiKey className="w-4 h-4" />
                                                             </button>
                                                             {!u.isPlatformOwner && (
@@ -481,6 +485,10 @@ export default function StoresPage() {
                     </div>
                 </div>
             )}
+
+            {pwTarget && (
+                <PasswordSupportModal target={pwTarget} onClose={() => setPwTarget(null)} flash={flash} />
+            )}
         </div>
     );
 }
@@ -502,6 +510,115 @@ function Row({ k, v }) {
             <dt className="text-gray-400 col-span-1">{k}</dt>
             <dd className="text-gray-800 col-span-2 break-words">{String(v)}</dd>
         </>
+    );
+}
+
+// Support tool: set a NEW password for a store user and reveal it once so the
+// platform owner can read it back to the store. Stored passwords are bcrypt
+// hashes and can never be displayed — resetting is the only supported recovery.
+function PasswordSupportModal({ target, onClose, flash }) {
+    const [pw, setPw] = useState(() => genPassword());
+    const [busy, setBusy] = useState(false);
+    const [done, setDone] = useState(false);
+
+    const copy = async (text, label) => {
+        try {
+            await navigator.clipboard.writeText(text);
+            flash("success", `${label} copied`);
+        } catch {
+            flash("error", "Couldn't copy automatically — select the text and copy it.");
+        }
+    };
+
+    const submit = async () => {
+        if (!pw || pw.length < 8) {
+            flash("error", "Password must be at least 8 characters.");
+            return;
+        }
+        setBusy(true);
+        try {
+            const res = await resetAdminPassword(target.id, pw);
+            if (!res?.success) throw new Error(res?.message || "Reset failed");
+            setDone(true);
+        } catch (e) {
+            flash("error", e.message);
+        } finally {
+            setBusy(false);
+        }
+    };
+
+    return (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm" onClick={() => !busy && onClose()}>
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md" onClick={(e) => e.stopPropagation()}>
+                <div className="flex items-center justify-between p-5 border-b border-gray-100">
+                    <h2 className="font-bold text-gray-800 flex items-center gap-2">
+                        <FiKey className="w-4 h-4 text-indigo-600" /> Reset password — @{target.username}
+                    </h2>
+                    <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-lg"><FiX className="w-5 h-5 text-gray-500" /></button>
+                </div>
+
+                {!done ? (
+                    <>
+                        <div className="p-5 space-y-3">
+                            <p className="text-sm text-gray-600">
+                                Set a new password for this account and read it back to the store owner. For security, the
+                                existing password is encrypted and can&apos;t be shown — resetting is the only way to recover access.
+                            </p>
+                            <div>
+                                <label className="block text-xs text-gray-500 mb-1">New password</label>
+                                <div className="flex items-center gap-2">
+                                    <input
+                                        value={pw}
+                                        onChange={(e) => setPw(e.target.value)}
+                                        className="flex-1 px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                    />
+                                    <button onClick={() => setPw(genPassword())} title="Generate a new one" className="p-2.5 rounded-xl text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 border border-gray-200">
+                                        <FiRotateCw className="w-4 h-4" />
+                                    </button>
+                                </div>
+                                <p className="text-[11px] text-gray-400 mt-1">Editable — use the generated one or type a temporary password (min 8 characters).</p>
+                            </div>
+                        </div>
+                        <div className="flex justify-end gap-2 p-5 border-t border-gray-100">
+                            <button onClick={onClose} disabled={busy} className="px-4 py-2.5 text-sm text-gray-600 hover:bg-gray-100 rounded-xl">Cancel</button>
+                            <button onClick={submit} disabled={busy} className="px-4 py-2.5 text-sm text-white font-medium rounded-xl inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60">
+                                {busy && <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
+                                Set password
+                            </button>
+                        </div>
+                    </>
+                ) : (
+                    <>
+                        <div className="p-5 space-y-3">
+                            <div className="flex items-center gap-2 text-emerald-700">
+                                <FiCheckCircle className="w-5 h-5" />
+                                <span className="font-semibold text-sm">New sign-in details</span>
+                            </div>
+                            <p className="text-sm text-gray-600">Share these with the store owner. The password won&apos;t be shown again.</p>
+                            <CredRow label="Username" value={target.username} onCopy={() => copy(target.username, "Username")} />
+                            <CredRow label="Password" value={pw} mono onCopy={() => copy(pw, "Password")} />
+                        </div>
+                        <div className="flex justify-end p-5 border-t border-gray-100">
+                            <button onClick={onClose} className="px-4 py-2.5 text-sm text-white font-medium rounded-xl bg-gray-800 hover:bg-gray-900">Done</button>
+                        </div>
+                    </>
+                )}
+            </div>
+        </div>
+    );
+}
+
+function CredRow({ label, value, mono, onCopy }) {
+    return (
+        <div className="flex items-center justify-between gap-2 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5">
+            <div className="min-w-0">
+                <div className="text-[11px] uppercase tracking-wide text-gray-400">{label}</div>
+                <div className={`text-sm text-gray-900 truncate ${mono ? "font-mono" : ""}`}>{value}</div>
+            </div>
+            <button onClick={onCopy} title={`Copy ${label.toLowerCase()}`} className="shrink-0 inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-indigo-700 bg-indigo-50 hover:bg-indigo-100 rounded-lg">
+                <FiCopy className="w-3.5 h-3.5" /> Copy
+            </button>
+        </div>
     );
 }
 
