@@ -90,17 +90,68 @@ const sanitizeTheme = (t = {}) => {
     return out;
 };
 
-function Field({ label, hint, children }) {
+// Prepend https:// when the admin typed a URL without a scheme (e.g.
+// "facebook.com/mystore"), so the single most common save failure never happens.
+const normUrl = (v) => {
+    const s = (v || "").trim();
+    if (!s) return "";
+    return /^[a-z][a-z0-9+.-]*:\/\//i.test(s) ? s : `https://${s}`;
+};
+
+// Friendly names for the fields the API can reject, keyed by the validation
+// issue's path, so the error banner reads "Contact email: …" not "Validation
+// failed". Unmapped paths fall back to a humanised last segment.
+const FIELD_LABELS = {
+    siteName: "Store name", tagline: "Tagline", description: "Description",
+    logoUrl: "Logo", faviconUrl: "Favicon",
+    contactEmail: "Contact email", contactPhone: "Contact phone", contactAddress: "Address",
+    currencyCode: "Currency code", currencySymbol: "Currency symbol",
+    "seo.ogImage": "Social share image",
+};
+const friendlyField = (path = "") => {
+    if (FIELD_LABELS[path]) return FIELD_LABELS[path];
+    if (path.startsWith("socialLinks")) {
+        const i = Number(path.split(".")[1]);
+        const which = path.endsWith(".url") ? " URL" : path.endsWith(".platform") ? " name" : "";
+        return `Social link ${Number.isFinite(i) ? i + 1 : ""}${which}`.trim();
+    }
+    if (path.startsWith("theme.")) return `Theme colour (${path.split(".")[1]})`;
+    const seg = path.split(".").pop() || path;
+    return seg.replace(/([A-Z])/g, " $1").replace(/^./, (c) => c.toUpperCase());
+};
+
+// Which settings tab a given validation path lives on, so a failed save can jump
+// the user straight to the offending field's tab.
+const tabForPath = (path = "") => {
+    if (/^(siteName|tagline|description|logoUrl|faviconUrl)/.test(path)) return "branding";
+    if (path.startsWith("theme")) return "appearance";
+    if (/^(contactEmail|contactPhone|contactAddress|socialLinks)/.test(path)) return "contact";
+    if (/^(currencyCode|currencySymbol|seo)/.test(path)) return "seo";
+    if (path.startsWith("features")) return "features";
+    if (/^(receipt|pos)/.test(path)) return "pos";
+    if (path.startsWith("barcode")) return "barcode";
+    if (/^(analytics|whatsapp)/.test(path)) return "integrations";
+    if (path.startsWith("payment")) return "payments";
+    if (/^(aboutText|copyrightText|columns|bottomLinks|showNewsletter|newsletter|showPaymentBadges)/.test(path)) return "footer";
+    return null;
+};
+
+function Field({ label, hint, children, error }) {
     return (
         <label className="block">
             <span className="block text-sm font-medium text-gray-700 mb-1">{label}</span>
             {children}
-            {hint && <span className="block text-xs text-gray-400 mt-1">{hint}</span>}
+            {error
+                ? <span className="block text-xs text-red-600 mt-1 flex items-center gap-1"><FiAlertCircle className="w-3 h-3 shrink-0" /> {error}</span>
+                : hint && <span className="block text-xs text-gray-400 mt-1">{hint}</span>}
         </label>
     );
 }
 
 const inputCls = "w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500";
+// Same input, but flagged red when the field failed validation.
+const inputErrCls = "w-full px-3 py-2.5 bg-red-50 border border-red-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-red-500";
+const fieldCls = (hasError) => (hasError ? inputErrCls : inputCls);
 
 // A swatch + hex input pair for picking a theme colour. The native colour input
 // needs a 6-digit hex; the text field lets the admin paste any value (sanitised
@@ -224,6 +275,9 @@ export default function SettingsPage() {
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [msg, setMsg] = useState({ type: "", text: "" });
+    // Per-field validation messages from the API, keyed by issue path (e.g.
+    // "contactEmail", "socialLinks.0.url"). Shown inline + summarised in the banner.
+    const [fieldErrors, setFieldErrors] = useState({});
     // When true the manual code/symbol fields stay open (user picked "Custom").
     const [customCurrency, setCustomCurrency] = useState(false);
 
@@ -250,25 +304,27 @@ export default function SettingsPage() {
     const resetTheme = () => setSettings((p) => ({ ...p, theme: { ...THEME_DEFAULTS } }));
 
     const save = async () => {
-        setSaving(true); setMsg({ type: "", text: "" });
+        setSaving(true); setMsg({ type: "", text: "" }); setFieldErrors({});
         try {
             const sPayload = {
                 siteName: settings.siteName || "",
                 tagline: settings.tagline || "",
                 description: settings.description || "",
-                logoUrl: settings.logoUrl || "",
-                faviconUrl: settings.faviconUrl || "",
-                contactEmail: settings.contactEmail || "",
+                logoUrl: normUrl(settings.logoUrl),
+                faviconUrl: normUrl(settings.faviconUrl),
+                contactEmail: (settings.contactEmail || "").trim(),
                 contactPhone: settings.contactPhone || "",
                 contactAddress: settings.contactAddress || "",
-                socialLinks: (settings.socialLinks || []).filter((l) => l.platform?.trim() && l.url?.trim()),
+                socialLinks: (settings.socialLinks || [])
+                    .filter((l) => l.platform?.trim() && l.url?.trim())
+                    .map((l) => ({ ...l, url: normUrl(l.url) })),
                 currencyCode: (settings.currencyCode || "USD").toUpperCase().slice(0, 3),
                 currencySymbol: settings.currencySymbol || "$",
                 seo: {
                     defaultTitle: settings.seo?.defaultTitle || "",
                     defaultDescription: settings.seo?.defaultDescription || "",
                     defaultKeywords: settings.seo?.defaultKeywords || "",
-                    ogImage: settings.seo?.ogImage || "",
+                    ogImage: normUrl(settings.seo?.ogImage),
                 },
                 features: { ...(settings.features || {}) },
                 receipt: {
@@ -349,7 +405,29 @@ export default function SettingsPage() {
                     }));
                 }
             } else {
-                setMsg({ type: "error", text: r1?.message || r2?.message || "Failed to save settings" });
+                // Surface WHICH field(s) the API rejected and why, instead of a
+                // bare "Validation failed". The error middleware returns a
+                // `details: [{ path, message }]` array for 422s.
+                const details = [
+                    ...(Array.isArray(r1?.details) ? r1.details : []),
+                    ...(Array.isArray(r2?.details) ? r2.details : []),
+                ];
+                if (details.length) {
+                    const fe = {};
+                    details.forEach((d) => { if (d?.path) fe[d.path] = d.message; });
+                    setFieldErrors(fe);
+                    const list = details.slice(0, 8).map((d) => `${friendlyField(d.path)} — ${d.message}`);
+                    setMsg({
+                        type: "error",
+                        text: `Please fix ${details.length} field${details.length > 1 ? "s" : ""}: ${list.join("  ·  ")}`,
+                    });
+                    // Jump to the tab holding the first offending field.
+                    const jump = tabForPath(details[0]?.path);
+                    if (jump) setTab(jump);
+                } else {
+                    setMsg({ type: "error", text: r1?.message || r2?.message || "Failed to save settings" });
+                }
+                if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" });
             }
         } catch {
             setMsg({ type: "error", text: "Network error. Please try again." });
@@ -514,8 +592,8 @@ export default function SettingsPage() {
 
                 {tab === "contact" && (
                     <>
-                        <Field label="Contact email">
-                            <input type="email" className={inputCls} value={settings.contactEmail || ""} onChange={(e) => setS({ contactEmail: e.target.value })} placeholder="store@example.com" />
+                        <Field label="Contact email" error={fieldErrors.contactEmail}>
+                            <input type="email" className={fieldCls(fieldErrors.contactEmail)} value={settings.contactEmail || ""} onChange={(e) => setS({ contactEmail: e.target.value })} placeholder="store@example.com" />
                         </Field>
                         <Field label="Contact phone">
                             <input className={inputCls} value={settings.contactPhone || ""} onChange={(e) => setS({ contactPhone: e.target.value })} placeholder="+1 555 000 0000" />
@@ -533,16 +611,25 @@ export default function SettingsPage() {
                             </div>
                             <div className="space-y-2">
                                 {(settings.socialLinks || []).length === 0 && <p className="text-xs text-gray-400">No social links yet.</p>}
-                                {(settings.socialLinks || []).map((l, i) => (
-                                    <div key={i} className="flex gap-2">
-                                        <input className={`${inputCls} flex-1`} placeholder="Platform (e.g. Facebook)" value={l.platform || ""}
-                                            onChange={(e) => { const arr = [...settings.socialLinks]; arr[i] = { ...arr[i], platform: e.target.value }; setS({ socialLinks: arr }); }} />
-                                        <input className={`${inputCls} flex-[2]`} placeholder="https://..." value={l.url || ""}
-                                            onChange={(e) => { const arr = [...settings.socialLinks]; arr[i] = { ...arr[i], url: e.target.value }; setS({ socialLinks: arr }); }} />
-                                        <button type="button" onClick={() => setS({ socialLinks: settings.socialLinks.filter((_, j) => j !== i) })}
-                                            className="px-2.5 text-gray-400 hover:text-red-500"><FiX className="w-4 h-4" /></button>
-                                    </div>
-                                ))}
+                                {(settings.socialLinks || []).map((l, i) => {
+                                    const pErr = fieldErrors[`socialLinks.${i}.platform`];
+                                    const uErr = fieldErrors[`socialLinks.${i}.url`];
+                                    return (
+                                        <div key={i}>
+                                            <div className="flex gap-2">
+                                                <input className={`${fieldCls(pErr)} flex-1`} placeholder="Platform (e.g. Facebook)" value={l.platform || ""}
+                                                    onChange={(e) => { const arr = [...settings.socialLinks]; arr[i] = { ...arr[i], platform: e.target.value }; setS({ socialLinks: arr }); }} />
+                                                <input className={`${fieldCls(uErr)} flex-[2]`} placeholder="https://..." value={l.url || ""}
+                                                    onChange={(e) => { const arr = [...settings.socialLinks]; arr[i] = { ...arr[i], url: e.target.value }; setS({ socialLinks: arr }); }} />
+                                                <button type="button" onClick={() => setS({ socialLinks: settings.socialLinks.filter((_, j) => j !== i) })}
+                                                    className="px-2.5 text-gray-400 hover:text-red-500"><FiX className="w-4 h-4" /></button>
+                                            </div>
+                                            {(pErr || uErr) && (
+                                                <p className="text-xs text-red-600 mt-1 flex items-center gap-1"><FiAlertCircle className="w-3 h-3 shrink-0" /> {pErr || uErr}</p>
+                                            )}
+                                        </div>
+                                    );
+                                })}
                             </div>
                         </div>
                     </>
@@ -579,11 +666,11 @@ export default function SettingsPage() {
                         </Field>
                         {showCustomCurrency && (
                             <div className="grid grid-cols-2 gap-3">
-                                <Field label="Currency code" hint="3 letters, e.g. USD">
-                                    <input maxLength={3} className={`${inputCls} uppercase`} value={settings.currencyCode || ""} onChange={(e) => setS({ currencyCode: e.target.value.toUpperCase() })} />
+                                <Field label="Currency code" hint="3 letters, e.g. USD" error={fieldErrors.currencyCode}>
+                                    <input maxLength={3} className={`${fieldCls(fieldErrors.currencyCode)} uppercase`} value={settings.currencyCode || ""} onChange={(e) => setS({ currencyCode: e.target.value.toUpperCase() })} />
                                 </Field>
-                                <Field label="Currency symbol" hint="Shown before every price, e.g. $ or ৳.">
-                                    <input maxLength={5} className={inputCls} value={settings.currencySymbol || ""} onChange={(e) => setS({ currencySymbol: e.target.value })} />
+                                <Field label="Currency symbol" hint="Shown before every price, e.g. $ or ৳." error={fieldErrors.currencySymbol}>
+                                    <input maxLength={5} className={fieldCls(fieldErrors.currencySymbol)} value={settings.currencySymbol || ""} onChange={(e) => setS({ currencySymbol: e.target.value })} />
                                 </Field>
                             </div>
                         )}

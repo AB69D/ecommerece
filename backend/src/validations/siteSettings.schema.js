@@ -1,8 +1,8 @@
 import { z } from 'zod';
 
 const socialLink = z.object({
-    platform: z.string().min(1),
-    url: z.string().url(),
+    platform: z.string().min(1, 'Give the social platform a name (e.g. Facebook).'),
+    url: z.string().url('Each social link needs a full URL starting with https://'),
     icon: z.string().optional(),
 });
 
@@ -113,23 +113,23 @@ const theme = z
     .partial();
 
 export const updateSiteSettingsSchema = z.object({
-    siteName: z.string().min(1).max(100).optional(),
-    tagline: z.string().max(200).optional(),
-    description: z.string().max(500).optional(),
-    logoUrl: z.string().url().or(z.literal('')).optional(),
-    faviconUrl: z.string().url().or(z.literal('')).optional(),
-    contactEmail: z.string().email().or(z.literal('')).optional(),
-    contactPhone: z.string().max(50).optional(),
-    contactAddress: z.string().max(500).optional(),
+    siteName: z.string().min(1, 'Store name is required.').max(100, 'Store name must be 100 characters or fewer.').optional(),
+    tagline: z.string().max(200, 'Tagline must be 200 characters or fewer.').optional(),
+    description: z.string().max(500, 'Description must be 500 characters or fewer.').optional(),
+    logoUrl: z.string().url('Logo must be a full link starting with https:// (or leave it blank).').or(z.literal('')).optional(),
+    faviconUrl: z.string().url('Favicon must be a full link starting with https:// (or leave it blank).').or(z.literal('')).optional(),
+    contactEmail: z.string().email('Enter a valid email like you@store.com (or leave it blank).').or(z.literal('')).optional(),
+    contactPhone: z.string().max(50, 'Phone must be 50 characters or fewer.').optional(),
+    contactAddress: z.string().max(500, 'Address must be 500 characters or fewer.').optional(),
     socialLinks: z.array(socialLink).optional(),
-    currencyCode: z.string().length(3).optional(),
-    currencySymbol: z.string().max(5).optional(),
+    currencyCode: z.string().length(3, 'Use the 3-letter currency code, e.g. USD or BDT.').optional(),
+    currencySymbol: z.string().max(5, 'Currency symbol must be 5 characters or fewer.').optional(),
     seo: z
         .object({
             defaultTitle: z.string().optional(),
             defaultDescription: z.string().optional(),
             defaultKeywords: z.string().optional(),
-            ogImage: z.string().url().or(z.literal('')).optional(),
+            ogImage: z.string().url('Social share image must be a full link starting with https:// (or leave it blank).').or(z.literal('')).optional(),
         })
         .partial()
         .optional(),
