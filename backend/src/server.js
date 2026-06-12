@@ -96,6 +96,13 @@ const apiLimiter = rateLimit({
     standardHeaders: true,
     legacyHeaders: false,
     message: { success: false, message: 'Too many requests, please try again later.' },
+    // Public storefront READS (GET /api/client/*) are server-rendered by the
+    // frontend from a handful of shared CDN / serverless egress IPs. A per-IP cap
+    // therefore throttles SSR for ALL visitors at once the moment traffic rises
+    // (every store page would 404/degrade). These reads are cheap, cacheable and
+    // not a meaningful abuse vector, so exempt them here — writes, auth, admin and
+    // platform calls stay fully rate-limited.
+    skip: (req) => req.method === 'GET' && req.originalUrl.startsWith('/api/client/'),
 });
 
 const authLimiter = rateLimit({

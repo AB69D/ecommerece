@@ -29,19 +29,29 @@ const RESERVED_STORE = new Set(["www", "api", "cdn", "assets", "static", "mail",
 // Does this slug resolve to a live, approved tenant? resolveTenant 404s an unknown
 // or un-approved store and 403s a suspended one. We probe the products list (not
 // site-settings) because it returns 200 for a brand-new store that hasn't saved
-// any settings yet — so a freshly-approved blank store is still browsable. Used by
-// the [store] layout to 404 a bad /<store> URL. no-store so one store's answer is
-// never cached for another.
+// any settings yet — so a freshly-approved blank store is still browsable.
+//
+// CRITICAL: this fails OPEN. The check only 404s a store when the backend
+// EXPLICITLY says the slug is unknown/unapproved (404/403). A network error,
+// timeout, or any other status renders the store anyway — a backend hiccup must
+// never take every storefront offline. Genuinely bad slugs are still caught when
+// the backend is reachable; reserved/invalid slugs are rejected up front.
 export async function validateStore(store) {
     if (!isValidStore(store) || RESERVED_STORE.has(store)) return false;
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 3500);
     try {
         const res = await fetch(`${BACKEND_URL}/api/client/product/products?limit=1`, {
             headers: { "X-Tenant": store },
             cache: "no-store",
+            signal: controller.signal,
         });
-        return res.ok;
+        // Only a definitive "no such store" closes the door.
+        return !(res.status === 404 || res.status === 403);
     } catch {
-        return false;
+        return true; // unreachable backend -> don't 404 a real store
+    } finally {
+        clearTimeout(timer);
     }
 }
 
