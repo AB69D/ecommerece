@@ -27,6 +27,7 @@ import {
     createAnnouncement,
     deactivateAnnouncement,
 } from '../controllers/announcement.controller.js';
+import { exportTenantData } from '../controllers/backup.controller.js';
 import { requireSuperAdmin } from '../middlewares/platformAuth.middleware.js';
 
 const router = Router();
@@ -54,6 +55,7 @@ router.get('/overview', getOverview);
 router.get('/tenants', listTenants);
 router.get('/tenants/:id', getTenant);
 router.get('/tenants/:id/users', getTenantUsers);
+router.get('/tenants/:id/export', exportTenantData);
 router.post('/tenants/:id/approve', approveTenant);
 router.post('/tenants/:id/suspend', suspendTenant);
 router.post('/tenants/:id/reject', rejectTenant);

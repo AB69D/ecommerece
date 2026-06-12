@@ -34,6 +34,10 @@ export const listTenants = (status = "") => {
 
 export const getTenant = (id) => authFetch(`${BASE}/tenants/${id}`).then(json);
 
+// Full data backup for one store — returns the raw Response so the caller can
+// stream it to a file download (it's a JSON attachment, not an envelope).
+export const exportTenantData = (id) => authFetch(`${BASE}/tenants/${id}/export`);
+
 // Every staff account belonging to a store (owner + admins + POS sellers).
 export const listTenantUsers = (id) => authFetch(`${BASE}/tenants/${id}/users`).then(json);
 

@@ -3,11 +3,11 @@ import { useEffect, useMemo, useState } from "react";
 import {
     FiGlobe, FiCheck, FiX, FiAlertCircle, FiSlash, FiPause, FiPlay,
     FiEye, FiRefreshCw, FiClock, FiUser, FiExternalLink, FiUsers, FiKey, FiShield,
-    FiCreditCard, FiLock, FiCopy, FiRotateCw, FiCheckCircle,
+    FiCreditCard, FiLock, FiCopy, FiRotateCw, FiCheckCircle, FiDownload, FiDatabase,
 } from "react-icons/fi";
 import {
     listTenants, getTenant, listTenantUsers, approveTenant, suspendTenant, rejectTenant,
-    resetAdminPassword, toggleAdminActive, listPlans, assignPlan, setBilling,
+    resetAdminPassword, toggleAdminActive, listPlans, assignPlan, setBilling, exportTenantData,
 } from "@/services/platform";
 
 const genPassword = () => {
@@ -90,6 +90,7 @@ export default function StoresPage() {
     const [users, setUsers] = useState(null); // store staff for the open detail
     const [plans, setPlans] = useState([]); // plans available to assign
     const [pwTarget, setPwTarget] = useState(null); // { id, username } for the reset-password modal
+    const [backupBusy, setBackupBusy] = useState(false);
 
     const isPlatformOwner = !!me?.isPlatformOwner;
 
@@ -170,6 +171,34 @@ export default function StoresPage() {
     const reloadUsers = async (id) => {
         const ures = await listTenantUsers(id).catch(() => null);
         if (ures?.success) setUsers(ures.data?.users || []);
+    };
+
+    // Download a full JSON data backup of a store (categories, products, orders,
+    // customers, coupons, reviews, staff). Streams the authenticated response to a
+    // file via a temporary object URL.
+    const downloadBackup = async (tenant) => {
+        setBackupBusy(true);
+        try {
+            const res = await exportTenantData(tenant._id);
+            if (!res.ok) {
+                const body = await res.json().catch(() => ({}));
+                throw new Error(body.message || "Backup failed");
+            }
+            const blob = await res.blob();
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = `${tenant.subdomain}-backup-${new Date().toISOString().slice(0, 10)}.json`;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            URL.revokeObjectURL(url);
+            flash("success", `Backup downloaded for ${tenant.businessName}`);
+        } catch (e) {
+            flash("error", e.message || "Backup failed");
+        } finally {
+            setBackupBusy(false);
+        }
     };
 
     // Open the reset-password support modal for a store user (owner or staff).
@@ -460,6 +489,23 @@ export default function StoresPage() {
                                             onSaved={async () => { await openDetail(detail.tenant._id); load(); }}
                                         />
                                     )}
+
+                                    <Section title="Data backup" icon={FiDatabase}>
+                                        <p className="text-xs text-gray-500 mb-2">
+                                            Download a full JSON backup of this store — categories, products, orders, customers,
+                                            coupons, reviews and staff. Passwords and gateway secrets are never included.
+                                        </p>
+                                        <button
+                                            onClick={() => downloadBackup(detail.tenant)}
+                                            disabled={backupBusy}
+                                            className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-lg bg-gray-800 text-white hover:bg-gray-900 disabled:opacity-60"
+                                        >
+                                            {backupBusy
+                                                ? <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                                : <FiDownload className="w-4 h-4" />}
+                                            Download backup
+                                        </button>
+                                    </Section>
 
                                     <Section title="Timeline" icon={FiClock}>
                                         <dl className="grid grid-cols-3 gap-y-1.5 text-sm">
