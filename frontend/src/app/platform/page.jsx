@@ -3,9 +3,16 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import {
     FiGlobe, FiShoppingBag, FiDollarSign, FiClock, FiRefreshCw, FiExternalLink,
-    FiAlertCircle, FiArrowRight, FiStar, FiUsers,
+    FiAlertCircle, FiArrowRight, FiStar, FiUsers, FiTag, FiBell,
 } from "react-icons/fi";
 import { getOverview } from "@/services/platform";
+
+const QUICK_LINKS = [
+    { href: "/platform/stores", icon: FiGlobe, label: "Stores", desc: "Approve, manage, support" },
+    { href: "/platform/plans", icon: FiTag, label: "Plans", desc: "Subscription tiers & limits" },
+    { href: "/platform/announcements", icon: FiBell, label: "Announcements", desc: "Notify store owners" },
+    { href: "/platform/owners", icon: FiUsers, label: "Owners", desc: "Platform & store owners" },
+];
 
 const STORE_BADGE = {
     pending: "bg-amber-100 text-amber-700 border-amber-200",
@@ -90,6 +97,19 @@ export default function PlatformOverviewPage() {
                     <span className="inline-flex items-center gap-1 font-semibold">Review <FiArrowRight className="w-4 h-4" /></span>
                 </Link>
             )}
+
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6">
+                {QUICK_LINKS.map(({ href, icon: Icon, label, desc }) => (
+                    <Link key={href} href={href} className="group bg-white rounded-2xl border border-gray-100 p-4 hover:border-indigo-200 hover:shadow-sm transition-all">
+                        <div className="flex items-center gap-2">
+                            <span className="w-9 h-9 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center"><Icon className="w-5 h-5" /></span>
+                            <span className="font-semibold text-gray-800">{label}</span>
+                            <FiArrowRight className="w-4 h-4 text-gray-300 ml-auto group-hover:text-indigo-500 transition-colors" />
+                        </div>
+                        <p className="text-xs text-gray-400 mt-2">{desc}</p>
+                    </Link>
+                ))}
+            </div>
 
             <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
                 <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
