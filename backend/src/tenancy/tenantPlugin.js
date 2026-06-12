@@ -48,9 +48,18 @@ export function tenantPlugin(schema) {
         tenantId: { type: mongoose.Schema.Types.ObjectId, ref: 'Tenant', index: true },
     });
 
-    // Stamp tenantId on create/save for single documents.
+    // Stamp tenantId on create for single documents.
+    //
+    // CRITICAL: only stamp on INSERT (this.isNew). Never re-stamp an existing
+    // document on update. A doc loaded with a field projection that omits
+    // tenantId (e.g. `.select('+passwordHash username')`) has `this.tenantId`
+    // undefined in memory even though it IS set in the DB — re-stamping it here
+    // would silently MOVE that row to the current context's tenant (for a
+    // platform/system save that resolves to the PRIMARY tenant), corrupting
+    // cross-tenant ownership. On a genuine insert tenantId is legitimately
+    // absent and we adopt the active tenant.
     schema.pre('save', function stampTenant(next) {
-        if (!this.tenantId) {
+        if (this.isNew && !this.tenantId) {
             const tenantId = getEffectiveTenantId();
             if (tenantId) this.tenantId = tenantId;
         }

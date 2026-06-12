@@ -724,12 +724,14 @@ export const resetAdminPassword = async (req, res) => {
         if (password.length < 8) return fail(res, 400, 'Password must be at least 8 characters.');
 
         const admin = await runAsSystem(() =>
-            AdminModel.findById(id).select('+passwordHash username').exec(),
+            AdminModel.findById(id).select('username').exec(),
         );
         if (!admin) return fail(res, 404, 'Account not found');
 
-        admin.passwordHash = await bcrypt.hash(password, 10);
-        await admin.save();
+        // Atomic field update (NOT load-then-save): never round-trips the whole
+        // doc, so a projection that omits tenantId can't trigger a re-stamp.
+        const passwordHash = await bcrypt.hash(password, 10);
+        await runAsSystem(() => AdminModel.updateOne({ _id: id }, { $set: { passwordHash } }).exec());
         logger.info({ id, by: req.platformAdmin?.email }, 'platform.resetAdminPassword');
         return ok(res, `Password reset for "${admin.username}".`, {});
     } catch (err) {
@@ -759,11 +761,13 @@ export const toggleAdminActive = async (req, res) => {
             return fail(res, 409, 'This platform owner is defined in the server env and cannot be deactivated here.');
         }
 
-        admin.isActive = !admin.isActive;
-        await admin.save();
-        logger.info({ id, isActive: admin.isActive, by: me.email }, 'platform.toggleAdminActive');
-        return ok(res, `${admin.isActive ? 'Activated' : 'Deactivated'} "${admin.username}".`, {
-            isActive: admin.isActive,
+        // Atomic flip (NOT load-then-save) so a projection without tenantId can't
+        // cause a re-stamp on save.
+        const nextActive = !admin.isActive;
+        await runAsSystem(() => AdminModel.updateOne({ _id: id }, { $set: { isActive: nextActive } }).exec());
+        logger.info({ id, isActive: nextActive, by: me.email }, 'platform.toggleAdminActive');
+        return ok(res, `${nextActive ? 'Activated' : 'Deactivated'} "${admin.username}".`, {
+            isActive: nextActive,
         });
     } catch (err) {
         return fail(res, 500, err.message || 'Failed to update account');
