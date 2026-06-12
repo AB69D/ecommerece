@@ -96,7 +96,17 @@ export function tenantPlugin(schema) {
             }
             return next();
         }
-        this.pipeline().unshift({ $match: { tenantId } });
+        // CRITICAL: unlike find/update, an aggregation $match is sent to Mongo
+        // RAW — Mongoose does not cast it against the schema. The request context
+        // often carries the tenantId as a STRING (it comes from the JWT claim via
+        // setRequestTenant), and `{ tenantId: "<hex>" }` never equals the stored
+        // ObjectId, so the pipeline would silently match nothing (every report /
+        // chart empty). Coerce to ObjectId so the $match actually scopes.
+        const tid =
+            typeof tenantId === 'string' && mongoose.isValidObjectId(tenantId)
+                ? new mongoose.Types.ObjectId(tenantId)
+                : tenantId;
+        this.pipeline().unshift({ $match: { tenantId: tid } });
         next();
     });
 }
