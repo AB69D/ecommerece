@@ -3,33 +3,34 @@ import NewArrivals from "@/components/New-Arraivals.jsx";
 import AllProducts from "@/components/AllProducts.jsx";
 import TopSelling from "@/components/TopSelling.jsx";
 import CustomerReviews from "@/components/CustomerReviews.jsx";
+import { fetchSiteSettings } from "@/lib/dynamicContent.js";
+import { SITE_URL, absoluteUrl } from "@/lib/seo.js";
 
-export const metadata = {
-    title: "Ab9dEcommerce - Quality Products | Wide Selection",
-    description: "Shop quality products at Ab9dEcommerce. We offer a wide selection of quality products across multiple categories.",
-    keywords: "Ab9dEcommerce, products, pure various products, quality products, traditional food, products",
-    openGraph: {
-        title: "Ab9dEcommerce - quality products",
-        description: "Shop quality products at Ab9dEcommerce. Premium quality various products, and quality products.",
-        url: "https://example.com",
-        siteName: "Ab9dEcommerce",
-        images: [
-            {
-                url: "/logo.png",
-                width: 800,
-                height: 600,
-                alt: "Ab9dEcommerce Logo"
-            }
-        ],
-        type: "website"
-    },
-    twitter: {
-        card: "summary_large_image",
-        title: "Ab9dEcommerce - quality products",
-        description: "Shop quality products at Ab9dEcommerce",
-        images: ["/logo.png"]
-    }
-};
+// Home metadata follows THIS store's settings. We omit `title` so the store's
+// layout title template ("<store name> - …") applies — otherwise every store's
+// home would share one hardcoded title.
+export async function generateMetadata({ params }) {
+    const { store } = await params;
+    const s = await fetchSiteSettings(store);
+    const siteName = s?.siteName || "Ab9dEcommerce";
+    const description =
+        s?.seo?.defaultDescription || s?.description || s?.tagline ||
+        `Shop quality products at ${siteName}.`;
+    const ogImage = absoluteUrl(s?.seo?.ogImage || s?.logoUrl || "/logo.png");
+    return {
+        description,
+        ...(s?.seo?.defaultKeywords ? { keywords: s.seo.defaultKeywords } : {}),
+        openGraph: {
+            title: siteName,
+            description,
+            url: `${SITE_URL}/${store}`,
+            siteName,
+            images: [{ url: ogImage, width: 800, height: 600, alt: siteName }],
+            type: "website",
+        },
+        twitter: { card: "summary_large_image", title: siteName, description, images: [ogImage] },
+    };
+}
 
 export default function Home() {
   return (
