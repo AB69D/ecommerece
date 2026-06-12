@@ -7,6 +7,7 @@ import { logger } from '../lib/logger.js';
 import { optionalCustomer } from '../middlewares/clientAuth.middleware.js';
 import { initSession, validateTransaction, verifyIpnHash } from '../lib/sslcommerz.js';
 import { sendOrderConfirmationEmail } from '../lib/orderEmail.js';
+import { runAsSystem, runAsTenant } from '../tenancy/tenantContext.js';
 
 const clientPaymentRouter = Router();
 
@@ -49,15 +50,25 @@ const resultUrl = (orderId, outcome) =>
 // gateway `val_id` and require status VALID/VALIDATED with a matching tran_id and
 // amount before crediting the order. The md5 `verify_sign` is a secondary signal
 // that is logged but never gates (the validation call is authoritative).
-const settlePaid = async ({ tranId, valId, body, cfg, source }) => {
-    const payment = await PaymentModel.findOne({ tranId });
-    if (!payment) {
+const settlePaid = async ({ tranId, valId, body, source }) => {
+    // The gateway callback carries NO tenant (it's a server-to-server / browser
+    // POST to a fixed URL), so find the payment ACROSS all stores first.
+    const found = await runAsSystem(() => PaymentModel.findOne({ tranId }).exec());
+    if (!found) {
         logger.warn({ tranId, source }, 'Payment callback for unknown tran_id');
         return { ok: false, reason: 'unknown_tran' };
     }
+    // Everything below MUST run in the payment's OWN store context: the store's
+    // gateway credentials (getPaymentConfig), its order, its settings — never the
+    // primary fallback. Bind to the payment's tenant for the rest of settlement.
+    return runAsTenant(found.tenantId, () => settleInTenant({ payment: found, tranId, valId, body, source }));
+};
+
+const settleInTenant = async ({ payment, tranId, valId, body, source }) => {
     // Already settled (the IPN and the browser redirect race each other) — no-op.
     if (payment.status === 'paid') return { ok: true, payment };
 
+    const cfg = await getPaymentConfig(); // THIS store's gateway credentials
     if (!cfg.storeId || !cfg.storePassword) {
         logger.error({ tranId }, 'Cannot validate payment: gateway credentials missing');
         return { ok: false, reason: 'no_credentials' };
@@ -290,8 +301,7 @@ clientPaymentRouter.post('/success', async (req, res) => {
     const tranId = body.value_a || body.tran_id || '';
     const orderId = body.value_b || '';
     try {
-        const cfg = await getPaymentConfig();
-        const result = await settlePaid({ tranId, valId: body.val_id, body, cfg, source: 'redirect' });
+        const result = await settlePaid({ tranId, valId: body.val_id, body, source: 'redirect' });
         return res.redirect(303, resultUrl(orderId, result.ok ? 'success' : 'failed'));
     } catch (error) {
         logger.error({ err: error, tranId }, 'Payment success callback error');
@@ -307,10 +317,10 @@ clientPaymentRouter.post('/fail', async (req, res) => {
     const tranId = body.value_a || body.tran_id || '';
     const orderId = body.value_b || '';
     try {
-        await PaymentModel.updateOne(
+        await runAsSystem(() => PaymentModel.updateOne(
             { tranId, status: { $nin: ['paid', 'refunded'] } },
             { $set: { status: 'failed', ipnPayload: body } },
-        );
+        ).exec());
     } catch (error) {
         logger.error({ err: error, tranId }, 'Payment fail callback error');
     }
@@ -323,10 +333,10 @@ clientPaymentRouter.post('/cancel', async (req, res) => {
     const tranId = body.value_a || body.tran_id || '';
     const orderId = body.value_b || '';
     try {
-        await PaymentModel.updateOne(
+        await runAsSystem(() => PaymentModel.updateOne(
             { tranId, status: { $nin: ['paid', 'refunded'] } },
             { $set: { status: 'cancelled', ipnPayload: body } },
-        );
+        ).exec());
     } catch (error) {
         logger.error({ err: error, tranId }, 'Payment cancel callback error');
     }
@@ -340,15 +350,16 @@ clientPaymentRouter.post('/ipn', async (req, res) => {
     const body = req.body || {};
     const tranId = body.value_a || body.tran_id || '';
     try {
-        const cfg = await getPaymentConfig();
         const status = String(body.status || '').toUpperCase();
         if (status === 'VALID' || status === 'VALIDATED') {
-            await settlePaid({ tranId, valId: body.val_id, body, cfg, source: 'ipn' });
+            await settlePaid({ tranId, valId: body.val_id, body, source: 'ipn' });
         } else if (status === 'FAILED' || status === 'CANCELLED') {
-            await PaymentModel.updateOne(
+            // Cross-tenant: the callback carries no store, so update by tran_id in
+            // system context (the unique tran_id pins the exact payment).
+            await runAsSystem(() => PaymentModel.updateOne(
                 { tranId, status: { $nin: ['paid', 'refunded'] } },
                 { $set: { status: status === 'FAILED' ? 'failed' : 'cancelled', ipnPayload: body } },
-            );
+            ).exec());
         }
     } catch (error) {
         logger.error({ err: error, tranId }, 'IPN handling error');
@@ -363,16 +374,20 @@ clientPaymentRouter.post('/ipn', async (req, res) => {
 clientPaymentRouter.get('/status/:orderId', async (req, res) => {
     try {
         const orderId = String(req.params.orderId || '').trim();
-        const order = await OrderModel.findOne({ orderId })
+        // The result page that polls this lives outside a store path, so the
+        // request carries no tenant. The order id is random/unguessable and only
+        // non-PII status is returned, so resolve it across stores (system context)
+        // rather than letting it fall back to the primary store and 404.
+        const order = await runAsSystem(() => OrderModel.findOne({ orderId })
             .select('orderId paymentStatus orderStatus paymentMethod totalAmount')
-            .lean();
+            .lean());
         if (!order) {
             return res.status(404).json({ message: 'Order not found', error: true, success: false });
         }
-        const attempt = await PaymentModel.findOne({ orderId })
+        const attempt = await runAsSystem(() => PaymentModel.findOne({ orderId })
             .sort({ createdAt: -1 })
             .select('status')
-            .lean();
+            .lean());
         return res.json({
             message: 'Payment status',
             data: {
