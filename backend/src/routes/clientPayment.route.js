@@ -378,16 +378,21 @@ clientPaymentRouter.get('/status/:orderId', async (req, res) => {
         // request carries no tenant. The order id is random/unguessable and only
         // non-PII status is returned, so resolve it across stores (system context)
         // rather than letting it fall back to the primary store and 404.
+        // .exec() so the query runs INSIDE the system context — a bare .lean()
+        // returns an un-executed Query whose tenant hook would fire after the
+        // context pops (and wrongly scope to the primary store).
         const order = await runAsSystem(() => OrderModel.findOne({ orderId })
             .select('orderId paymentStatus orderStatus paymentMethod totalAmount')
-            .lean());
+            .lean()
+            .exec());
         if (!order) {
             return res.status(404).json({ message: 'Order not found', error: true, success: false });
         }
         const attempt = await runAsSystem(() => PaymentModel.findOne({ orderId })
             .sort({ createdAt: -1 })
             .select('status')
-            .lean());
+            .lean()
+            .exec());
         return res.json({
             message: 'Payment status',
             data: {
