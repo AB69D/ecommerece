@@ -5,6 +5,7 @@ import {
     FiCheckCircle, FiLock, FiRefreshCw, FiCalendar, FiTrendingUp,
 } from "react-icons/fi";
 import { getMyBilling } from "@/services/billing";
+import { useAdminAuth } from "@/context/AdminAuthContext";
 
 const fmtMoney = (amount, currency = "BDT") => {
     const n = Number(amount || 0);
@@ -53,6 +54,8 @@ const BILLING_STATE = {
 };
 
 export default function BillingPage() {
+    const { can } = useAdminAuth();
+    const canBilling = can("settings:manage"); // owner-only
     const [data, setData] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
@@ -71,7 +74,19 @@ export default function BillingPage() {
         }
     }, []);
 
-    useEffect(() => { load(); }, [load]);
+    useEffect(() => { if (canBilling) load(); }, [load, canBilling]);
+
+    // Defence-in-depth: the sidebar already hides this from non-owners, but a
+    // staff member could still type the URL. Billing is an owner-level concern.
+    if (!canBilling) {
+        return (
+            <div className="max-w-md mx-auto text-center py-16">
+                <FiLock className="w-10 h-10 text-gray-300 mx-auto mb-3" />
+                <h1 className="text-xl font-bold text-gray-800">Owners only</h1>
+                <p className="text-sm text-gray-500 mt-2">Billing &amp; plan details are visible to the store owner.</p>
+            </div>
+        );
+    }
 
     if (loading) {
         return <div className="flex justify-center py-20"><div className="w-8 h-8 border-4 border-gray-200 border-t-indigo-600 rounded-full animate-spin" /></div>;
