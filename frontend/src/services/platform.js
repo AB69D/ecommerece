@@ -95,6 +95,22 @@ export const setBilling = (id, payload) =>
         body: JSON.stringify(payload),
     }).then(json);
 
+// ── Announcements (super-admin) ──────────────────────────────────────────────
+// Notices broadcast to store owners (in-admin banner + optional email).
+export const listAnnouncements = () => authFetch(`${BASE}/announcements`).then(json);
+
+// payload: { title, body, level?, audience?: 'all'|'store', targetTenantId?,
+//   expiresAt?, sendEmail? }
+export const createAnnouncement = (payload) =>
+    authFetch(`${BASE}/announcements`, {
+        method: "POST",
+        headers: jsonHeaders,
+        body: JSON.stringify(payload),
+    }).then(json);
+
+export const deactivateAnnouncement = (id) =>
+    authFetch(`${BASE}/announcements/${id}/deactivate`, { method: "POST" }).then(json);
+
 // ── Owner management ─────────────────────────────────────────────────────────
 // Platform owners (cross-tenant super-admins).
 export const listOwners = () => authFetch(`${BASE}/owners`).then(json);

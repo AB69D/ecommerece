@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { FiGrid, FiGlobe, FiShield, FiLogOut, FiSlash, FiTag } from "react-icons/fi";
+import { FiGrid, FiGlobe, FiShield, FiLogOut, FiSlash, FiTag, FiBell } from "react-icons/fi";
 import { isAuthenticated, logout, fetchMe } from "@/services/adminAuth";
 import { AdminAuthContext, buildCan } from "@/context/AdminAuthContext";
 
@@ -10,6 +10,7 @@ const NAV = [
     { name: "Overview", path: "/platform", icon: FiGrid },
     { name: "Stores", path: "/platform/stores", icon: FiGlobe },
     { name: "Plans", path: "/platform/plans", icon: FiTag },
+    { name: "Announcements", path: "/platform/announcements", icon: FiBell },
     { name: "Owners", path: "/platform/owners", icon: FiShield },
 ];
 

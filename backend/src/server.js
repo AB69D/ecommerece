@@ -51,6 +51,7 @@ import posRouter from './routes/pos.route.js';
 import couponRouter from './routes/coupon.route.js';
 import stockRouter from './routes/stock.route.js';
 import billingRouter from './routes/billing.route.js';
+import announcementRouter from './routes/announcement.route.js';
 import platformRouter from './routes/platform.route.js';
 
 const app = express();
@@ -179,6 +180,7 @@ app.use('/api/admin/analytics', requireAuth, analyticsRouter);
 app.use('/api/admin/pos', requireAuth, posRouter);
 app.use('/api/admin/stock', requireAuth, stockRouter);
 app.use('/api/admin/billing', requireAuth, billingRouter);
+app.use('/api/admin/announcements', requireAuth, announcementRouter);
 app.use('/api/admin/customer', requireAuth, customerRouter);
 app.use('/api/admin/coupon', requireAuth, couponRouter.admin);
 app.use('/api/admin/site-settings', requireAuth, siteSettingsRouter.admin);

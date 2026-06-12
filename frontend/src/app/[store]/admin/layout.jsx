@@ -10,6 +10,7 @@ import {
 import { isAuthenticated, logout, fetchMe } from "@/services/adminAuth";
 import { AdminAuthContext, buildCan } from "@/context/AdminAuthContext";
 import { hasAnyPermission } from "@/lib/permissions";
+import AnnouncementBanner from "@/components/admin/AnnouncementBanner";
 
 // "Log in as" leaves the platform owner's own token under admin_owner_token while
 // the store session takes over admin_token. Reading that backup tells us we're in
@@ -285,6 +286,7 @@ export default function AdminLayout({ children }) {
                             </button>
                         </div>
                     )}
+                    <AnnouncementBanner />
                     <div className="max-w-6xl mx-auto bg-white rounded-xl shadow-sm border border-gray-100 p-4 sm:p-6 lg:p-8">
                         {children}
                     </div>

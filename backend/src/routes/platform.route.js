@@ -22,6 +22,11 @@ import {
     assignPlan,
     setBilling,
 } from '../controllers/platform.controller.js';
+import {
+    listAnnouncements,
+    createAnnouncement,
+    deactivateAnnouncement,
+} from '../controllers/announcement.controller.js';
 import { requireSuperAdmin } from '../middlewares/platformAuth.middleware.js';
 
 const router = Router();
@@ -65,6 +70,11 @@ router.get('/plans', listPlans);
 router.post('/plans', createPlan);
 router.post('/tenants/:id/plan', assignPlan);
 router.post('/tenants/:id/billing', setBilling);
+
+// Announcements (notices broadcast to store owners).
+router.get('/announcements', listAnnouncements);
+router.post('/announcements', createAnnouncement);
+router.post('/announcements/:id/deactivate', deactivateAnnouncement);
 
 // Store owners (the per-tenant owner accounts).
 router.get('/store-owners', listStoreOwners);
