@@ -1,10 +1,13 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
+import { useParams } from "next/navigation";
 import { posFetchMe, clearPosToken } from "@/services/pos";
 import PosLogin from "./PosLogin";
 import PosTerminal from "./PosTerminal";
 
 export default function PosPage() {
+    const params = useParams();
+    const store = params?.store;
     const [me, setMe] = useState(null);
     const [checking, setChecking] = useState(true);
 
@@ -45,7 +48,11 @@ export default function PosPage() {
         );
     }
 
-    if (!me) {
+    // The POS token is bound to ONE store. If this session belongs to a different
+    // store than the URL's /<store>/pos, treat it as not signed in HERE — show the
+    // login for this store rather than rendering another store's terminal under
+    // this URL. (The beanbrew session stays valid for /beanbrew/pos.)
+    if (!me || (me.store && store && me.store !== store)) {
         return <PosLogin onLoggedIn={loadMe} />;
     }
 

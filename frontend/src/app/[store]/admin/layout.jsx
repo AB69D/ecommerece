@@ -36,7 +36,14 @@ export default function AdminLayout({ children }) {
     const store = params?.store;
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const [isMobile, setIsMobile] = useState(false);
-    const [checkedAuth, setCheckedAuth] = useState(false);
+    // Tracks WHICH store the current session was validated against. Rendering is
+    // gated on `validatedStore === store`, so navigating to a DIFFERENT store's
+    // admin URL never renders this session's store under that URL — the
+    // comparison fails on the very first render (before the effect re-runs),
+    // keeping the loader up until we redirect. A plain boolean wouldn't: this
+    // layout stays mounted across store changes, so it would still be `true` from
+    // the previous store and flash that store's admin under the new URL.
+    const [validatedStore, setValidatedStore] = useState(null);
     const [me, setMe] = useState(null);
     const impersonationStore = useSyncExternalStore(subscribeImpersonation, readImpersonationStore, () => "");
 
@@ -67,16 +74,19 @@ export default function AdminLayout({ children }) {
             // Otherwise we send them away WITHOUT ever rendering this store's data:
             //   • a platform owner -> the console (a store is entered ONLY via the
             //     explicit "Log in as" button — never silently by typing a URL);
-            //   • a store owner on someone else's store -> their own store / login.
+            //   • a store user on a store they don't belong to -> sign in for THAT
+            //     store. We deliberately do NOT bounce them into their own store's
+            //     admin: that conflates two stores' URLs and is exactly the
+            //     cross-store confusion we want to avoid.
             if (store && data.store !== store) {
-                router.replace(data.isPlatformOwner ? '/platform' : (data.store ? `/${data.store}/admin` : '/login'));
+                router.replace(data.isPlatformOwner ? '/platform' : '/login');
                 return;
             }
             if (!data.store && data.isPlatformOwner) {
                 router.replace('/platform');
                 return;
             }
-            setCheckedAuth(true);
+            setValidatedStore(store);
         })();
     }, [router, loadMe, store]);
 
@@ -106,7 +116,10 @@ export default function AdminLayout({ children }) {
         window.location.assign('/platform');
     };
 
-    if (!checkedAuth) {
+    // Gate on the validated store matching the URL store: on cross-store
+    // navigation this is false from the first render, so the previous store's
+    // admin is never shown under the new store's URL.
+    if (validatedStore !== store) {
         return (
             <div className="min-h-screen bg-gray-100 flex items-center justify-center">
                 <div className="w-10 h-10 border-4 border-gray-300 border-t-emerald-600 rounded-full animate-spin" />
