@@ -8,6 +8,7 @@ import { runAsTenant, runAsSystem } from '../tenancy/tenantContext.js';
 import { provisionTenant } from '../tenancy/provisionTenant.js';
 import { clearTenantCache } from '../tenancy/resolveTenant.js';
 import { isPlatformEmail } from '../middlewares/platformAuth.middleware.js';
+import { writeAudit } from '../lib/audit.js';
 import { sendEmail } from '../lib/mailer.js';
 import { logger } from '../lib/logger.js';
 import { env } from '../config/env.js';
@@ -747,6 +748,26 @@ const mintStoreSession = async (tenant, req) => {
         { expiresIn: '2h' },
     );
     logger.info({ tenantId: String(tenant._id), by: req.platformAdmin?.email }, 'platform.impersonate');
+
+    // Record the access in the STORE's OWN audit trail so the owner sees exactly
+    // when platform support entered their store (data-privacy transparency). Runs
+    // in the store's tenant context so it lands in that store's Audit Logs.
+    await runAsTenant(tenant._id, () =>
+        writeAudit({
+            actor: { id: req.platformAdmin?.id || null, username: req.platformAdmin?.email || 'platform', role: 'platform-owner' },
+            action: 'platform.support_access',
+            resource: 'Store',
+            resourceId: String(tenant._id),
+            method: 'POST',
+            path: '/api/platform/impersonate',
+            statusCode: 200,
+            ip: req.ip || '',
+            userAgent: (req.headers['user-agent'] || '').slice(0, 300),
+            message: `Platform support (${req.platformAdmin?.email || 'platform'}) signed in as ${owner.username} to assist this store`,
+            success: true,
+        }),
+    ).catch(() => {});
+
     return { token, store: { businessName: tenant.businessName, subdomain: tenant.subdomain, owner: owner.username } };
 };
 

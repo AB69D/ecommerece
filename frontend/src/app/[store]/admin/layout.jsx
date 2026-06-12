@@ -8,7 +8,6 @@ import {
     FiShoppingBag, FiTag, FiBarChart2,
 } from "react-icons/fi";
 import { isAuthenticated, logout, fetchMe } from "@/services/adminAuth";
-import { impersonateStoreBySubdomain } from "@/services/platform";
 import { AdminAuthContext, buildCan } from "@/context/AdminAuthContext";
 import { hasAnyPermission } from "@/lib/permissions";
 
@@ -62,32 +61,14 @@ export default function AdminLayout({ children }) {
                 return;
             }
             // This is /<store>/admin — confirm the signed-in user belongs to
-            // <store>. A token already for THIS store passes straight through.
+            // <store>. A token already for THIS store passes straight through
+            // (incl. a platform owner who used the explicit, audited "Log in as").
+            // Otherwise we send them away WITHOUT ever rendering this store's data:
+            //   • a platform owner -> the console (a store is entered ONLY via the
+            //     explicit "Log in as" button — never silently by typing a URL);
+            //   • a store owner on someone else's store -> their own store / login.
             if (store && data.store !== store) {
-                // A PLATFORM OWNER opening a store they don't own is stepped INTO
-                // that store (impersonation), so the URL and the data always match
-                // and they're never shown another store's data. A reload picks up
-                // the new store token.
-                if (data.isPlatformOwner) {
-                    try {
-                        const res = await impersonateStoreBySubdomain(store);
-                        if (res?.success && res.data?.token) {
-                            const cur = localStorage.getItem('admin_token');
-                            // Preserve the ORIGINAL platform token across store switches.
-                            if (cur && !localStorage.getItem('admin_owner_token')) {
-                                localStorage.setItem('admin_owner_token', cur);
-                            }
-                            localStorage.setItem('admin_impersonation_store', res.data.store?.businessName || store);
-                            localStorage.setItem('admin_token', res.data.token);
-                            window.location.reload();
-                            return;
-                        }
-                    } catch { /* fall through to the console */ }
-                    router.replace('/platform'); // store missing / suspended
-                    return;
-                }
-                // A store owner on someone else's store -> their own store (or login).
-                router.replace(data.store ? `/${data.store}/admin` : '/login');
+                router.replace(data.isPlatformOwner ? '/platform' : (data.store ? `/${data.store}/admin` : '/login'));
                 return;
             }
             if (!data.store && data.isPlatformOwner) {
