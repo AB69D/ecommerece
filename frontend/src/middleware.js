@@ -76,6 +76,21 @@ export function middleware(request) {
                 if (isValidStore(cookieStore)) tenant = cookieStore;
             }
         }
+        // Admin & POS are token-scoped, BUT we still pass the CURRENT store (from
+        // the calling page's Referer) so the backend can REJECT any write whose
+        // URL store doesn't match the session's token store. This is the safety
+        // net for a stale browser tab / cross-store bleed silently writing to the
+        // wrong store: the backend's token-vs-host guard turns it into a 403
+        // instead of a misfiled record. Referer ONLY (never the cookie) so it's
+        // multi-tab safe; auth (login / me) is exempt — it's global-by-username
+        // and is how the app itself detects a store mismatch.
+        if (
+            !tenant &&
+            pathname.startsWith('/api/admin/') &&
+            !pathname.startsWith('/api/admin/auth/')
+        ) {
+            tenant = storeFromReferer(request.headers.get('referer'));
+        }
         const headers = new Headers(request.headers);
         headers.delete('x-tenant'); // never trust an inbound value
         if (tenant) headers.set('x-tenant', tenant);
