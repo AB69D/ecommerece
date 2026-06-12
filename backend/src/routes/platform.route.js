@@ -15,6 +15,7 @@ import {
     toggleAdminActive,
     listStoreOwners,
     impersonateStoreOwner,
+    impersonateBySubdomain,
     getOverview,
 } from '../controllers/platform.controller.js';
 import { requireSuperAdmin } from '../middlewares/platformAuth.middleware.js';
@@ -48,6 +49,7 @@ router.post('/tenants/:id/approve', approveTenant);
 router.post('/tenants/:id/suspend', suspendTenant);
 router.post('/tenants/:id/reject', rejectTenant);
 router.post('/tenants/:id/impersonate', impersonateStoreOwner);
+router.post('/stores/:subdomain/impersonate', impersonateBySubdomain);
 
 // Platform owners (cross-tenant super-admins).
 router.get('/owners', listOwners);

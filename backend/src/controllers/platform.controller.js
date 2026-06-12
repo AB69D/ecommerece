@@ -720,45 +720,60 @@ export const listStoreOwners = async (req, res) => {
 // step into the store's admin panel to help. Only approved stores with an active
 // owner can be entered.
 // ---------------------------------------------------------------------------
+// Shared: mint a short-lived admin session bound to a store's owner. Throws
+// { code, message } on any precondition failure so callers map it to an HTTP code.
+const mintStoreSession = async (tenant, req) => {
+    if (!tenant) throw { code: 404, message: 'Store not found' };
+    if (!tenant.ownerAdminId) throw { code: 400, message: 'This store has no owner account.' };
+    if (tenant.status !== 'approved') throw { code: 409, message: 'Only an approved store can be accessed.' };
+
+    const owner = await runAsSystem(() =>
+        AdminModel.findById(tenant.ownerAdminId).select('username email role isActive').lean().exec(),
+    );
+    if (!owner) throw { code: 404, message: 'Store owner account not found.' };
+    if (owner.isActive === false) throw { code: 409, message: 'The store owner account is deactivated. Activate it first.' };
+
+    const token = jwt.sign(
+        {
+            sub: String(owner._id),
+            username: owner.username,
+            role: owner.role || 'super-admin',
+            email: owner.email || undefined,
+            tenantId: String(tenant._id),
+            imp: true,                                   // marks an impersonation session
+            by: req.platformAdmin?.email || 'platform',  // audit: who entered
+        },
+        process.env.JWT_SECRET,
+        { expiresIn: '2h' },
+    );
+    logger.info({ tenantId: String(tenant._id), by: req.platformAdmin?.email }, 'platform.impersonate');
+    return { token, store: { businessName: tenant.businessName, subdomain: tenant.subdomain, owner: owner.username } };
+};
+
 export const impersonateStoreOwner = async (req, res) => {
     try {
         const { id } = req.params;
         if (!mongoose.isValidObjectId(id)) return fail(res, 400, 'Invalid tenant id');
-
         const tenant = await TenantModel.findById(id).lean();
-        if (!tenant) return fail(res, 404, 'Tenant not found');
-        if (!tenant.ownerAdminId) return fail(res, 400, 'This store has no owner account.');
-        if (tenant.status !== 'approved') return fail(res, 409, 'Only an approved store can be accessed.');
-
-        const owner = await runAsSystem(() =>
-            AdminModel.findById(tenant.ownerAdminId)
-                .select('username email role isActive')
-                .lean()
-                .exec(),
-        );
-        if (!owner) return fail(res, 404, 'Store owner account not found.');
-        if (owner.isActive === false) return fail(res, 409, 'The store owner account is deactivated. Activate it first.');
-
-        const token = jwt.sign(
-            {
-                sub: String(owner._id),
-                username: owner.username,
-                role: owner.role || 'super-admin',
-                email: owner.email || undefined,
-                tenantId: String(tenant._id),
-                imp: true,                                   // marks an impersonation session
-                by: req.platformAdmin?.email || 'platform',  // audit: who entered
-            },
-            process.env.JWT_SECRET,
-            { expiresIn: '2h' },
-        );
-
-        logger.info({ tenantId: id, by: req.platformAdmin?.email }, 'platform.impersonate');
-        return ok(res, `Signed in as ${owner.username} — ${tenant.businessName}.`, {
-            token,
-            store: { businessName: tenant.businessName, subdomain: tenant.subdomain, owner: owner.username },
-        });
+        const session = await mintStoreSession(tenant, req);
+        return ok(res, `Signed in as ${session.store.owner} — ${session.store.businessName}.`, session);
     } catch (err) {
+        if (err?.code) return fail(res, err.code, err.message);
+        return fail(res, 500, err.message || 'Failed to access store');
+    }
+};
+
+// POST /api/platform/stores/:subdomain/impersonate — same as above but keyed by
+// the store SLUG, so a platform owner who simply opens /<store>/admin can be
+// dropped straight into that store (the frontend calls this on a store mismatch).
+export const impersonateBySubdomain = async (req, res) => {
+    try {
+        const sub = String(req.params.subdomain || '').trim().toLowerCase();
+        const tenant = await TenantModel.findOne({ subdomain: sub }).lean();
+        const session = await mintStoreSession(tenant, req);
+        return ok(res, `Signed in as ${session.store.owner} — ${session.store.businessName}.`, session);
+    } catch (err) {
+        if (err?.code) return fail(res, err.code, err.message);
         return fail(res, 500, err.message || 'Failed to access store');
     }
 };

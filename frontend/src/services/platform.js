@@ -60,6 +60,11 @@ export const rejectTenant = (id, reason = "") =>
 export const impersonateStore = (id) =>
     authFetch(`${BASE}/tenants/${id}/impersonate`, { method: "POST" }).then(json);
 
+// Same, but keyed by the store slug — used when a platform owner simply opens
+// /<store>/admin so we can step them into that store automatically.
+export const impersonateStoreBySubdomain = (subdomain) =>
+    authFetch(`${BASE}/stores/${subdomain}/impersonate`, { method: "POST" }).then(json);
+
 // ── Owner management ─────────────────────────────────────────────────────────
 // Platform owners (cross-tenant super-admins).
 export const listOwners = () => authFetch(`${BASE}/owners`).then(json);
