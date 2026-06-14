@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState, useCallback } from "react";
+import { useParams } from "next/navigation";
 import Link from "@/components/StoreLink";
 import {
     FiDollarSign, FiShoppingCart, FiPackage, FiAlertTriangle, FiTrendingUp, FiTrendingDown,
@@ -57,6 +58,7 @@ function StatCard({ icon, label, value, accent, growth }) {
 }
 
 export default function DashboardPage() {
+    const { store } = useParams() || {};
     const [days, setDays] = useState(30);
     const [overview, setOverview] = useState(null);
     const [recentOrders, setRecentOrders] = useState([]);
@@ -128,16 +130,32 @@ export default function DashboardPage() {
                     <h1 className="text-2xl font-bold text-gray-800">Dashboard</h1>
                     <p className="text-sm text-gray-500 mt-0.5">Your store at a glance</p>
                 </div>
-                <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-xl">
-                    {RANGES.map((r) => (
-                        <button
-                            key={r.value}
-                            onClick={() => setDays(r.value)}
-                            className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-all ${days === r.value ? "bg-white text-indigo-600 shadow-sm" : "text-gray-500 hover:text-gray-700"}`}
-                        >
-                            {r.label}
-                        </button>
-                    ))}
+                <div className="flex flex-wrap items-center gap-2">
+                    <a
+                        href={`/${store}/pos`}
+                        className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-teal-600 hover:bg-teal-700 text-white text-sm font-semibold rounded-xl shadow transition-colors"
+                    >
+                        <FiShoppingBag className="w-4 h-4" /> Open POS
+                    </a>
+                    <a
+                        href={`/${store}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 text-sm font-semibold rounded-xl shadow-sm transition-colors"
+                    >
+                        <FiGlobe className="w-4 h-4" /> View Store
+                    </a>
+                    <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-xl">
+                        {RANGES.map((r) => (
+                            <button
+                                key={r.value}
+                                onClick={() => setDays(r.value)}
+                                className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-all ${days === r.value ? "bg-white text-indigo-600 shadow-sm" : "text-gray-500 hover:text-gray-700"}`}
+                            >
+                                {r.label}
+                            </button>
+                        ))}
+                    </div>
                 </div>
             </div>
 

@@ -1,12 +1,16 @@
 "use client";
 import { authFetch } from "@/services/api";
 import { useState, useEffect } from "react";
-import { FiPackage, FiShoppingCart, FiDollarSign, FiTrendingUp, FiUsers, FiTruck, FiCheck, FiX, FiClock, FiActivity, FiGrid, FiArchive } from "react-icons/fi";
+import { useParams } from "next/navigation";
+import { FiPackage, FiShoppingCart, FiDollarSign, FiTrendingUp, FiUsers, FiTruck, FiCheck, FiX, FiClock, FiActivity, FiGrid, FiArchive, FiShoppingBag, FiExternalLink } from "react-icons/fi";
 import Link from "@/components/StoreLink";
 import { useCurrency } from "@/context/CurrencyContext.jsx";
+import { useAdminAuth } from "@/context/AdminAuthContext";
 
 export default function DashboardPage() {
     const { symbol } = useCurrency();
+    const { me } = useAdminAuth();
+    const { store } = useParams() || {};
     const [stats, setStats] = useState(null);
     const [loading, setLoading] = useState(true);
     const [recentOrders, setRecentOrders] = useState([]);
@@ -89,9 +93,31 @@ export default function DashboardPage() {
     return (
         <div className="space-y-6">
             {/* Header */}
-            <div>
-                <h3 className="text-2xl font-bold text-gray-800">Dashboard</h3>
-                <p className="text-gray-500 mt-1">Welcome to Ab9dEcommerce Admin Panel</p>
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div>
+                    <h3 className="text-2xl font-bold text-gray-800">Dashboard</h3>
+                    <p className="text-gray-500 mt-1">
+                        {me?.fullName ? `Welcome, ${me.fullName}` : 'Welcome'} · {store}
+                    </p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                    <a
+                        href={`/${store}/pos`}
+                        className="inline-flex items-center gap-2 px-4 py-2.5 bg-teal-600 hover:bg-teal-700 text-white text-sm font-semibold rounded-xl shadow transition-colors"
+                    >
+                        <FiShoppingBag className="w-4 h-4" />
+                        Open POS
+                    </a>
+                    <a
+                        href={`/${store}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-2 px-4 py-2.5 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 text-sm font-semibold rounded-xl shadow-sm transition-colors"
+                    >
+                        <FiExternalLink className="w-4 h-4" />
+                        View Store
+                    </a>
+                </div>
             </div>
 
             {/* Stats Cards */}
