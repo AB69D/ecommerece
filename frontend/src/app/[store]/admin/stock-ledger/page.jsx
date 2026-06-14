@@ -183,6 +183,9 @@ export default function StockLedgerPage() {
                                                     </td>
                                                     <td className="px-4 py-3">
                                                         <span className={`inline-block text-[11px] font-medium px-2 py-0.5 rounded-full ${rb.cls}`}>{rb.label}</span>
+                                                        {m.note && (
+                                                            <div className="text-[11px] text-gray-400 mt-0.5 max-w-[120px] truncate" title={m.note}>{m.note}</div>
+                                                        )}
                                                     </td>
                                                     <td className="px-4 py-3 hidden sm:table-cell">
                                                         <span className={`inline-block text-[11px] font-medium px-2 py-0.5 rounded-full capitalize ${CHANNEL_BADGE[m.channel] || "bg-gray-100 text-gray-600"}`}>{m.channel}</span>

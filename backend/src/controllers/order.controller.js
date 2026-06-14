@@ -344,7 +344,7 @@ export const updateStockController = async (request, response) => {
                 delta: stockChange,
                 balanceAfter,
             }],
-            { reason: 'adjustment', channel: 'admin', actor: actorFromReq(request), note: `Manual ${action}` }
+            { reason: 'adjustment', channel: 'admin', actor: actorFromReq(request), note: request.body.note || `Manual ${action}` }
         );
 
         return response.json({

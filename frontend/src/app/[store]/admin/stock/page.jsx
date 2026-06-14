@@ -56,7 +56,8 @@ export default function StockManagementPage() {
                     productId: adjustModal.product._id,
                     weightIndex: adjustModal.weightIndex,
                     quantity: parseInt(adjustForm.quantity),
-                    action: adjustForm.action
+                    action: adjustForm.action,
+                    ...(adjustForm.reason ? { note: adjustForm.reason } : {})
                 })
             });
             const data = await res.json();
