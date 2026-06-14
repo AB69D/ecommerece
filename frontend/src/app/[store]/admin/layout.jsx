@@ -180,7 +180,7 @@ export default function AdminLayout({ children }) {
 
     return (
         <AdminAuthContext.Provider value={ctxValue}>
-            <div className="min-h-screen bg-gray-100 flex">
+            <div className="min-h-screen bg-gray-100 flex overflow-x-hidden">
                 <button
                     onClick={() => setSidebarOpen(true)}
                     className={`fixed top-4 left-4 z-50 p-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg shadow-lg transition-all lg:hidden ${sidebarOpen ? 'hidden' : ''}`}
@@ -265,6 +265,13 @@ export default function AdminLayout({ children }) {
                         </div>
 
                         <div className="p-4 border-t border-gray-100 space-y-1">
+                            <a
+                                href={`/${store}/pos`}
+                                className="flex items-center gap-3 px-4 py-3 text-sm text-gray-500 hover:text-teal-600 hover:bg-teal-50 rounded-xl transition-colors"
+                            >
+                                <FiShoppingBag className="w-5 h-5" />
+                                POS Terminal
+                            </a>
                             <Link
                                 href={`/${store}`}
                                 target="_blank"
@@ -284,7 +291,7 @@ export default function AdminLayout({ children }) {
                     </div>
                 </div>
 
-                <div className="flex-1 min-h-screen p-4 lg:p-6 overflow-y-auto lg:ml-0">
+                <div className="flex-1 min-h-screen p-4 lg:p-6 overflow-y-auto overflow-x-hidden lg:ml-0">
                     {impersonationStore && (
                         <div className="max-w-6xl mx-auto mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl bg-amber-500 text-amber-950 px-4 py-2.5 shadow-sm">
                             <span className="text-sm font-medium flex items-center gap-2">

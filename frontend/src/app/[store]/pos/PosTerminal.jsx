@@ -1,8 +1,9 @@
 "use client";
 import { useState, useMemo, useCallback, useEffect } from "react";
+import { useParams } from "next/navigation";
 import {
     FiShoppingBag, FiLogOut, FiShoppingCart, FiTag, FiRotateCcw, FiBarChart2,
-    FiCheckCircle, FiAlertCircle, FiX, FiExternalLink, FiClock, FiTruck,
+    FiCheckCircle, FiAlertCircle, FiX, FiExternalLink, FiClock, FiTruck, FiSettings,
 } from "react-icons/fi";
 import SellView from "./SellView";
 import ReturnsView from "./ReturnsView";
@@ -13,6 +14,7 @@ import { canSell, canRead, canManage, canReadOrders, canChangeOrderStatus } from
 import { getPosSettings } from "@/services/pos";
 
 export default function PosTerminal({ me, onLogout }) {
+    const { store } = useParams() || {};
     const perms = me?.effectivePermissions || [];
     const sell = canSell(perms);
     const read = canRead(perms);
@@ -72,7 +74,13 @@ export default function PosTerminal({ me, onLogout }) {
                     </div>
                     <div className="flex items-center gap-1.5">
                         <a
-                            href="/"
+                            href={`/${store}/admin`}
+                            className="hidden sm:inline-flex items-center gap-1.5 text-xs text-slate-300 hover:text-white px-3 py-2 rounded-lg hover:bg-slate-800 transition-colors"
+                        >
+                            <FiSettings className="w-4 h-4" /> Admin
+                        </a>
+                        <a
+                            href={`/${store}`}
                             target="_blank"
                             rel="noreferrer"
                             className="hidden sm:inline-flex items-center gap-1.5 text-xs text-slate-300 hover:text-white px-3 py-2 rounded-lg hover:bg-slate-800 transition-colors"

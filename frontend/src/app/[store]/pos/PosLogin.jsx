@@ -1,10 +1,12 @@
 "use client";
 import { useState } from "react";
-import { FiUser, FiLock, FiArrowRight, FiAlertCircle, FiEye, FiEyeOff, FiShoppingBag } from "react-icons/fi";
+import { useParams } from "next/navigation";
+import { FiUser, FiLock, FiArrowRight, FiAlertCircle, FiEye, FiEyeOff, FiShoppingBag, FiSettings } from "react-icons/fi";
 import { posLogin, setPosToken, posFetchMe, clearPosToken } from "@/services/pos";
 import { hasPosAccess } from "./posPerms";
 
 export default function PosLogin({ onLoggedIn }) {
+    const { store } = useParams() || {};
     const [username, setUsername] = useState("");
     const [password, setPassword] = useState("");
     const [showPassword, setShowPassword] = useState(false);
@@ -124,9 +126,17 @@ export default function PosLogin({ onLoggedIn }) {
                         </button>
                     </form>
 
-                    <p className="text-xs text-slate-500 text-center mt-6">
-                        Need an account? Ask an administrator to add you as a POS seller.
-                    </p>
+                    <div className="mt-6 flex flex-col items-center gap-3">
+                        <a
+                            href={`/${store}/admin`}
+                            className="inline-flex items-center gap-1.5 text-xs text-teal-400 hover:text-teal-300 transition-colors"
+                        >
+                            <FiSettings className="w-3.5 h-3.5" /> Go to Admin Panel
+                        </a>
+                        <p className="text-xs text-slate-500 text-center">
+                            Need an account? Ask an administrator to add you as a POS seller.
+                        </p>
+                    </div>
                 </div>
             </div>
         </div>
