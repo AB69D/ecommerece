@@ -14,6 +14,13 @@ let timer = null;
 const CHUNK_SIZE = 60;
 const FLUSH_DELAY = 60; // ms — let a render pass collect all card ids first
 
+const RESERVED_FIRST_SEG = new Set(['login', 'platform', 'sell', 'api']);
+const getCurrentStore = () => {
+    if (typeof window === 'undefined') return '';
+    const seg = window.location.pathname.split('/')[1] || '';
+    return seg && !RESERVED_FIRST_SEG.has(seg) ? seg : '';
+};
+
 function notify(id, summary) {
     const subs = subscribers.get(id);
     if (subs) subs.forEach((cb) => cb(summary));
@@ -25,11 +32,14 @@ async function flush() {
     pending = new Set();
     if (ids.length === 0) return;
 
+    const store = getCurrentStore();
     for (let i = 0; i < ids.length; i += CHUNK_SIZE) {
         const chunk = ids.slice(i, i + CHUNK_SIZE);
         let data = {};
         try {
-            const res = await fetch(`/api/client/review/summary?productIds=${encodeURIComponent(chunk.join(","))}`);
+            const res = await fetch(`/api/client/review/summary?productIds=${encodeURIComponent(chunk.join(","))}`, {
+                headers: store ? { 'X-Tenant': store } : {},
+            });
             if (res.ok) {
                 const json = await res.json();
                 data = json?.data || {};

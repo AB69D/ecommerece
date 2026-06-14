@@ -56,4 +56,7 @@ export const logout = () => {
     localStorage.removeItem('admin_token');
 };
 
-export const isAuthenticated = () => !!localStorage.getItem('admin_token');
+export const isAuthenticated = () => {
+    if (typeof window === 'undefined') return false;
+    return !!localStorage.getItem('admin_token');
+};

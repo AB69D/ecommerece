@@ -23,6 +23,11 @@ export const requireSuperAdmin = async (req, res, next) => {
             return res.status(401).json({ success: false, error: true, message: 'Unauthorized' });
         }
         const decoded = jwt.verify(header.slice(7), env.JWT_SECRET);
+
+        if (decoded.type === 'customer') {
+            return res.status(401).json({ success: false, error: true, message: 'Invalid token type' });
+        }
+
         const email = String(decoded.email || '').toLowerCase();
 
         // Fast path: env allow-list owner (no DB read needed).

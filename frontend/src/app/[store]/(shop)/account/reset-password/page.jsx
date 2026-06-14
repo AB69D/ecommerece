@@ -1,6 +1,6 @@
 "use client";
 import { Suspense, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useParams } from "next/navigation";
 import Link, { useStorePush } from "@/components/StoreLink";
 import { FiLock, FiArrowRight, FiAlertCircle, FiEye, FiEyeOff } from "react-icons/fi";
 import { resetPassword as resetPasswordRequest } from "@/services/customerAuth";
@@ -10,6 +10,7 @@ function ResetPasswordForm() {
     const goTo = useStorePush();
     const params = useSearchParams();
     const token = params.get("token") || "";
+    const { store = "" } = useParams() || {};
     const { login } = useCustomerAuth();
 
     const [password, setPassword] = useState("");
@@ -31,7 +32,7 @@ function ResetPasswordForm() {
         setError("");
         setLoading(true);
         try {
-            const result = await resetPasswordRequest({ token, password });
+            const result = await resetPasswordRequest({ token, password }, store);
             setLoading(false);
             if (result.success && result.data?.token) {
                 // Reset succeeded — the backend signed us straight in.

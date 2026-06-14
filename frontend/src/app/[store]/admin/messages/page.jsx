@@ -1,14 +1,18 @@
 "use client";
 import { useState, useEffect } from "react";
+import { useParams } from "next/navigation";
 import { FiTrash2, FiMail, FiUser, FiPhone, FiClock } from "react-icons/fi";
 
 export default function AdminMessagesPage() {
+    const { store = "" } = useParams() || {};
     const [messages, setMessages] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
     const fetchMessages = async () => {
         try {
-            const res = await fetch(`/api/client/contact/messages`);
+            const res = await fetch(`/api/client/contact/messages`, {
+                headers: store ? { 'X-Tenant': store } : {},
+            });
             const data = await res.json();
             if (data.success) {
                 setMessages(data.data);
@@ -27,7 +31,8 @@ export default function AdminMessagesPage() {
         
         try {
             const res = await fetch(`/api/client/contact/delete/${id}`, {
-                method: "DELETE"
+                method: "DELETE",
+                headers: store ? { 'X-Tenant': store } : {},
             });
             const data = await res.json();
             if (data.success) {

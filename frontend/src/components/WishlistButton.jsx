@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
+import { useParams } from "next/navigation";
 import { FiHeart } from "react-icons/fi";
 import {
     toggleWishlist,
@@ -25,6 +26,7 @@ const minWeight = (weights = []) => {
 // then persists to the server and reverts on failure.
 export default function WishlistButton({ product, variant = "card", className = "" }) {
     const productId = product?._id ? String(product._id) : "";
+    const { store = "" } = useParams() || {};
     const [active, setActive] = useState(false);
     const [enabled, setEnabled] = useState(true);
     const [busy, setBusy] = useState(false);
@@ -68,7 +70,7 @@ export default function WishlistButton({ product, variant = "card", className = 
                 category: product.category?.category_name || "",
                 price: mw?.price || 0,
                 discountPercent: mw?.discountPercent || 0,
-            });
+            }, store);
             // Reconcile with the server's authoritative answer.
             if (res?.success) {
                 const next = readWishlistIds();

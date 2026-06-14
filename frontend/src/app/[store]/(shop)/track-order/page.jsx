@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect, Suspense } from "react";
-import { useSearchParams, useRouter } from "next/navigation";
+import { useSearchParams, useRouter, useParams } from "next/navigation";
 import { FiPackage, FiCheck, FiTruck, FiClock, FiSearch, FiPhone, FiCalendar, FiAlertCircle, FiStar, FiImage, FiVideo, FiX } from "react-icons/fi";
 import { FaStar, FaStarHalfAlt, FaRegStar } from "react-icons/fa";
 import { PiWhatsappLogoBold } from "react-icons/pi";
@@ -14,6 +14,7 @@ function TrackOrderContent() {
     const { symbol } = useCurrency();
     const wa = useWhatsApp();
     const reviewsEnabled = useFeature("productReviews");
+    const { store = "" } = useParams() || {};
     const [orders, setOrders] = useState([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
@@ -52,7 +53,7 @@ function TrackOrderContent() {
         try {
             const res = await fetch(`/api/client/order/track`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 'Content-Type': 'application/json', ...(store ? { 'X-Tenant': store } : {}) },
                 body: JSON.stringify({ phone: phone.trim(), orderId: orderId.trim() })
             });
             const data = await res.json();
@@ -149,7 +150,8 @@ function TrackOrderContent() {
 
             const res = await fetch(`/api/client/review/create`, {
                 method: 'POST',
-                body: formData
+                body: formData,
+                headers: store ? { 'X-Tenant': store } : {},
             });
             const data = await res.json();
             if (data.success) {

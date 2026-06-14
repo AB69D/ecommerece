@@ -1,5 +1,6 @@
 "use client";
 import { createContext, useContext, useState, useEffect, useCallback } from "react";
+import { useParams } from "next/navigation";
 import { fetchMe, persistSession, logout as clearSession } from "@/services/customerAuth";
 
 // Provides the signed-in shopper (`customer`) and auth actions to the whole
@@ -28,10 +29,11 @@ const notifyStorefront = () => {
 export function CustomerAuthProvider({ children }) {
     const [customer, setCustomer] = useState(null);
     const [loading, setLoading] = useState(true);
+    const { store = "" } = useParams() || {};
 
     const refresh = useCallback(async () => {
         try {
-            const res = await fetchMe();
+            const res = await fetchMe(store);
             setCustomer(res?.success && res.data?.customer ? res.data.customer : null);
         } catch {
             setCustomer(null);

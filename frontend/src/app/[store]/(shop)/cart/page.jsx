@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import { useStorePush } from "@/components/StoreLink";
+import { useParams } from "next/navigation";
 import { FiShoppingCart, FiPlus, FiMinus, FiTrash2, FiArrowLeft } from "react-icons/fi";
 import { useCurrency } from "@/context/CurrencyContext.jsx";
 
@@ -11,6 +12,7 @@ export default function CartPage() {
     const [updating, setUpdating] = useState(false);
     const { symbol } = useCurrency();
     const goTo = useStorePush();
+    const { store = "" } = useParams() || {};
 
     // Get or create guestId
     const getGuestId = () => {
@@ -34,9 +36,10 @@ export default function CartPage() {
             console.log('Fetching cart with guestId:', guestId);
             
             const res = await fetch(`/api/client/cart/get`, {
-                headers: { 
+                headers: {
                     'guest-id': guestId,
-                    'Content-Type': 'application/json'
+                    'Content-Type': 'application/json',
+                    ...(store ? { 'X-Tenant': store } : {}),
                 }
             });
             
@@ -62,9 +65,10 @@ export default function CartPage() {
             const guestId = getGuestId();
             const res = await fetch(`/api/client/cart/update`, {
                 method: 'PUT',
-                headers: { 
+                headers: {
                     'Content-Type': 'application/json',
-                    'guest-id': guestId
+                    'guest-id': guestId,
+                    ...(store ? { 'X-Tenant': store } : {}),
                 },
                 body: JSON.stringify({ itemId, quantity })
             });
@@ -85,7 +89,7 @@ export default function CartPage() {
             const guestId = getGuestId();
             const res = await fetch(`/api/client/cart/remove/${itemId}`, {
                 method: 'DELETE',
-                headers: { 'guest-id': guestId }
+                headers: { 'guest-id': guestId, ...(store ? { 'X-Tenant': store } : {}) }
             });
             const data = await res.json();
             if (data.success) {

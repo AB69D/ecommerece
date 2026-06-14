@@ -1,48 +1,57 @@
 "use client";
 import { useEffect, useState } from "react";
+import { useParams } from "next/navigation";
 import { fetchSiteSettings } from "@/lib/dynamicContent";
 
-// Shared, module-level cache of the public site settings so every consumer
-// (header, footer, chatbot, product page, reviews, PWA, …) triggers a single
-// network request instead of each refetching the same document.
-let _cache = null; // resolved settings object
-let _inflight = null; // Promise while the first fetch is running
+// Shared, module-level cache of the public site settings keyed by store slug so
+// every consumer (header, footer, chatbot, product page, reviews, PWA, …) within
+// the same store triggers a single network request instead of each refetching the
+// same document. Navigating between stores never serves stale data from a
+// different tenant because each store gets its own cache entry.
+const _cache = new Map(); // store slug → resolved settings object
+const _inflight = new Map(); // store slug → Promise while the first fetch is running
 
-export const loadSiteSettings = () => {
-    if (_cache) return Promise.resolve(_cache);
-    if (_inflight) return _inflight;
-    _inflight = fetchSiteSettings()
+export const loadSiteSettings = (store = "") => {
+    if (_cache.has(store)) return Promise.resolve(_cache.get(store));
+    if (_inflight.has(store)) return _inflight.get(store);
+    const p = fetchSiteSettings(store)
         .then((data) => {
-            _cache = data || {};
-            return _cache;
+            const result = data || {};
+            _cache.set(store, result);
+            return result;
         })
         .catch(() => {
-            _cache = {};
-            return _cache;
+            _cache.set(store, {});
+            return {};
         })
         .finally(() => {
-            _inflight = null;
+            _inflight.delete(store);
         });
-    return _inflight;
+    _inflight.set(store, p);
+    return p;
 };
 
-// Returns the cached settings object, or null until the first fetch resolves.
+// Returns the cached settings object for the active store, or null until the
+// first fetch resolves.
 export function useSiteSettings() {
-    const [settings, setSettings] = useState(_cache);
+    const params = useParams();
+    const store = params?.store || "";
+    const [settings, setSettings] = useState(_cache.get(store) ?? null);
 
     useEffect(() => {
-        if (_cache) {
-            setSettings(_cache);
+        const cached = _cache.get(store);
+        if (cached) {
+            setSettings(cached);
             return;
         }
         let cancelled = false;
-        loadSiteSettings().then((s) => {
+        loadSiteSettings(store).then((s) => {
             if (!cancelled) setSettings(s);
         });
         return () => {
             cancelled = true;
         };
-    }, []);
+    }, [store]);
 
     return settings;
 }

@@ -1,6 +1,6 @@
 "use client";
 import { Suspense, useEffect, useRef, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useParams } from "next/navigation";
 import { useStorePush } from "@/components/StoreLink";
 import { FiCheck, FiX, FiLoader, FiRefreshCw } from "react-icons/fi";
 import { useCurrency } from "@/context/CurrencyContext.jsx";
@@ -17,6 +17,7 @@ function PaymentResultInner() {
     const params = useSearchParams();
     const orderId = params.get("order") || "";
     const hint = params.get("status") || ""; // success | failed | cancelled (advisory)
+    const { store = "" } = useParams() || {};
 
     const { code, symbol } = useCurrency();
     const { customer } = useCustomerAuth();
@@ -47,7 +48,7 @@ function PaymentResultInner() {
         try {
             const guestId = typeof window !== "undefined" ? localStorage.getItem("guestId") : null;
             const res = await fetch(`/api/client/order/${encodeURIComponent(orderId)}`, {
-                headers: guestId ? { "guest-id": guestId } : {},
+                headers: { ...(guestId ? { "guest-id": guestId } : {}), ...(store ? { "X-Tenant": store } : {}) },
             });
             const data = await res.json();
             if (data.success && data.data) return data.data;
@@ -93,7 +94,9 @@ function PaymentResultInner() {
         const poll = async () => {
             attempts += 1;
             try {
-                const res = await fetch(`/api/client/payment/status/${encodeURIComponent(orderId)}`);
+                const res = await fetch(`/api/client/payment/status/${encodeURIComponent(orderId)}`, {
+                    headers: store ? { 'X-Tenant': store } : {},
+                });
                 const data = await res.json();
                 if (cancelled) return;
                 if (data.success && data.data) {
@@ -134,6 +137,7 @@ function PaymentResultInner() {
             const headers = { "Content-Type": "application/json" };
             if (guestId) headers["guest-id"] = guestId;
             if (token) headers["Authorization"] = `Bearer ${token}`;
+            if (store) headers["X-Tenant"] = store;
             const res = await fetch(`/api/client/payment/init`, {
                 method: "POST",
                 headers,

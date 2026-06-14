@@ -12,7 +12,12 @@ export function CurrencyProvider({ initialSymbol = "$", initialCode = "USD", chi
 
     useEffect(() => {
         let active = true;
-        fetch("/api/client/site-settings")
+        const RESERVED = new Set(['login', 'platform', 'sell', 'api']);
+        const seg = typeof window !== 'undefined' ? (window.location.pathname.split('/')[1] || '') : '';
+        const store = seg && !RESERVED.has(seg) ? seg : '';
+        fetch("/api/client/site-settings", {
+            headers: store ? { 'X-Tenant': store } : {},
+        })
             .then((r) => (r.ok ? r.json() : null))
             .then((j) => {
                 const d = j?.data;

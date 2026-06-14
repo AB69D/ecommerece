@@ -158,6 +158,15 @@ const siteSettingsSchema = new mongoose.Schema(
             storePassword: { type: String, default: '' },
         },
 
+        // ── Delivery / shipping charges ────────────────────────────────────
+        // Admin-configurable per-store delivery rates shown at checkout.
+        // localCharge: within the same city/district (default 70 BDT).
+        // regionalCharge: outside the city / nationwide (default 100 BDT).
+        delivery: {
+            localCharge: { type: Number, default: 70 },
+            regionalCharge: { type: Number, default: 100 },
+        },
+
         maintenanceMode: { type: Boolean, default: false },
     },
     { timestamps: true },

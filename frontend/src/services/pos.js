@@ -7,6 +7,13 @@ const API = "/api/admin";
 const TOKEN_KEY = "pos_token";
 const jsonHeaders = { "Content-Type": "application/json" };
 
+const RESERVED_FIRST_SEG = new Set(['login', 'platform', 'sell', 'api']);
+const currentStore = () => {
+    if (typeof window === 'undefined') return '';
+    const seg = window.location.pathname.split('/')[1] || '';
+    return seg && !RESERVED_FIRST_SEG.has(seg) ? seg : '';
+};
+
 export const getPosToken = () =>
     (typeof window !== "undefined" ? localStorage.getItem(TOKEN_KEY) : null);
 
@@ -113,4 +120,9 @@ export const getShift = (id) => posFetch(`/pos/shift/${id}`).then(json);
 
 // Public site settings — drives receipt layout, tax, feature flags, etc.
 // Uses the unauthenticated client endpoint so any cashier can read it.
-export const getPosSettings = () => fetch(`/api/client/site-settings`).then(json);
+export const getPosSettings = () => {
+    const store = currentStore();
+    return fetch(`/api/client/site-settings`, {
+        headers: store ? { 'X-Tenant': store } : {},
+    }).then(json);
+};

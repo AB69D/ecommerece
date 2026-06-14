@@ -1,5 +1,6 @@
 import ProductModel, { ensureVariantCodes } from "../models/product.model.js";
 import CategoryModel from "../models/category.model.js";
+import OrderModel from '../models/order.model.js';
 import mongoose from "mongoose";
 
 export const createProductController = async (request, response) => {
@@ -194,6 +195,10 @@ export const getProductDetails = async (request, response) => {
 
         const product = await ProductModel.findOne({ _id: productId }).populate('category');
 
+        if (!product) {
+            return response.status(404).json({ message: "Product not found", error: true, success: false });
+        }
+
         return response.json({
             message: "product details",
             data: product,
@@ -202,11 +207,8 @@ export const getProductDetails = async (request, response) => {
         });
 
     } catch (error) {
-        return response.status(500).json({
-            message: error.message || error,
-            error: true,
-            success: false
-        });
+        const status = error.name === 'CastError' ? 400 : 500;
+        return response.status(status).json({ message: error.message || error, error: true, success: false });
     }
 };
 
@@ -224,6 +226,8 @@ export const updateProductDetails = async (request, response) => {
 
         const updateData = { ...request.body };
         delete updateData._id;
+        delete updateData.tenantId;
+        delete updateData.__v;
 
         // Normalise the storefront visibility flag to a real boolean.
         if (updateData.showInEcommerce !== undefined) {
@@ -262,11 +266,8 @@ export const updateProductDetails = async (request, response) => {
         });
 
     } catch (error) {
-        return response.status(500).json({
-            message: error.message || error,
-            error: true,
-            success: false
-        });
+        const status = error.name === 'CastError' ? 400 : 500;
+        return response.status(status).json({ message: error.message || error, error: true, success: false });
     }
 };
 
@@ -291,11 +292,8 @@ export const deleteProductDetails = async (request, response) => {
             data: deleteProduct
         });
     } catch (error) {
-        return response.status(500).json({
-            message: error.message || error,
-            error: true,
-            success: false
-        });
+        const status = error.name === 'CastError' ? 400 : 500;
+        return response.status(status).json({ message: error.message || error, error: true, success: false });
     }
 };
 
@@ -451,7 +449,7 @@ export const getTopSellingProducts = async (request, response) => {
         }).populate('category');
 
         const productsWithSales = products.map(product => {
-            const salesData = topSelling.find(item => item._id === product._id.toString());
+            const salesData = topSelling.find(item => String(item._id) === String(product._id));
             return {
                 ...product.toObject(),
                 totalSold: salesData ? salesData.totalSold : 0

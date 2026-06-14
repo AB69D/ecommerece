@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState, useCallback } from "react";
 import Link, { useStorePush } from "@/components/StoreLink";
+import { useParams } from "next/navigation";
 import { FiPackage, FiRefreshCw, FiShoppingBag } from "react-icons/fi";
 import AccountShell from "@/components/account/AccountShell";
 import { useMoney } from "@/context/CurrencyContext";
@@ -25,6 +26,7 @@ const formatDate = (d) =>
 function OrdersInner() {
     const money = useMoney();
     const goTo = useStorePush();
+    const { store = "" } = useParams() || {};
     const [orders, setOrders] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
@@ -53,7 +55,7 @@ function OrdersInner() {
         try {
             for (const item of order.items || []) {
                 // eslint-disable-next-line no-await-in-loop
-                await addToCart(item.productId, item.quantity, item.weight, item.weightIndex || 0, item.price, 0);
+                await addToCart(item.productId, item.quantity, item.weight, item.weightIndex || 0, item.price, 0, store);
             }
             if (typeof window !== "undefined") window.dispatchEvent(new Event("cart-updated"));
             goTo("/cart");

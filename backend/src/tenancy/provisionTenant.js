@@ -1,5 +1,9 @@
 import PlanModel from '../models/plan.model.js';
 import SubscriptionModel from '../models/subscription.model.js';
+import { SiteSettings } from '../models/siteSettings.model.js';
+import { Footer } from '../models/footer.model.js';
+import { NavMenuItem } from '../models/navMenu.model.js';
+import { runAsTenant } from './tenantContext.js';
 import { logger } from '../lib/logger.js';
 
 // ── Tenant provisioning ─────────────────────────────────────────────────────
@@ -46,6 +50,37 @@ export async function provisionTenant(tenant) {
         });
         logger.info({ tenantId: String(tenantId) }, 'Provision: created subscription');
     }
+
+    // Seed default tenant-scoped documents so the storefront and admin panel
+    // have a valid baseline immediately after approval (no blank-page 404s).
+    await runAsTenant(tenantId, async () => {
+        // SiteSettings singleton — needed for feature flags (isFeatureEnabled).
+        const existingSettings = await SiteSettings.findOne({ key: 'global' });
+        if (!existingSettings) {
+            await SiteSettings.create({ key: 'global' });
+            logger.info({ tenantId: String(tenantId) }, 'Provision: created default SiteSettings');
+        }
+
+        // NavMenu — seed a basic home link so the header renders something.
+        const existingNav = await NavMenuItem.findOne({ location: 'header' });
+        if (!existingNav) {
+            await NavMenuItem.create({
+                label: 'Home',
+                url: '/',
+                location: 'header',
+                order: 0,
+                isVisible: true,
+            });
+            logger.info({ tenantId: String(tenantId) }, 'Provision: created default NavMenu');
+        }
+
+        // Footer singleton.
+        const existingFooter = await Footer.findOne({ key: 'global' });
+        if (!existingFooter) {
+            await Footer.create({ key: 'global' });
+            logger.info({ tenantId: String(tenantId) }, 'Provision: created default Footer');
+        }
+    });
 
     if (!tenant.provisionedAt) tenant.provisionedAt = new Date();
     await tenant.save();

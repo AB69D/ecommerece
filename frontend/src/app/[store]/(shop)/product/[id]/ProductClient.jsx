@@ -1,6 +1,7 @@
 "use client";
 import React, { useState, useEffect, useRef } from "react";
 import Link, { useStorePush } from "@/components/StoreLink";
+import { useParams } from "next/navigation";
 import { FiShoppingCart, FiCheck, FiHelpCircle, FiMessageCircle, FiPhoneCall, FiPackage, FiArrowLeft } from "react-icons/fi";
 import { PiWhatsappLogoBold } from "react-icons/pi";
 import { addToCart } from "@/utils/cart";
@@ -12,6 +13,7 @@ import { useWhatsApp } from "@/hooks/useWhatsApp";
 
 export default function ProductClient({ productId }) {
     const wa = useWhatsApp();
+    const { store = "" } = useParams() || {};
     const [product, setProduct] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
@@ -32,7 +34,9 @@ export default function ProductClient({ productId }) {
             try {
                 if (!productId) return;
                 
-                const res = await fetch(`/api/client/product/product/${productId}`);
+                const res = await fetch(`/api/client/product/product/${productId}`, {
+                    headers: store ? { 'X-Tenant': store } : {},
+                });
                 const data = await res.json();
                 
                 if (data.success) {
@@ -57,7 +61,9 @@ export default function ProductClient({ productId }) {
     const fetchRelatedProducts = async (categoryId, currentProductId) => {
         setRelatedLoading(true);
         try {
-            const res = await fetch(`/api/client/product/products?category=${categoryId}&limit=8`);
+            const res = await fetch(`/api/client/product/products?category=${categoryId}&limit=8`, {
+                headers: store ? { 'X-Tenant': store } : {},
+            });
             const data = await res.json();
             if (data.success) {
                 const filtered = data.data.filter(p => p._id !== currentProductId).slice(0, 4);
@@ -100,9 +106,10 @@ export default function ProductClient({ productId }) {
 
             const res = await fetch(`/api/client/cart/add`, {
                 method: 'POST',
-                headers: { 
+                headers: {
                     'Content-Type': 'application/json',
-                    'guest-id': guestId
+                    'guest-id': guestId,
+                    ...(store ? { 'X-Tenant': store } : {}),
                 },
                 body: JSON.stringify({
                     productId: product._id,
@@ -156,9 +163,10 @@ export default function ProductClient({ productId }) {
 
             const res = await fetch(`/api/client/cart/add`, {
                 method: 'POST',
-                headers: { 
+                headers: {
                     'Content-Type': 'application/json',
-                    'guest-id': guestId
+                    'guest-id': guestId,
+                    ...(store ? { 'X-Tenant': store } : {}),
                 },
                 body: JSON.stringify({
                     productId: product._id,

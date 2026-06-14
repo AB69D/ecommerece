@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import { useParams } from "next/navigation";
 import { FiStar, FiImage, FiVideo, FiX, FiCheck } from "react-icons/fi";
 import { FaStar } from "react-icons/fa";
 import StarRating from "./StarRating.jsx";
@@ -8,6 +9,8 @@ import { useFeature } from "@/hooks/useSiteSettings";
 
 export default function ProductReviews({ productId, productName }) {
     const reviewsEnabled = useFeature("productReviews");
+    const params = useParams();
+    const store = params?.store || "";
     const [data, setData] = useState(null);
     const [loading, setLoading] = useState(true);
     const [showForm, setShowForm] = useState(false);
@@ -26,7 +29,9 @@ export default function ProductReviews({ productId, productName }) {
     const fetchReviews = async () => {
         if (!productId) return;
         try {
-            const res = await fetch(`/api/client/review/product/${productId}`);
+            const res = await fetch(`/api/client/review/product/${productId}`, {
+                headers: { 'X-Tenant': store }
+            });
             const json = res.ok ? await res.json() : null;
             if (json?.success) setData(json.data);
         } catch {
@@ -73,7 +78,7 @@ export default function ProductReviews({ productId, productName }) {
             fd.append("productId", productId);
             media.forEach((file) => fd.append("media", file));
 
-            const res = await fetch(`/api/client/review/create`, { method: "POST", body: fd });
+            const res = await fetch(`/api/client/review/create`, { method: "POST", body: fd, headers: { 'X-Tenant': store } });
             const json = await res.json();
             if (json?.success) {
                 setSubmitted(true);

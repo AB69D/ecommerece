@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
 import Link, { useStorePush } from "@/components/StoreLink";
+import { useParams } from "next/navigation";
 import { FiHeart, FiTrash2, FiArrowLeft, FiEye } from "react-icons/fi";
 import { useCurrency } from "@/context/CurrencyContext.jsx";
 import {
@@ -16,6 +17,7 @@ export default function WishlistPage() {
     const [busy, setBusy] = useState(false);
     const { symbol } = useCurrency();
     const goTo = useStorePush();
+    const { store = "" } = useParams() || {};
 
     // Keep the shared id cache (and every heart) in step with this page.
     const syncIds = useCallback((list) => {
@@ -24,7 +26,7 @@ export default function WishlistPage() {
 
     const load = useCallback(async () => {
         try {
-            const res = await getWishlist();
+            const res = await getWishlist(store);
             if (res?.success && res.data) {
                 setItems(res.data.items || []);
                 syncIds(res.data.items || []);
@@ -43,7 +45,7 @@ export default function WishlistPage() {
     const remove = async (productId) => {
         setBusy(true);
         try {
-            const res = await removeFromWishlist(productId);
+            const res = await removeFromWishlist(productId, store);
             if (res?.success && res.data) {
                 setItems(res.data.items || []);
                 syncIds(res.data.items || []);
@@ -58,7 +60,7 @@ export default function WishlistPage() {
     const clearAll = async () => {
         setBusy(true);
         try {
-            const res = await clearWishlist();
+            const res = await clearWishlist(store);
             if (res?.success) {
                 setItems([]);
                 writeWishlistIds(new Set());

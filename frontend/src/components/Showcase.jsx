@@ -1,18 +1,22 @@
 "use client";
 import React, { useState, useEffect, useCallback, useRef } from "react";
+import { useParams } from "next/navigation";
 
 export default function Showcase() {
     const [headers, setHeaders] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [current, setCurrent] = useState(0);
+    const { store = "" } = useParams() || {};
 
     const sliderRef = useRef(null);
 
     useEffect(() => {
         const fetchHeaders = async () => {
             try {
-                const res = await fetch(`/api/client/header/headers`);
+                const res = await fetch(`/api/client/header/headers`, {
+                    headers: store ? { 'X-Tenant': store } : {},
+                });
                 const data = await res.json();
                 if (data.success) {
                     setHeaders(data.data);

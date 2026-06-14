@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
-import { useRouter, usePathname, useSearchParams } from "next/navigation";
+import { useRouter, usePathname, useSearchParams, useParams } from "next/navigation";
 import Link from "@/components/StoreLink";
 import { FiSearch, FiX, FiChevronLeft, FiChevronRight, FiSliders } from "react-icons/fi";
 import ProductCard from "./ProductCard";
@@ -47,6 +47,7 @@ export default function ProductBrowser({ lockedCategorySlug = null, fallbackHead
     const router = useRouter();
     const pathname = usePathname();
     const searchParams = useSearchParams();
+    const { store = "" } = useParams() || {};
 
     // ---- read current filter state from the URL ----
     const q = searchParams.get("q") || "";
@@ -87,7 +88,7 @@ export default function ProductBrowser({ lockedCategorySlug = null, fallbackHead
         if (inStock) params.inStock = true;
         if (lockedCategorySlug) params.category = lockedCategorySlug;
 
-        searchProducts(params)
+        searchProducts(params, store)
             .then((data) => {
                 if (cancelled) return;
                 if (data && data.success) {

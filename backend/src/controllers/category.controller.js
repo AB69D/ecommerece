@@ -1,4 +1,5 @@
 import CategoryModel from "../models/category.model.js";
+import mongoose from 'mongoose';
 
 
 export const AddCategoryController = async (req, res) => {
@@ -63,6 +64,14 @@ export const updateCategoryController = async (request, response) => {
     try {
         const { _id, category_name, category_image } = request.body
 
+        if (!_id || !mongoose.Types.ObjectId.isValid(_id)) {
+            return response.status(400).json({
+                message: "provide a valid category _id",
+                error: true,
+                success: false
+            });
+        }
+
         let updateData = {};
         if (category_name) updateData.category_name = category_name;
         
@@ -76,6 +85,14 @@ export const updateCategoryController = async (request, response) => {
         const update = await CategoryModel.updateOne({
             _id: _id
         }, updateData)
+
+        if (update.matchedCount === 0) {
+            return response.status(404).json({
+                message: "Category not found",
+                error: true,
+                success: false
+            });
+        }
 
         return response.json({
             message: "Updated Category Successfully",
@@ -96,7 +113,23 @@ export const deleteCategoryController = async (request, response) => {
     try {
         const { _id } = request.body
 
+        if (!_id || !mongoose.Types.ObjectId.isValid(_id)) {
+            return response.status(400).json({
+                message: "provide a valid category _id",
+                error: true,
+                success: false
+            });
+        }
+
         const deleteCategory = await CategoryModel.deleteOne({ _id: _id })
+
+        if (deleteCategory.deletedCount === 0) {
+            return response.status(404).json({
+                message: "Category not found",
+                error: true,
+                success: false
+            });
+        }
 
         return response.json({
             message: "Delete category successfully",

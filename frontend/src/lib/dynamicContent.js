@@ -13,17 +13,20 @@ const fetchJson = async (path, store = "") => {
     // browser keep the relative path so the Next.js rewrite proxy handles it.
     const isServer = typeof window === "undefined";
     const url = isServer ? `${BACKEND_URL}${path}` : path;
-    // A guest viewing a specific store: forward the tenant ourselves (the absolute
-    // URL bypasses middleware) and skip the shared-URL data cache so store A's
-    // response is never served for store B. The primary store keeps the 60s cache.
-    const scoped = isServer && !!store;
+    // On the server: forward the tenant header (absolute URL bypasses middleware)
+    // and skip the shared-URL data cache so store A's response is never served for
+    // store B. On the client: also forward X-Tenant when a store slug is provided
+    // so the browser's relative-path fetch hits the right tenant.
+    const scoped = !!store;
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 5000);
     try {
         const res = await fetch(url, {
             ...(scoped
                 ? { headers: { "X-Tenant": store }, cache: "no-store" }
-                : { next: { revalidate: 60 } }),
+                : isServer
+                    ? { next: { revalidate: 60 } }
+                    : {}),
             signal: controller.signal,
         });
         if (!res.ok) return null;

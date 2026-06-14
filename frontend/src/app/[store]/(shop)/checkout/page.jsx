@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect, useRef } from "react";
 import { useStorePush } from "@/components/StoreLink";
+import { useParams } from "next/navigation";
 import { FiArrowLeft, FiCheck, FiTag, FiX, FiMapPin } from "react-icons/fi";
 import { useCurrency } from "@/context/CurrencyContext.jsx";
 import { trackInitiateCheckout, trackPurchase } from "@/lib/tracking";
@@ -13,6 +14,7 @@ import { useSiteSettings } from "@/hooks/useSiteSettings";
 
 export default function CheckoutPage() {
     const wa = useWhatsApp();
+    const { store = "" } = useParams() || {};
     const [cart, setCart] = useState(null);
     const [loading, setLoading] = useState(true);
     const [placingOrder, setPlacingOrder] = useState(false);
@@ -54,8 +56,8 @@ export default function CheckoutPage() {
     };
     
     const deliveryCharges = {
-        local: 70,
-        regional: 100
+        local: settings?.delivery?.localCharge ?? 70,
+        regional: settings?.delivery?.regionalCharge ?? 100,
     };
 
     const deliveryLabels = {
@@ -133,7 +135,7 @@ export default function CheckoutPage() {
             const guestId = getGuestId();
             fetch(`/api/client/checkout/lead`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'guest-id': guestId },
+                headers: { 'Content-Type': 'application/json', 'guest-id': guestId, ...(store ? { 'X-Tenant': store } : {}) },
                 body: JSON.stringify({
                     customerName: formData.customerName,
                     customerPhone: formData.customerPhone,
@@ -164,7 +166,7 @@ export default function CheckoutPage() {
         try {
             const guestId = getGuestId();
             const res = await fetch(`/api/client/cart/get`, {
-                headers: { 'guest-id': guestId }
+                headers: { 'guest-id': guestId, ...(store ? { 'X-Tenant': store } : {}) }
             });
             const data = await res.json();
             if (data.success) {
@@ -190,7 +192,7 @@ export default function CheckoutPage() {
         setCouponLoading(true);
         try {
             const base = cart?.totalAmount ?? 0;
-            const res = await validateCouponPublic(code, base, "ecommerce");
+            const res = await validateCouponPublic(code, base, "ecommerce", store);
             if (res?.success && res.data?.valid && res.data.coupon) {
                 setAppliedCoupon(res.data.coupon);
                 setCouponInput("");
@@ -225,7 +227,8 @@ export default function CheckoutPage() {
             const headers = {
                 'Content-Type': 'application/json',
                 'guest-id': guestId,
-                'idempotency-key': idempotencyKeyRef.current
+                'idempotency-key': idempotencyKeyRef.current,
+                ...(store ? { 'X-Tenant': store } : {}),
             };
             // Attach the customer token (when signed in) so the backend stamps
             // this order with customerId and it shows up in their order history.
@@ -516,8 +519,8 @@ export default function CheckoutPage() {
                                         onChange={handleChange}
                                         className="w-full px-4 py-2 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition"
                                     >
-                                        <option value="local">Local Delivery ({symbol}70)</option>
-                                        <option value="regional">Regional Delivery ({symbol}100)</option>
+                                        <option value="local">Local Delivery ({symbol}{deliveryCharges.local})</option>
+                                        <option value="regional">Regional Delivery ({symbol}{deliveryCharges.regional})</option>
                                     </select>
                                 </div>
                                 <div className="md:col-span-2">

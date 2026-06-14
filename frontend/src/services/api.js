@@ -14,12 +14,17 @@ const currentStore = () => {
 
 export const authFetch = async (url, options = {}) => {
     const token = getToken();
+    const store = currentStore();
     const headers = {
         ...options.headers,
     };
 
     if (token) {
         headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    if (store) {
+        headers['X-Tenant'] = store;
     }
 
     const res = await fetch(url, { ...options, headers });
@@ -43,12 +48,17 @@ export const authFetch = async (url, options = {}) => {
 // address book, profile edits); anonymous reads must not redirect.
 export const customerFetch = async (url, options = {}) => {
     const token = typeof window !== 'undefined' ? localStorage.getItem('customer_token') : null;
+    const store = currentStore();
     const headers = {
         ...options.headers,
     };
 
     if (token) {
         headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    if (store) {
+        headers['X-Tenant'] = store;
     }
 
     const res = await fetch(url, { ...options, headers });

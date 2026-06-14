@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import { useParams } from "next/navigation";
 import Link from "@/components/StoreLink";
 import { FiMail, FiArrowRight, FiAlertCircle, FiCheckCircle, FiArrowLeft } from "react-icons/fi";
 import { requestPasswordReset } from "@/services/customerAuth";
@@ -9,6 +10,7 @@ export default function ForgotPasswordPage() {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
     const [sent, setSent] = useState(false);
+    const { store = "" } = useParams() || {};
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -19,7 +21,7 @@ export default function ForgotPasswordPage() {
         setError("");
         setLoading(true);
         try {
-            const result = await requestPasswordReset({ email: email.trim() });
+            const result = await requestPasswordReset({ email: email.trim() }, store);
             setLoading(false);
             // The backend always returns a generic success (it never reveals
             // whether the email has an account), so we show the same confirmation

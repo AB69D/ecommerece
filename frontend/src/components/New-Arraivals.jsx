@@ -1,5 +1,6 @@
 "use client";
 import React, { useState, useEffect, useCallback, useRef } from "react";
+import { useParams } from "next/navigation";
 import { FiArrowLeft, FiArrowRight, FiEye, FiPlus } from "react-icons/fi";
 import { useStorePush } from "@/components/StoreLink";
 import ProductCardSkeleton from "./ProductCardSkeleton";
@@ -17,6 +18,7 @@ export default function NewArraivals() {
     const { symbol } = useCurrency();
     const goTo = useStorePush();
     const sliderRef = useRef(null);
+    const { store = "" } = useParams() || {};
 
     useEffect(() => {
         const handleResize = () => {
@@ -38,7 +40,9 @@ export default function NewArraivals() {
     useEffect(() => {
         const fetchProducts = async () => {
             try {
-                const res = await fetch(`/api/client/product/products?limit=20`);
+                const res = await fetch(`/api/client/product/products?limit=20`, {
+                    headers: store ? { 'X-Tenant': store } : {},
+                });
                 const data = await res.json();
 
                 if (data.success) {

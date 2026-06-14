@@ -19,8 +19,10 @@ const toQuery = (params = {}) => {
 // Search / browse products. Accepts { q, category, sort, minPrice, maxPrice,
 // inStock, page, limit }. Returns the raw envelope
 // { success, data, totalCount, totalNoPage, page, priceBounds, appliedSort }.
-export const searchProducts = async (params = {}) => {
-    const res = await fetch(`${API}/search${toQuery(params)}`);
+export const searchProducts = async (params = {}, store = "") => {
+    const res = await fetch(`${API}/search${toQuery(params)}`, {
+        headers: store ? { 'X-Tenant': store } : {},
+    });
     return res.json();
 };
 
@@ -28,7 +30,9 @@ export const searchProducts = async (params = {}) => {
 // the envelope { success, data } where data is a short list of name-matched
 // products (image + variant price only). The backend ignores queries shorter
 // than two characters.
-export const suggestProducts = async (params = {}) => {
-    const res = await fetch(`${API}/suggest${toQuery(params)}`);
+export const suggestProducts = async (params = {}, store = "") => {
+    const res = await fetch(`${API}/suggest${toQuery(params)}`, {
+        headers: store ? { 'X-Tenant': store } : {},
+    });
     return res.json();
 };

@@ -1,6 +1,6 @@
 "use client";
 import { authFetch } from "@/services/api";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import Link from "@/components/StoreLink";
 import { FiEdit, FiTrash2, FiSearch, FiX, FiImage } from "react-icons/fi";
 import { useRouter } from "next/navigation";
@@ -30,8 +30,12 @@ export default function AllProductsPage() {
     const [editModal, setEditModal] = useState({ show: false, product: null });
     const [editShowEcom, setEditShowEcom] = useState(true);
     const [editWeights, setEditWeights] = useState([]);
+    const [editQa, setEditQa] = useState([]);
+    const [editError, setEditError] = useState("");
+    const [editCoverImage, setEditCoverImage] = useState(null);
     const [categories, setCategories] = useState([]);
     const [message, setMessage] = useState("");
+    const msgTimer = useRef(null);
 
     const openEdit = (product) => {
         setEditShowEcom(product.showInEcommerce !== false);
@@ -47,11 +51,20 @@ export default function AllProductsPage() {
                 images: w.images || [],
             })),
         );
+        setEditQa((product.qa || []).map((q) => ({ ...q })));
+        setEditError("");
+        setEditCoverImage(null);
         setEditModal({ show: true, product });
     };
 
     const updateEditWeight = (index, field, value) => {
         setEditWeights((prev) => prev.map((w, i) => (i === index ? { ...w, [field]: value } : w)));
+    };
+
+    const showMessage = (msg) => {
+        if (msgTimer.current) clearTimeout(msgTimer.current);
+        setMessage(msg);
+        msgTimer.current = setTimeout(() => setMessage(''), 3000);
     };
 
     const limit = 10;
@@ -111,64 +124,85 @@ export default function AllProductsPage() {
             const data = await res.json();
 
             if (data.success) {
-                setMessage("Product deleted successfully");
+                showMessage("Product deleted successfully");
                 setProducts(products.filter(p => p._id !== deleteModal.product._id));
             } else {
-                setMessage("Failed to delete product");
+                showMessage("Failed to delete product");
             }
         } catch (error) {
-            setMessage("Failed to delete product");
+            showMessage("Failed to delete product");
         }
 
         setDeleteModal({ show: false, product: null });
-        setTimeout(() => setMessage(""), 3000);
     };
 
     const handleEdit = async (e) => {
         e.preventDefault();
-        const formData = new FormData(e.target);
-        const productData = {
-            _id: editModal.product._id,
-            firstName: formData.get("firstName"),
-            lastName: formData.get("lastName"),
-            category: formData.get("category"),
-            description: formData.get("description"),
-            qa: formData.get("qa") ? JSON.parse(formData.get("qa")) : [],
-            showInEcommerce: editShowEcom,
-            // Preserve each variant's images; persist edited stock/price/codes.
-            weights: editWeights.map((w) => ({
-                weight: w.weight,
-                stock: parseInt(w.stock) || 0,
-                price: parseFloat(w.price) || 0,
-                costPrice: parseFloat(w.costPrice) || 0,
-                discountPercent: parseFloat(w.discountPercent) || 0,
-                sku: (w.sku || "").trim(),
-                barcode: (w.barcode || "").trim(),
-                images: w.images || [],
-            })),
-        };
+        setEditError("");
+        const formEl = e.target;
+        const formFields = new FormData(formEl);
+
+        const fd = new FormData();
+        fd.append("_id", editModal.product._id);
+        fd.append("firstName", formFields.get("firstName") || "");
+        fd.append("lastName", formFields.get("lastName") || "");
+        fd.append("category", formFields.get("category") || "");
+        fd.append("description", formFields.get("description") || "");
+        fd.append("qa", JSON.stringify(editQa));
+        fd.append("showInEcommerce", String(editShowEcom));
+        fd.append("weights", JSON.stringify(editWeights.map((w) => ({
+            weight: w.weight,
+            stock: parseInt(w.stock) || 0,
+            price: parseFloat(w.price) || 0,
+            costPrice: parseFloat(w.costPrice) || 0,
+            discountPercent: parseFloat(w.discountPercent) || 0,
+            sku: (w.sku || "").trim(),
+            barcode: (w.barcode || "").trim(),
+            images: w.images || [],
+        }))));
+        if (editCoverImage) {
+            fd.append("cover_image", editCoverImage);
+        }
 
         try {
             const res = await authFetch(`/api/admin/product/update-product-details`, {
                 method: "PUT",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(productData)
+                body: fd,
             });
             const data = await res.json();
 
             if (data.success) {
-                setMessage("Product updated successfully");
-                const updatedProducts = products.map(p => p._id === editModal.product._id ? { ...p, ...productData } : p);
+                const categoryId = formFields.get("category");
+                const cat = categories.find(c => c._id === categoryId);
+                const updatedProducts = products.map(p =>
+                    p._id === editModal.product._id
+                        ? {
+                            ...p,
+                            firstName: formFields.get("firstName") || p.firstName,
+                            lastName: formFields.get("lastName") || p.lastName,
+                            description: formFields.get("description") || p.description,
+                            showInEcommerce: editShowEcom,
+                            qa: editQa,
+                            weights: editWeights.map((w) => ({
+                                ...w,
+                                stock: parseInt(w.stock) || 0,
+                                price: parseFloat(w.price) || 0,
+                                costPrice: parseFloat(w.costPrice) || 0,
+                                discountPercent: parseFloat(w.discountPercent) || 0,
+                            })),
+                            category: cat ? { _id: cat._id, category_name: cat.category_name } : p.category,
+                          }
+                        : p
+                );
                 setProducts(updatedProducts);
+                showMessage("Product updated successfully");
+                setEditModal({ show: false, product: null });
             } else {
-                setMessage("Failed to update product");
+                setEditError(data.message || "Failed to update product");
             }
         } catch (error) {
-            setMessage("Failed to update product");
+            setEditError("Failed to update product");
         }
-
-        setEditModal({ show: false, product: null });
-        setTimeout(() => setMessage(""), 3000);
     };
 
     return (
@@ -419,9 +453,61 @@ export default function AllProductsPage() {
                                 </div>
                             )}
 
-                            <div className="hidden">
-                                <input type="hidden" name="qa" value={JSON.stringify(editModal.product.qa || [])} />
+                            {/* Cover image upload */}
+                            <div className="mb-4">
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Cover Image</label>
+                                {editModal.product.cover_image && !editCoverImage && (
+                                    <img src={editModal.product.cover_image} alt="Current cover" className="w-16 h-16 object-cover rounded-lg mb-2 border" />
+                                )}
+                                {editCoverImage && (
+                                    <img src={URL.createObjectURL(editCoverImage)} alt="New cover" className="w-16 h-16 object-cover rounded-lg mb-2 border" />
+                                )}
+                                <input
+                                    type="file"
+                                    accept="image/*"
+                                    onChange={(e) => setEditCoverImage(e.target.files?.[0] || null)}
+                                    className="w-full text-sm text-gray-600 file:mr-3 file:py-1.5 file:px-3 file:border-0 file:rounded-lg file:text-sm file:font-medium file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100"
+                                />
                             </div>
+
+                            {/* Q&A editor */}
+                            <div className="mb-4 border-t pt-4">
+                                <h4 className="text-sm font-semibold text-gray-800 mb-3">Q&amp;A</h4>
+                                <div className="space-y-2">
+                                    {editQa.map((item, idx) => (
+                                        <div key={idx} className="bg-gray-50 border rounded-lg p-3 flex gap-2">
+                                            <div className="flex-1 space-y-1.5">
+                                                <input
+                                                    type="text"
+                                                    value={item.question}
+                                                    onChange={(e) => setEditQa(prev => prev.map((q, i) => i === idx ? { ...q, question: e.target.value } : q))}
+                                                    placeholder="Question"
+                                                    className="w-full px-2 py-1.5 border rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 outline-none"
+                                                />
+                                                <input
+                                                    type="text"
+                                                    value={item.answer}
+                                                    onChange={(e) => setEditQa(prev => prev.map((q, i) => i === idx ? { ...q, answer: e.target.value } : q))}
+                                                    placeholder="Answer"
+                                                    className="w-full px-2 py-1.5 border rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 outline-none"
+                                                />
+                                            </div>
+                                            <button type="button" onClick={() => setEditQa(prev => prev.filter((_, i) => i !== idx))} className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg shrink-0">
+                                                <FiX className="w-4 h-4" />
+                                            </button>
+                                        </div>
+                                    ))}
+                                </div>
+                                <button type="button" onClick={() => setEditQa(prev => [...prev, { question: "", answer: "" }])} className="mt-2 text-sm text-emerald-600 hover:text-emerald-700 font-medium">
+                                    + Add Q&amp;A
+                                </button>
+                            </div>
+
+                            {editError && (
+                                <div className="mb-4 p-3 bg-red-50 text-red-700 border border-red-200 rounded-lg text-sm">
+                                    {editError}
+                                </div>
+                            )}
                             <div className="flex gap-3 justify-end">
                                 <button type="button" onClick={() => setEditModal({ show: false, product: null })} className="px-4 py-2 border rounded-lg hover:bg-gray-100">Cancel</button>
                                 <button type="submit" className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700">Save Changes</button>

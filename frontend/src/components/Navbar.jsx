@@ -2,7 +2,7 @@
 import Link, { useStorePush } from "@/components/StoreLink";
 import Image from "next/image";
 import { useState, useEffect, useCallback } from "react";
-import { usePathname } from "next/navigation";
+import { usePathname, useParams } from "next/navigation";
 import {
     FiSearch,
     FiShoppingCart,
@@ -43,11 +43,14 @@ function Navbar() {
     const [searchOpen, setSearchOpen] = useState(false);
     const goTo = useStorePush();
     const pathname = usePathname();
+    const { store = "" } = useParams() || {};
     const { customer, logout } = useCustomerAuth();
 
     const fetchCategories = useCallback(async () => {
         try {
-            const res = await fetch(`/api/client/category/get-all-category`);
+            const res = await fetch(`/api/client/category/get-all-category`, {
+                headers: store ? { 'X-Tenant': store } : {},
+            });
             const data = await res.json();
             if (data.success) {
                 setCategories(data.data || []);
@@ -70,9 +73,9 @@ function Navbar() {
     const fetchCartCount = useCallback(async () => {
         try {
             const guestId = getGuestId();
-            const res = await fetch(`/api/client/cart/get`, {
-                headers: { "guest-id": guestId },
-            });
+            const headers = { "guest-id": guestId };
+            if (store) headers["X-Tenant"] = store;
+            const res = await fetch(`/api/client/cart/get`, { headers });
             const data = await res.json();
             if (data.success && data.data) {
                 setCartCount(data.data.items?.length || 0);
@@ -84,7 +87,7 @@ function Navbar() {
 
     const fetchWishlistCount = useCallback(async () => {
         try {
-            const data = await getWishlist();
+            const data = await getWishlist(store);
             if (data?.success && data.data) {
                 setWishlistCount(data.data.items?.length || 0);
             }
@@ -99,7 +102,9 @@ function Navbar() {
             await fetchCartCount();
             await fetchWishlistCount();
             try {
-                const res = await fetch(`/api/client/site-settings`);
+                const res = await fetch(`/api/client/site-settings`, {
+                    headers: store ? { 'X-Tenant': store } : {},
+                });
                 const data = await res.json();
                 if (data?.success && data.data) {
                     setBranding({

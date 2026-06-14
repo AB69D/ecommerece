@@ -1,5 +1,6 @@
 "use client";
 import React, { useState, useEffect, useCallback } from "react";
+import { useParams } from "next/navigation";
 import { FiArrowLeft, FiArrowRight, FiEye, FiPlus } from "react-icons/fi";
 import { useStorePush } from "@/components/StoreLink";
 import ProductCardSkeleton from "./ProductCardSkeleton";
@@ -16,6 +17,7 @@ export default function TopSelling() {
     const [hoveredProduct, setHoveredProduct] = useState(null);
     const { symbol } = useCurrency();
     const goTo = useStorePush();
+    const { store = "" } = useParams() || {};
 
     const containerRef = React.useRef(null);
 
@@ -39,7 +41,9 @@ export default function TopSelling() {
     useEffect(() => {
         const fetchProducts = async () => {
             try {
-                const res = await fetch(`/api/client/product/top-selling?limit=20`);
+                const res = await fetch(`/api/client/product/top-selling?limit=20`, {
+                    headers: store ? { 'X-Tenant': store } : {},
+                });
                 const data = await res.json();
 
                 if (data.success) {

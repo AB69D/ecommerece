@@ -1,9 +1,11 @@
 "use client";
 
 import { useState } from "react";
+import { useParams } from "next/navigation";
 import { FiMapPin, FiPhone, FiMail, FiClock } from "react-icons/fi";
 
 export function ContactForm() {
+    const { store = "" } = useParams() || {};
     const [formData, setFormData] = useState({
         name: "",
         email: "",
@@ -31,7 +33,8 @@ export function ContactForm() {
             const response = await fetch(`/api/client/contact/submit`, {
                 method: "POST",
                 headers: {
-                    "Content-Type": "application/json"
+                    "Content-Type": "application/json",
+                    ...(store ? { "X-Tenant": store } : {}),
                 },
                 body: JSON.stringify(formData)
             });

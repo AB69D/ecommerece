@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
+import { useParams } from "next/navigation";
 import { useStorePush } from "@/components/StoreLink";
 import { FiEye, FiPlus } from "react-icons/fi";
 import { ProductGridSkeleton } from "./ProductCardSkeleton";
@@ -14,11 +15,14 @@ export default function AllProducts() {
     const [hoveredProduct, setHoveredProduct] = useState(null);
     const { symbol } = useCurrency();
     const goTo = useStorePush();
+    const { store = "" } = useParams() || {};
 
     useEffect(() => {
         const fetchProducts = async () => {
             try {
-                const res = await fetch(`/api/client/product/products?limit=50`);
+                const res = await fetch(`/api/client/product/products?limit=50`, {
+                    headers: store ? { 'X-Tenant': store } : {},
+                });
                 const data = await res.json();
 
                 if (data.success) {

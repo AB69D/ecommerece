@@ -4,6 +4,7 @@ import { FiArrowLeft, FiArrowRight } from "react-icons/fi";
 import { FaStar, FaStarHalfAlt, FaRegStar, FaQuoteLeft } from "react-icons/fa";
 import { getReviews } from "@/utils/review";
 import { useFeature } from "@/hooks/useSiteSettings";
+import { useParams } from "next/navigation";
 
 const renderStars = (rating) => {
     const stars = [];
@@ -23,6 +24,7 @@ const renderStars = (rating) => {
 };
 
 export default function CustomerReviews() {
+    const { store = "" } = useParams() || {};
     const reviewsEnabled = useFeature("productReviews");
     const [reviews, setReviews] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -37,7 +39,7 @@ export default function CustomerReviews() {
         }
         const fetchReviews = async () => {
             try {
-                const result = await getReviews();
+                const result = await getReviews(store);
                 if (result.success) {
                     setReviews(result.data);
                 } else if (result.error) {

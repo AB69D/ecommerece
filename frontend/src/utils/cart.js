@@ -1,4 +1,4 @@
-const getHeaders = () => {
+const getHeaders = (store = "") => {
     const headers = {
         'Content-Type': 'application/json'
     };
@@ -7,6 +7,9 @@ const getHeaders = () => {
         if (guestId) {
             headers['guest-id'] = guestId;
         }
+    }
+    if (store) {
+        headers['X-Tenant'] = store;
     }
     return headers;
 };
@@ -23,14 +26,15 @@ const ensureGuestId = () => {
     return null;
 };
 
-export const addToCart = async (productId, quantity = 1, weight = '', weightIndex = 0, price = 0, discountPercent = 0) => {
+export const addToCart = async (productId, quantity = 1, weight = '', weightIndex = 0, price = 0, discountPercent = 0, store = '') => {
     try {
         const guestId = ensureGuestId();
         const res = await fetch(`/api/client/cart/add`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'guest-id': guestId
+                'guest-id': guestId,
+                ...(store ? { 'X-Tenant': store } : {}),
             },
             body: JSON.stringify({ productId, quantity, weight, weightIndex, price, discountPercent }),
             credentials: 'include'
@@ -43,12 +47,13 @@ export const addToCart = async (productId, quantity = 1, weight = '', weightInde
     }
 };
 
-export const getCart = async () => {
+export const getCart = async (store = '') => {
     try {
         const guestId = ensureGuestId();
         const res = await fetch(`/api/client/cart/get`, {
             headers: {
-                'guest-id': guestId
+                'guest-id': guestId,
+                ...(store ? { 'X-Tenant': store } : {}),
             },
             credentials: 'include'
         });
@@ -60,14 +65,15 @@ export const getCart = async () => {
     }
 };
 
-export const updateCartItem = async (itemId, quantity) => {
+export const updateCartItem = async (itemId, quantity, store = '') => {
     try {
         const guestId = localStorage.getItem('guestId');
         const res = await fetch(`/api/client/cart/update`, {
             method: 'PUT',
             headers: {
                 'Content-Type': 'application/json',
-                'guest-id': guestId
+                'guest-id': guestId,
+                ...(store ? { 'X-Tenant': store } : {}),
             },
             body: JSON.stringify({ itemId, quantity }),
             credentials: 'include'
@@ -80,13 +86,14 @@ export const updateCartItem = async (itemId, quantity) => {
     }
 };
 
-export const removeFromCart = async (itemId) => {
+export const removeFromCart = async (itemId, store = '') => {
     try {
         const guestId = localStorage.getItem('guestId');
         const res = await fetch(`/api/client/cart/remove/${itemId}`, {
             method: 'DELETE',
             headers: {
-                'guest-id': guestId
+                'guest-id': guestId,
+                ...(store ? { 'X-Tenant': store } : {}),
             },
             credentials: 'include'
         });
@@ -98,14 +105,15 @@ export const removeFromCart = async (itemId) => {
     }
 };
 
-export const createOrder = async (orderData) => {
+export const createOrder = async (orderData, store = '') => {
     try {
         const guestId = localStorage.getItem('guestId');
         const res = await fetch(`/api/client/order/create`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'guest-id': guestId
+                'guest-id': guestId,
+                ...(store ? { 'X-Tenant': store } : {}),
             },
             body: JSON.stringify(orderData),
             credentials: 'include'
@@ -118,12 +126,13 @@ export const createOrder = async (orderData) => {
     }
 };
 
-export const getOrders = async () => {
+export const getOrders = async (store = '') => {
     try {
         const guestId = localStorage.getItem('guestId');
         const res = await fetch(`/api/client/order/list`, {
             headers: {
-                'guest-id': guestId
+                'guest-id': guestId,
+                ...(store ? { 'X-Tenant': store } : {}),
             },
             credentials: 'include'
         });
@@ -135,12 +144,13 @@ export const getOrders = async () => {
     }
 };
 
-export const getOrder = async (orderId) => {
+export const getOrder = async (orderId, store = '') => {
     try {
         const guestId = localStorage.getItem('guestId');
         const res = await fetch(`/api/client/order/${orderId}`, {
             headers: {
-                'guest-id': guestId
+                'guest-id': guestId,
+                ...(store ? { 'X-Tenant': store } : {}),
             },
             credentials: 'include'
         });

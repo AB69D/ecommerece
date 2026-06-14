@@ -53,33 +53,35 @@ export const writeWishlistIds = (ids) => {
 export const isWishlisted = (productId) => readWishlistIds().has(String(productId));
 
 // ---- server calls ---------------------------------------------------------
-export const getWishlist = () =>
-    fetch(`/api/client/wishlist/get`, { headers: { ...guestHeader() } }).then((r) => r.json());
+const tenantHeader = (store) => (store ? { 'X-Tenant': store } : {});
 
-export const toggleWishlist = (item) =>
+export const getWishlist = (store = "") =>
+    fetch(`/api/client/wishlist/get`, { headers: { ...guestHeader(), ...tenantHeader(store) } }).then((r) => r.json());
+
+export const toggleWishlist = (item, store = "") =>
     fetch(`/api/client/wishlist/toggle`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", ...guestHeader() },
+        headers: { "Content-Type": "application/json", ...guestHeader(), ...tenantHeader(store) },
         body: JSON.stringify(item),
     }).then((r) => r.json());
 
-export const removeFromWishlist = (productId) =>
+export const removeFromWishlist = (productId, store = "") =>
     fetch(`/api/client/wishlist/remove/${productId}`, {
         method: "DELETE",
-        headers: { ...guestHeader() },
+        headers: { ...guestHeader(), ...tenantHeader(store) },
     }).then((r) => r.json());
 
-export const clearWishlist = () =>
+export const clearWishlist = (store = "") =>
     fetch(`/api/client/wishlist/clear`, {
         method: "DELETE",
-        headers: { ...guestHeader() },
+        headers: { ...guestHeader(), ...tenantHeader(store) },
     }).then((r) => r.json());
 
 // Pull the server wishlist and refresh the local id cache. Call on app load so
 // hearts reflect a wishlist built on another device/session for this guest.
-export const syncWishlistIds = async () => {
+export const syncWishlistIds = async (store = "") => {
     try {
-        const res = await getWishlist();
+        const res = await getWishlist(store);
         if (res?.success && res.data) {
             const ids = new Set((res.data.items || []).map((it) => String(it.productId)));
             writeWishlistIds(ids);

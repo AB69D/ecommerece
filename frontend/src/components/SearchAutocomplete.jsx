@@ -1,6 +1,7 @@
 "use client";
 import { useState, useRef, useEffect } from "react";
 import { useStorePush } from "@/components/StoreLink";
+import { useParams } from "next/navigation";
 import { FiSearch, FiX } from "react-icons/fi";
 import { useCurrency } from "@/context/CurrencyContext.jsx";
 import { suggestProducts } from "@/services/product";
@@ -22,6 +23,7 @@ const fromPrice = (weights) => {
 export default function SearchAutocomplete({ onNavigate, autoFocus = false }) {
     const goTo = useStorePush();
     const { symbol } = useCurrency();
+    const { store = "" } = useParams() || {};
 
     const [query, setQuery] = useState("");
     const [results, setResults] = useState([]);
@@ -66,7 +68,7 @@ export default function SearchAutocomplete({ onNavigate, autoFocus = false }) {
         setOpen(true);
         const reqId = ++reqRef.current;
         debounceRef.current = setTimeout(() => {
-            suggestProducts({ q, limit: 6 })
+            suggestProducts({ q, limit: 6 }, store)
                 .then((data) => {
                     if (reqId !== reqRef.current) return; // a newer keystroke won
                     setResults((data && data.success && data.data) || []);

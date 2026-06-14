@@ -1,6 +1,6 @@
 "use client";
 import { Suspense, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams, useParams } from "next/navigation";
 import Link from "@/components/StoreLink";
 import { FiMail, FiLock, FiArrowRight, FiAlertCircle, FiEye, FiEyeOff } from "react-icons/fi";
 import { login as loginRequest } from "@/services/customerAuth";
@@ -10,6 +10,7 @@ function LoginForm() {
     const router = useRouter();
     const params = useSearchParams();
     const nextUrl = params.get("next") || "/account";
+    const { store = "" } = useParams() || {};
     const { login } = useCustomerAuth();
 
     const [email, setEmail] = useState("");
@@ -27,7 +28,7 @@ function LoginForm() {
         setError("");
         setLoading(true);
         try {
-            const result = await loginRequest({ email: email.trim(), password });
+            const result = await loginRequest({ email: email.trim(), password }, store);
             setLoading(false);
             if (result.success && result.data?.token) {
                 login(result.data.token, result.data.customer);

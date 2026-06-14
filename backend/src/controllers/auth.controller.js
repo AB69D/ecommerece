@@ -42,7 +42,9 @@ export const sendCode = async (request, response) => {
         const normalizedEmail = email.toLowerCase().trim();
 
         const isEnvAdmin = ADMIN_EMAILS.includes(normalizedEmail);
-        const dbAdmin = await AdminModel.findOne({ email: normalizedEmail });
+        const dbAdmin = await runAsSystem(async () =>
+            AdminModel.findOne({ email: normalizedEmail }).exec()
+        );
 
         if (!isEnvAdmin && !dbAdmin) {
             return response.status(403).json({
@@ -54,14 +56,19 @@ export const sendCode = async (request, response) => {
 
         const code = generateCode();
 
-        await OtpModel.deleteMany({ email: normalizedEmail });
-
-        const otp = new OtpModel({
-            email: normalizedEmail,
-            code,
-            expiresAt: new Date(Date.now() + 3 * 60 * 60 * 1000),
+        await runAsSystem(async () => {
+            await OtpModel.deleteMany({ email: normalizedEmail });
         });
-        await otp.save();
+
+        const otp = await runAsSystem(async () => {
+            const otpDoc = new OtpModel({
+                email: normalizedEmail,
+                code,
+                expiresAt: new Date(Date.now() + 3 * 60 * 60 * 1000),
+            });
+            await otpDoc.save();
+            return otpDoc;
+        });
 
         const sent = await sendEmail({
             to: normalizedEmail,
@@ -123,12 +130,14 @@ export const verifyCode = async (request, response) => {
 
         const normalizedEmail = email.toLowerCase().trim();
 
-        const otp = await OtpModel.findOne({
-            email: normalizedEmail,
-            code,
-            verified: false,
-            expiresAt: { $gt: new Date() }
-        });
+        const otp = await runAsSystem(async () =>
+            OtpModel.findOne({
+                email: normalizedEmail,
+                code,
+                verified: false,
+                expiresAt: { $gt: new Date() }
+            }).exec()
+        );
 
         if (!otp) {
             return response.status(400).json({
@@ -138,8 +147,10 @@ export const verifyCode = async (request, response) => {
             });
         }
 
-        otp.verified = true;
-        await otp.save();
+        await runAsSystem(async () => {
+            otp.verified = true;
+            await otp.save();
+        });
 
         const effectiveTenantId = getEffectiveTenantId();
         const token = jwt.sign(
@@ -184,6 +195,10 @@ export const verifyToken = async (request, response) => {
 
         const token = authHeader.split(' ')[1];
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+        if (decoded.type === 'customer') {
+            return response.status(401).json({ message: "Invalid token type", error: true, success: false, valid: false });
+        }
 
         return response.json({
             message: "Token is valid",

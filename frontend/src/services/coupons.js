@@ -33,9 +33,9 @@ export const validateCouponAdmin = (code, subtotal, channel = "pos") =>
     }).then((r) => r.json());
 
 // Public storefront validate/preview (unauthenticated).
-export const validateCouponPublic = (code, subtotal, channel = "ecommerce") =>
+export const validateCouponPublic = (code, subtotal, channel = "ecommerce", store = "") =>
     fetch(`/api/client/coupon/validate`, {
         method: "POST",
-        headers: jsonHeaders,
+        headers: { ...jsonHeaders, ...(store ? { 'X-Tenant': store } : {}) },
         body: JSON.stringify({ code, subtotal, channel }),
     }).then((r) => r.json());

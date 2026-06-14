@@ -130,7 +130,7 @@ clientProductRouter.get('/top-selling', async (req, res) => {
         }).select('-weights.costPrice').populate('category');
 
         const productsWithSales = products.map(product => {
-            const salesData = topSelling.find(item => item._id === product._id.toString());
+            const salesData = topSelling.find(item => String(item._id) === String(product._id));
             return {
                 ...product.toObject(),
                 totalSold: salesData ? salesData.totalSold : 0

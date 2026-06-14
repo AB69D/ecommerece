@@ -93,7 +93,7 @@ export const updateOrderStatusController = async (request, response) => {
         order.orderStatus = orderStatus;
         await order.save();
 
-        if ((orderStatus === 'cancelled' || orderStatus === 'failed') && (previousStatus !== 'cancelled' && previousStatus !== 'failed')) {
+        if (orderStatus === 'cancelled' && previousStatus !== 'cancelled') {
             // Restock is unconditional (+qty back to each line) — single bulkWrite.
             await applyStockDeltas(
                 order.items
@@ -290,11 +290,20 @@ export const getStockReportController = async (request, response) => {
 
 export const updateStockController = async (request, response) => {
     try {
-        const { productId, weightIndex, quantity, action } = request.body;
+        const { productId, weightIndex, action } = request.body;
+        const quantity = parseInt(request.body.quantity, 10);
 
-        if (!productId || weightIndex === undefined || !quantity || !action) {
+        if (!productId || weightIndex === undefined || !request.body.quantity || !action) {
             return response.status(400).json({
                 message: "productId, weightIndex, quantity, and action are required",
+                error: true,
+                success: false
+            });
+        }
+
+        if (isNaN(quantity) || quantity <= 0) {
+            return response.status(400).json({
+                message: "quantity must be a positive integer",
                 error: true,
                 success: false
             });
@@ -308,42 +317,32 @@ export const updateStockController = async (request, response) => {
             });
         }
 
-        const stockChange = action === 'add' ? parseInt(quantity) : -parseInt(quantity);
-
-        const product = await ProductModel.findOne({ _id: productId });
-
-        if (!product) {
-            return response.status(404).json({
-                message: "Product not found",
-                error: true,
-                success: false
-            });
+        const stockChange = action === 'subtract' ? -quantity : quantity;
+        const filter = { _id: productId };
+        if (action === 'subtract') {
+            filter[`weights.${weightIndex}.stock`] = { $gte: quantity };
         }
 
-        const currentStock = product.weights[weightIndex]?.stock || 0;
-
-        if (action === 'subtract' && currentStock < quantity) {
-            return response.status(400).json({
-                message: "Cannot subtract more than available stock",
-                error: true,
-                success: false
-            });
-        }
-
-        await ProductModel.updateOne(
-            { _id: productId },
-            { $inc: { [`weights.${weightIndex}.stock`]: stockChange } }
+        const updateResult = await ProductModel.findOneAndUpdate(
+            filter,
+            { $inc: { [`weights.${weightIndex}.stock`]: stockChange } },
+            { new: true }
         );
 
-        const variant = product.weights[weightIndex] || {};
+        if (!updateResult) {
+            return response.status(400).json({ message: "Insufficient stock or product not found", error: true, success: false });
+        }
+
+        const variant = updateResult.weights[weightIndex] || {};
+        const balanceAfter = variant.stock ?? 0;
         await recordStockMovements(
             [{
                 productId,
-                productName: `${product.firstName || ''}${product.lastName ? ` ${product.lastName}` : ''}`.trim(),
+                productName: `${updateResult.firstName || ''}${updateResult.lastName ? ` ${updateResult.lastName}` : ''}`.trim(),
                 weightIndex: Number(weightIndex),
                 weight: variant.weight || '',
                 delta: stockChange,
-                balanceAfter: currentStock + stockChange,
+                balanceAfter,
             }],
             { reason: 'adjustment', channel: 'admin', actor: actorFromReq(request), note: `Manual ${action}` }
         );
@@ -374,7 +373,7 @@ export const getOrderStatsController = async (request, response) => {
         const cancelledOrders = await OrderModel.countDocuments({ orderStatus: 'cancelled' });
 
         const totalRevenue = await OrderModel.aggregate([
-            { $match: { orderStatus: { $nin: ['cancelled', 'failed'] } } },
+            { $match: { orderStatus: { $nin: ['cancelled'] } } },
             { $group: { _id: null, total: { $sum: '$totalAmount' } } }
         ]);
 
