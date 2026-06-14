@@ -1,7 +1,7 @@
 "use client";
 import { authFetch } from "@/services/api";
 import React, { useState, useEffect } from "react";
-import { FiSearch, FiPlus, FiMinus, FiAlertCircle, FiTrendingUp, FiPackage } from "react-icons/fi";
+import { FiSearch, FiPlus, FiMinus, FiAlertCircle, FiTrendingUp, FiPackage, FiAlertTriangle } from "react-icons/fi";
 import { useAdminAuth } from "@/context/AdminAuthContext";
 import { useCurrency } from "@/context/CurrencyContext.jsx";
 
@@ -136,6 +136,31 @@ export default function StockManagementPage() {
                 </div>
             </div>
 
+            {/* Low stock alert banner */}
+            {!loading && (() => {
+                const lowStock = stockData.flatMap(p =>
+                    p.weights
+                        .filter(w => w.stock <= 5)
+                        .map(w => ({ productName: p.productName, weight: w.weight, stock: w.stock, _id: p._id, weightIndex: w.weightIndex }))
+                );
+                if (lowStock.length === 0) return null;
+                return (
+                    <div className="mb-6 border border-amber-200 bg-amber-50 rounded-xl p-4">
+                        <div className="flex items-center gap-2 mb-3">
+                            <FiAlertTriangle className="w-5 h-5 text-amber-600 flex-shrink-0" />
+                            <h4 className="font-semibold text-amber-800 text-sm">{lowStock.length} variant{lowStock.length !== 1 ? "s" : ""} running low</h4>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                            {lowStock.map((item, i) => (
+                                <span key={i} className={`inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full ${item.stock === 0 ? "bg-red-100 text-red-700" : "bg-amber-100 text-amber-700"}`}>
+                                    {item.stock === 0 ? "OUT" : item.stock} · {item.productName}{item.weight ? ` (${item.weight})` : ""}
+                                </span>
+                            ))}
+                        </div>
+                    </div>
+                );
+            })()}
+
             <div className="mb-6">
                 <div className="relative">
                     <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
@@ -175,7 +200,7 @@ export default function StockManagementPage() {
                                 </div>
                                 <div className="text-right">
                                     <p className="text-lg font-bold text-gray-800">Total: {product.totalStock} items</p>
-                                    <p className="text-sm text-emerald-600">Value: ${product.totalValue.toLocaleString()}</p>
+                                    <p className="text-sm text-emerald-600">Value: {symbol}{product.totalValue.toLocaleString()}</p>
                                 </div>
                             </div>
 
@@ -262,6 +287,16 @@ export default function StockManagementPage() {
                                     value={adjustForm.quantity}
                                     onChange={(e) => setAdjustForm({ ...adjustForm, quantity: e.target.value })}
                                     required
+                                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
+                                />
+                            </div>
+                            <div className="mb-4">
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Reason <span className="text-gray-400 font-normal">(optional)</span></label>
+                                <input
+                                    type="text"
+                                    placeholder="e.g. New shipment, Damaged goods, Stocktake…"
+                                    value={adjustForm.reason}
+                                    onChange={(e) => setAdjustForm({ ...adjustForm, reason: e.target.value })}
                                     className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
                                 />
                             </div>
