@@ -73,18 +73,26 @@ jobs:
               "${VPS_USER}@${VPS_HOST}" bash -s <<'EOF'
           set -euo pipefail
           cd /opt/ab9d-ecommerce
+
+          # Caddy owns port 80. Any system nginx (Contabo default install) must be
+          # stopped and disabled so the two don't race for the port.
+          if systemctl is-active --quiet nginx 2>/dev/null; then
+            echo "Stopping system nginx (conflicts with Caddy on port 80)..."
+            sudo systemctl stop nginx
+            sudo systemctl disable nginx
+          fi
+
           echo "Current commit (before): $(git rev-parse --short HEAD)"
           git fetch --quiet origin main
           git reset --hard origin/main
           echo "Current commit (after):  $(git rev-parse --short HEAD)"
+
           docker compose up -d --build backend
-          # restart caddy too if Caddyfile changed
-          if git diff --name-only HEAD@{1} HEAD 2>/dev/null | grep -qE '^(Caddyfile|docker-compose\.yml)$'; then
-            docker compose up -d --force-recreate caddy
-          fi
-          # wait for health
+          # always restart caddy so it can bind port 80 now that nginx is gone
+          docker compose up -d --force-recreate caddy
+          # wait for health (caddy proxies / → backend:8080 → /healthz JSON)
           for i in $(seq 1 30); do
-            if curl -fsS -m 3 http://127.0.0.1/healthz >/dev/null 2>&1; then
+            if curl -fsS -m 3 http://127.0.0.1/healthz 2>/dev/null | grep -q '"status"'; then
               echo "Backend healthy after $i attempts"
               exit 0
             fi
@@ -92,5 +100,6 @@ jobs:
           done
           echo "Backend did not become healthy"
           docker compose logs --tail=50 backend
+          docker compose logs --tail=20 caddy
           exit 1
           EOF
