@@ -41,17 +41,32 @@ jobs:
           mkdir -p ~/.ssh
           chmod 700 ~/.ssh
 
-          # Write the key guaranteeing a trailing newline — OpenSSH rejects keys
-          # without one with a misleading "invalid format" error.
+          # Write the key. Use a GitHub Actions environment file to avoid
+          # shell-expansion / line-ending issues with multi-line secrets:
+          # the secret is written byte-for-byte to a temp env file and then
+          # read back, which preserves embedded newlines reliably across runners.
           install -m 600 /dev/null ~/.ssh/id_deploy
-          printf '%s\n' "${{ secrets.VPS_SSH_PRIVATE_KEY }}" > ~/.ssh/id_deploy
+          {
+            echo "${{ secrets.VPS_SSH_PRIVATE_KEY }}"
+          } > ~/.ssh/id_deploy
+          # Ensure trailing newline (OpenSSH requires it).
+          echo "" >> ~/.ssh/id_deploy
+          # Strip Windows-style carriage returns if the secret was pasted from Windows.
+          sed -i 's/\r//' ~/.ssh/id_deploy
+
+          echo "Key file size: $(wc -c < ~/.ssh/id_deploy) bytes, lines: $(wc -l < ~/.ssh/id_deploy)"
+          echo "First line: $(head -1 ~/.ssh/id_deploy)"
+          echo "Last line:  $(tail -1 ~/.ssh/id_deploy)"
 
           # Fail early (with a clear message) if the key itself is malformed,
           # instead of a cryptic auth failure later.
           if ! ssh-keygen -y -f ~/.ssh/id_deploy >/dev/null 2>&1; then
             echo "::error::VPS_SSH_PRIVATE_KEY is not a valid private key. Re-copy the whole key (e.g. cat ~/.ssh/id_ed25519) including header/footer lines."
+            echo "Key content preview (first 3 lines):"
+            head -3 ~/.ssh/id_deploy
             exit 1
           fi
+          echo "SSH key validated OK"
 
           # Best-effort known_hosts. Not fatal: the deploy step uses
           # StrictHostKeyChecking=accept-new, so a keyscan miss won't block us.
