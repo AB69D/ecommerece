@@ -4,6 +4,7 @@ import CartModel from '../models/cart.model.js';
 import ProductModel from '../models/product.model.js';
 import CheckoutLeadModel from '../models/checkoutLead.model.js';
 import CouponModel from '../models/coupon.model.js';
+import { SiteSettings } from '../models/siteSettings.model.js';
 import { evaluateCoupon } from '../lib/coupon.js';
 import { recordStockMovements } from '../lib/stockLedger.js';
 import { sendOrderConfirmationEmail } from '../lib/orderEmail.js';
@@ -28,13 +29,14 @@ clientOrderRouter.post('/create', optionalCustomer, async (req, res) => {
             couponCode = ''
         } = req.body;
         
+        const siteSettings = await SiteSettings.findOne().lean();
         const deliveryCharges = {
-            local: 70,
-            regional: 100,
-            international: 130
+            local: siteSettings?.delivery?.localCharge ?? 70,
+            regional: siteSettings?.delivery?.regionalCharge ?? 100,
+            international: 130,
         };
 
-        const deliveryCharge = deliveryCharges[deliveryArea] || 70;
+        const deliveryCharge = deliveryCharges[deliveryArea] ?? deliveryCharges.local;
         
         let guestId = getGuestId(req);
 
