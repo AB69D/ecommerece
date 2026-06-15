@@ -131,17 +131,12 @@ export const resolveTenant = async (req, _res, next) => {
             if (byDomain) return finalize(req, next, host, byDomain);
         }
 
-        // Client storefront routes require an explicit tenant signal. Without one
-        // the request would silently fall through to the primary/default tenant,
-        // which is a cross-tenant data leak in multi-tenant production. Reject
-        // early so the failure is visible rather than silent.
-        if (req.path.startsWith('/client/')) {
-            return next(ApiError.notFound('No store found. Include a valid X-Tenant header.'));
-        }
-
-        // Admin/platform/other routes: no tenant signal is fine — admin auth
-        // will bind the tenant from the JWT via setRequestTenant(), and platform
-        // routes run in system context.
+        // No tenant signal — fall through to the default (primary) tenant.
+        // Admin auth will bind the correct tenant from the JWT via
+        // setRequestTenant(); platform routes run in system context.
+        // Client storefront routes also fall through here; the tenantPlugin
+        // picks up the defaultTenantId set at bootstrap so single-tenant
+        // and direct-IP access keep working without extra config.
         return next();
     } catch (err) {
         return next(err);
