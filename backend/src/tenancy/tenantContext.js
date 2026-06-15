@@ -81,6 +81,54 @@ export const reAttachTenant = (req, _res, next) => {
     return tenantStore.run({ tenantId, system: false }, () => next());
 };
 
+// ── Dev-only multer guard ────────────────────────────────────────────────────
+// Wraps a multer middleware and warns when the AsyncLocalStorage tenant context
+// is missing AFTER multer finishes — which means reAttachTenant was forgotten.
+// Attach to any multer instance in development:
+//
+//   import cloudinaryUpload, { wrapMulterForDev } from './uploadImage.js';
+//   const upload = wrapMulterForDev(cloudinaryUpload);
+//   router.post('/upload', upload.array('files', 5), reAttachTenant, handler);
+//
+// In production this is a transparent pass-through — zero overhead.
+export const wrapMulterForDev = (multerMiddleware) => {
+    if (process.env.NODE_ENV === 'production') return multerMiddleware;
+    return {
+        ...multerMiddleware,
+        // Proxy every Multer method (single, array, fields, none, any).
+        single: (fieldName) => wrapHandler(multerMiddleware.single(fieldName)),
+        array: (fieldName, maxCount) => wrapHandler(multerMiddleware.array(fieldName, maxCount)),
+        fields: (fields) => wrapHandler(multerMiddleware.fields(fields)),
+        none: () => wrapHandler(multerMiddleware.none()),
+        any: () => wrapHandler(multerMiddleware.any()),
+    };
+
+    function wrapHandler(handler) {
+        return (req, res, next) => {
+            handler(req, res, (err) => {
+                if (err) return next(err);
+                // If ALS tenant context is gone, the developer forgot reAttachTenant.
+                const store = tenantStore.getStore();
+                if (!store || !store.tenantId) {
+                    // Use req.tenant if the upstream resolver still has it.
+                    const hasReqTenant = !!(req.tenant?._id || req.tenantId);
+                    if (hasReqTenant) {
+                        console.warn(
+                            '[tenant] WARNING: multer broke the AsyncLocalStorage tenant context ' +
+                            `on ${req.method} ${req.path}. ` +
+                            'Add reAttachTenant BETWEEN the multer middleware and your handler:\n' +
+                            `  router.post('...', upload.xxx(), reAttachTenant, handler)\n` +
+                            'Continuing without the ALS context — queries may silently fall back ' +
+                            'to the default tenant.',
+                        );
+                    }
+                }
+                next();
+            });
+        };
+    }
+};
+
 // Re-bind the CURRENT request to a specific tenant AFTER its context was created
 // — used once auth has decoded the JWT's tenantId. On the shared domain there is
 // no subdomain, so withTenant leaves tenantId null and the plugin falls back to

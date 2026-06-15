@@ -5,7 +5,10 @@
   "type": "module",
   "scripts": {
     "start": "node src/server.js",
-    "dev": "nodemon src/server.js"
+    "dev": "nodemon src/server.js",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "eslint src/controllers src/routes"
   },
   "author": "Abdullah Al Fuad",
   "license": "ISC",
@@ -33,6 +36,10 @@
     "zod": "^3.23.8"
   },
   "devDependencies": {
-    "nodemon": "^3.1.7"
+    "nodemon": "^3.1.7",
+    "vitest": "^2.0.0",
+    "mongodb-memory-server": "^10.0.0",
+    "eslint": "^9.0.0",
+    "@eslint/js": "^9.0.0"
   }
 }

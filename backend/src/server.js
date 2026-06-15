@@ -15,8 +15,9 @@ import { notFound } from './middlewares/notFound.middleware.js';
 import requireAuth from './middlewares/auth.middleware.js';
 import { auditMutations } from './lib/audit.js';
 import AdminModel from './models/admin.model.js';
-import { runAsSystem, withTenant } from './tenancy/tenantContext.js';
+import { runAsSystem, withTenant, reAttachTenant } from './tenancy/tenantContext.js';
 import { resolveTenant } from './tenancy/resolveTenant.js';
+import { requireTenant } from './tenancy/requireTenant.js';
 import { bootstrapTenancy } from './tenancy/bootstrapTenancy.js';
 
 import categoryRouter from './routes/category.route.js';
@@ -174,6 +175,17 @@ app.use('/api/platform', (req, _res, next) => runAsSystem(() => next()), platfor
 // plugin's default tenant takes over, so behaviour is unchanged.
 app.use('/api', resolveTenant, withTenant);
 
+// ── Mandatory tenant guard (Phase 2+) ───────────────────────────────────────
+// When TENANT_ENFORCEMENT=true, /api/client/* and /api/admin/* MUST carry a
+// resolved tenant. A request with no X-Tenant header / subdomain signal is
+// rejected 400 here rather than silently served under the primary store.
+// /api/platform/* is mounted before this and never reaches it.
+// /api/admin/auth is also before this (the auth limiter is applied first in
+// the block above), but it too sets a tenant from the JWT — keep it exempt
+// here since it runs before requireAuth can bind the tenant.
+app.use('/api/client', requireTenant);
+app.use('/api/admin', requireTenant);
+
 // Auth (stricter rate limit)
 app.use('/api/admin/auth', authLimiter, authRouter);
 
@@ -204,6 +216,22 @@ app.use('/api/admin/site-settings', requireAuth, siteSettingsRouter.admin);
 app.use('/api/admin/footer', requireAuth, footerRouter.admin);
 app.use('/api/admin/page', requireAuth, pageRouter.admin);
 app.use('/api/admin/nav-menu', requireAuth, navMenuRouter.admin);
+
+// ── Global reAttachTenant for client routes ──────────────────────────────────
+// multer (and other streaming body parsers) process the request body via busboy
+// event emitters that run in Node's ROOT async context — losing the
+// AsyncLocalStorage tenant context that withTenant set at the start of the
+// request.  req.tenant (set by resolveTenant) is always preserved on the
+// request object, so reAttachTenant can restore the ALS context from it.
+//
+// Mounting here — BEFORE the client routers — means every route that uses multer
+// automatically gets the correct tenant context restored without each router
+// having to remember to add reAttachTenant between upload and handler.
+//
+// For admin routes this is a no-op: requireAuth calls setRequestTenant() which
+// re-binds the context from the JWT.  We still apply it to /api/client because
+// some client routes (review upload, checkout lead) use multer without auth.
+app.use('/api/client', reAttachTenant);
 
 // Public/client routes
 app.use('/api/client/auth', clientAuthRouter);

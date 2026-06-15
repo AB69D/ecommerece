@@ -2,6 +2,7 @@ import { Router } from 'express';
 import mongoose from 'mongoose';
 import ProductModel from '../models/product.model.js';
 import CategoryModel from '../models/category.model.js';
+import { tenantAggregate, tenantMatchStage } from '../tenancy/tenantAggregate.js';
 
 const clientProductRouter = Router();
 
@@ -110,10 +111,7 @@ clientProductRouter.get('/top-selling', async (req, res) => {
 
         const OrderModel = (await import('../models/order.model.js')).default;
 
-        // aggregate() bypasses tenantPlugin — scope to this tenant's orders only.
-        const topTenantId = (req.tenant && req.tenant._id) || req.tenantId || null;
-        const topSelling = await OrderModel.aggregate([
-            ...(topTenantId ? [{ $match: { tenantId: topTenantId } }] : []),
+        const topSelling = await tenantAggregate(OrderModel, [
             { $unwind: '$items' },
             {
                 $group: {
@@ -202,11 +200,9 @@ clientProductRouter.get('/search', async (req, res) => {
         }
 
         // ---- base match (visibility + tenant + text + category) ----
-        // aggregate() bypasses the tenantPlugin query hooks — inject tenantId
-        // manually so the search only returns this store's own products.
-        const baseMatch = { showInEcommerce: { $ne: false } };
-        const searchTenantId = (req.tenant && req.tenant._id) || req.tenantId || null;
-        if (searchTenantId) baseMatch.tenantId = searchTenantId;
+        // aggregate() bypasses tenantPlugin — tenantMatchStage injects the filter
+        // inline so it combines with the other conditions in one $match stage.
+        const baseMatch = { showInEcommerce: { $ne: false }, ...tenantMatchStage(req.tenant?._id) };
         const text = String(q || '').trim().slice(0, 100);
         if (text) {
             const rx = new RegExp(escapeRegex(text), 'i');

@@ -4,7 +4,9 @@ import multer from 'multer';
 import cloudinary from '../config/cloudinary.js';
 import ReviewModel from '../models/review.model.js';
 import { isFeatureEnabled } from '../lib/siteSettings.js';
-import { reAttachTenant } from '../tenancy/tenantContext.js';
+// reAttachTenant is now applied globally for all /api/client/* routes in
+// server.js, so no per-route import is needed here.
+import { tenantAggregate } from '../tenancy/tenantAggregate.js';
 
 const storage = multer.memoryStorage();
 const upload = multer({
@@ -54,7 +56,7 @@ const uploadToCloudinary = async (file) => {
 
 const clientReviewRouter = Router();
 
-clientReviewRouter.post('/create', upload.array('media', 5), reAttachTenant, async (req, res) => {
+clientReviewRouter.post('/create', upload.array('media', 5), async (req, res) => {
     try {
         // Honour the admin "Product reviews" feature toggle.
         if (!(await isFeatureEnabled('productReviews'))) {
@@ -197,15 +199,10 @@ clientReviewRouter.get('/summary', async (req, res) => {
         }
 
         const objectIds = ids.map((id) => new mongoose.Types.ObjectId(id));
-        // aggregate() bypasses the tenantPlugin query hooks, so inject the
-        // tenantId filter manually to prevent cross-tenant data leaks.
-        const tenantId = (req.tenant && req.tenant._id) || req.tenantId || null;
-        const matchStage = { product: { $in: objectIds } };
-        if (tenantId) matchStage.tenantId = tenantId;
-        const rows = await ReviewModel.aggregate([
-            { $match: matchStage },
-            { $group: { _id: '$product', average: { $avg: '$rating' }, count: { $sum: 1 } } }
-        ]);
+        const rows = await tenantAggregate(ReviewModel, [
+            { $match: { product: { $in: objectIds } } },
+            { $group: { _id: '$product', average: { $avg: '$rating' }, count: { $sum: 1 } } },
+        ], req.tenant?._id);
 
         const summary = {};
         rows.forEach((row) => {
