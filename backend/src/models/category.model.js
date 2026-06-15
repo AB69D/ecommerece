@@ -12,6 +12,8 @@ const categorySchema = new mongoose.Schema({
     timestamps : true
 })
 
+categorySchema.index({ tenantId: 1, createdAt: -1 });
+
 categorySchema.plugin(tenantPlugin);
 
 const CategoryModel = mongoose.model('category',categorySchema)

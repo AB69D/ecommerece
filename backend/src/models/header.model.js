@@ -14,6 +14,8 @@ const headerSchema = new mongoose.Schema({
     timestamps: true
 });
 
+headerSchema.index({ tenantId: 1, createdAt: -1 });
+
 headerSchema.plugin(tenantPlugin);
 
 const HeaderModel = mongoose.model('header', headerSchema);
