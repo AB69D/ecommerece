@@ -25,53 +25,39 @@ jobs:
       VPS_PORT: ${{ secrets.VPS_SSH_PORT || '22' }}
     steps:
       - name: Set up SSH
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.VPS_SSH_PRIVATE_KEY }}
         run: |
           set -euo pipefail
 
-          # --- Validate required secrets up front, with actionable errors ---
           if [ -z "${VPS_HOST}" ]; then
-            echo "::error::Repo secret VPS_HOST is empty or not set. Add it under Settings → Secrets and variables → Actions (the VPS public IP or hostname)."
+            echo "::error::VPS_HOST secret is not set."
             exit 1
           fi
-          if [ -z "${{ secrets.VPS_SSH_PRIVATE_KEY }}" ]; then
-            echo "::error::Repo secret VPS_SSH_PRIVATE_KEY is empty or not set. Paste the FULL private key including the BEGIN/END lines."
+          if [ -z "${SSH_PRIVATE_KEY}" ]; then
+            echo "::error::VPS_SSH_PRIVATE_KEY secret is not set."
             exit 1
           fi
 
           mkdir -p ~/.ssh
           chmod 700 ~/.ssh
 
-          # Write the key. Use a GitHub Actions environment file to avoid
-          # shell-expansion / line-ending issues with multi-line secrets:
-          # the secret is written byte-for-byte to a temp env file and then
-          # read back, which preserves embedded newlines reliably across runners.
+          # Write key via env var — avoids template-expansion line-ending issues.
           install -m 600 /dev/null ~/.ssh/id_deploy
-          {
-            echo "${{ secrets.VPS_SSH_PRIVATE_KEY }}"
-          } > ~/.ssh/id_deploy
-          # Ensure trailing newline (OpenSSH requires it).
-          echo "" >> ~/.ssh/id_deploy
-          # Strip Windows-style carriage returns if the secret was pasted from Windows.
+          printf '%s\n' "${SSH_PRIVATE_KEY}" > ~/.ssh/id_deploy
           sed -i 's/\r//' ~/.ssh/id_deploy
 
-          echo "Key file size: $(wc -c < ~/.ssh/id_deploy) bytes, lines: $(wc -l < ~/.ssh/id_deploy)"
-          echo "First line: $(head -1 ~/.ssh/id_deploy)"
-          echo "Last line:  $(tail -1 ~/.ssh/id_deploy)"
+          echo "Key: $(wc -l < ~/.ssh/id_deploy) lines, $(wc -c < ~/.ssh/id_deploy) bytes"
 
-          # Fail early (with a clear message) if the key itself is malformed,
-          # instead of a cryptic auth failure later.
           if ! ssh-keygen -y -f ~/.ssh/id_deploy >/dev/null 2>&1; then
-            echo "::error::VPS_SSH_PRIVATE_KEY is not a valid private key. Re-copy the whole key (e.g. cat ~/.ssh/id_ed25519) including header/footer lines."
-            echo "Key content preview (first 3 lines):"
+            echo "::error::VPS_SSH_PRIVATE_KEY is not a valid private key."
             head -3 ~/.ssh/id_deploy
             exit 1
           fi
           echo "SSH key validated OK"
 
-          # Best-effort known_hosts. Not fatal: the deploy step uses
-          # StrictHostKeyChecking=accept-new, so a keyscan miss won't block us.
           ssh-keyscan -p "${VPS_PORT}" -H "${VPS_HOST}" >> ~/.ssh/known_hosts 2>/dev/null \
-            || echo "::warning::ssh-keyscan could not reach ${VPS_HOST}:${VPS_PORT} — relying on accept-new. Check the host/port and that the VPS is up."
+            || echo "::warning::ssh-keyscan miss — using StrictHostKeyChecking=accept-new"
 
       - name: Verify SSH connectivity
         run: |
