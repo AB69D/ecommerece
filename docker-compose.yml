@@ -30,6 +30,7 @@ services:
       NODE_ENV: production
       PORT: 8080
       LOG_LEVEL: info
+      TENANT_ENFORCEMENT: "true"
       FRONTEND_URL: ${FRONTEND_URL}
       MONGODB_URI: mongodb://${MONGO_APP_USER}:${MONGO_APP_PASSWORD}@mongo:27017/${MONGO_APP_DB}?authSource=admin
       JWT_SECRET: ${JWT_SECRET}
