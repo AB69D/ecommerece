@@ -21,6 +21,87 @@ const features = z
         pwa: z.boolean(),
         whatsapp: z.boolean(),
         analytics: z.boolean(),
+        productReviews: z.boolean(),
+        reviewModeration: z.boolean(),
+    })
+    .partial();
+
+const announcement = z
+    .object({
+        enabled: z.boolean(),
+        message: z.string().max(300),
+        bgColor: z.string().max(20),
+        textColor: z.string().max(20),
+        link: z.string().max(500),
+    })
+    .partial();
+
+const paymentMethods = z
+    .object({
+        cod: z.object({ enabled: z.boolean(), instructions: z.string().max(300) }).partial(),
+        bkash: z.object({ enabled: z.boolean(), number: z.string().max(30), instructions: z.string().max(300) }).partial(),
+        nagad: z.object({ enabled: z.boolean(), number: z.string().max(30), instructions: z.string().max(300) }).partial(),
+        rocket: z.object({ enabled: z.boolean(), number: z.string().max(30), instructions: z.string().max(300) }).partial(),
+    })
+    .partial();
+
+const storeHoursScheduleEntry = z.object({
+    day: z.string().min(1).max(20),
+    open: z.string().max(5),
+    close: z.string().max(5),
+    closed: z.boolean(),
+});
+
+const storeHours = z
+    .object({
+        enabled: z.boolean(),
+        timezone: z.string().max(100),
+        schedule: z.array(storeHoursScheduleEntry),
+    })
+    .partial();
+
+const liveChat = z
+    .object({
+        provider: z.enum(['tawkto', 'crisp', 'none']),
+        propertyId: z.string().max(200),
+        enabled: z.boolean(),
+    })
+    .partial();
+
+const returnPolicy = z
+    .object({
+        enabled: z.boolean(),
+        content: z.string().max(10000),
+        lastUpdated: z.string().nullable().optional(),
+    })
+    .partial();
+
+const minimumOrder = z
+    .object({
+        enabled: z.boolean(),
+        amount: z.number().min(0),
+        message: z.string().max(200),
+    })
+    .partial();
+
+const trustBadgeItem = z.object({
+    key: z.string().min(1).max(50),
+    label: z.string().min(1).max(100),
+    icon: z.string().max(50),
+    enabled: z.boolean(),
+});
+
+const trustBadges = z
+    .object({
+        enabled: z.boolean(),
+        items: z.array(trustBadgeItem),
+    })
+    .partial();
+
+const delivery = z
+    .object({
+        localCharge: z.number().min(0),
+        regionalCharge: z.number().min(0),
     })
     .partial();
 
@@ -141,5 +222,13 @@ export const updateSiteSettingsSchema = z.object({
     whatsapp: whatsapp.optional(),
     theme: theme.optional(),
     payment: payment.optional(),
+    delivery: delivery.optional(),
+    announcement: announcement.optional(),
+    paymentMethods: paymentMethods.optional(),
+    storeHours: storeHours.optional(),
+    liveChat: liveChat.optional(),
+    returnPolicy: returnPolicy.optional(),
+    minimumOrder: minimumOrder.optional(),
+    trustBadges: trustBadges.optional(),
     maintenanceMode: z.boolean().optional(),
 });

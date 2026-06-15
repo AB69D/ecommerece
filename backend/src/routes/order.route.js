@@ -1,5 +1,5 @@
 import { Router } from 'express'
-import { createOrderController, updateOrderStatusController, getAllOrdersController, getOrderDetailsController, getStockReportController, updateStockController, getOrderStatsController, confirmOrderController, getOrdersByPhoneController } from '../controllers/order.controller.js'
+import { createOrderController, updateOrderStatusController, getAllOrdersController, getOrderDetailsController, getStockReportController, updateStockController, getOrderStatsController, confirmOrderController, getOrdersByPhoneController, bulkUpdateOrderStatusController } from '../controllers/order.controller.js'
 import { requirePermission, requireAnyPermission } from '../middlewares/auth.middleware.js'
 
 const orderRouter = Router()
@@ -16,6 +16,7 @@ orderRouter.post('/stats', requireAnyPermission('order:read', 'analytics:read'),
 
 // Admin order management
 orderRouter.put('/confirm-order', requirePermission('order:write'), confirmOrderController)
+orderRouter.patch('/bulk-status', requirePermission('order:write'), bulkUpdateOrderStatusController)
 
 // Client track order by phone
 orderRouter.post('/track-by-phone', requirePermission('order:read'), getOrdersByPhoneController)

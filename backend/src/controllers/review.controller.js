@@ -62,6 +62,32 @@ export const getAllReviews = async (request, response) => {
     }
 };
 
+export const approveReview = async (request, response) => {
+    try {
+        const { id } = request.params;
+        const review = await ReviewModel.findByIdAndUpdate(id, { $set: { approved: true } }, { new: true });
+        if (!review) {
+            return response.status(404).json({ message: "Review not found", error: true, success: false });
+        }
+        return response.json({ message: "Review approved", error: false, success: true, data: review });
+    } catch (error) {
+        return response.status(500).json({ message: error.message || error, error: true, success: false });
+    }
+};
+
+export const rejectReview = async (request, response) => {
+    try {
+        const { id } = request.params;
+        const review = await ReviewModel.findByIdAndUpdate(id, { $set: { approved: false } }, { new: true });
+        if (!review) {
+            return response.status(404).json({ message: "Review not found", error: true, success: false });
+        }
+        return response.json({ message: "Review rejected", error: false, success: true, data: review });
+    } catch (error) {
+        return response.status(500).json({ message: error.message || error, error: true, success: false });
+    }
+};
+
 export const deleteReview = async (request, response) => {
     try {
         const { id } = request.params;

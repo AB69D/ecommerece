@@ -2,6 +2,9 @@ import OrderModel from "../models/order.model.js";
 import ProductModel from "../models/product.model.js";
 import { recordStockMovements, applyStockDeltas, actorFromReq } from "../lib/stockLedger.js";
 import { sendOrderStatusEmail } from "../lib/orderEmail.js";
+import { logger } from "../lib/logger.js";
+import { getSettings } from "../lib/siteSettings.js";
+import { notifyAdminNewOrder, notifyCustomerOrderCreated, notifyCustomerStatusChange } from "../lib/notify.js";
 
 export const createOrderController = async (request, response) => {
     try {
@@ -30,6 +33,44 @@ export const createOrderController = async (request, response) => {
             paymentMethod: paymentMethod || 'cash_on_delivery'
         });
 
+        // Stock availability guard — skip when the store explicitly allows
+        // selling into negative stock (e.g. pre-order / backorder mode).
+        const settings = await getSettings();
+        if (!settings?.pos?.allowNegativeStock) {
+            const stockableItems = items.filter((i) => i.weightIndex !== undefined);
+            if (stockableItems.length > 0) {
+                const productIds = [...new Set(stockableItems.map((i) => i.productId))];
+                const products = await ProductModel.find({ _id: { $in: productIds } }).lean();
+                const productMap = Object.fromEntries(products.map((p) => [String(p._id), p]));
+
+                const insufficient = [];
+                for (const item of stockableItems) {
+                    const product = productMap[String(item.productId)];
+                    const available = product?.weights?.[item.weightIndex]?.stock ?? 0;
+                    if (available < item.quantity) {
+                        insufficient.push({
+                            productName: item.productName || item.productId,
+                            weight: item.weight,
+                            requested: item.quantity,
+                            available,
+                        });
+                    }
+                }
+
+                if (insufficient.length > 0) {
+                    const detail = insufficient
+                        .map((i) => `${i.productName} (${i.weight}): requested ${i.requested}, available ${i.available}`)
+                        .join('; ');
+                    return response.status(409).json({
+                        message: `Insufficient stock: ${detail}`,
+                        error: true,
+                        success: false,
+                        insufficientItems: insufficient,
+                    });
+                }
+            }
+        }
+
         await order.save();
 
         // Admin-created order: trusted decrement, no oversell race to guard
@@ -50,6 +91,11 @@ export const createOrderController = async (request, response) => {
             })),
             { reason: 'sale', channel: 'admin', orderId, actor: actorFromReq(request) }
         );
+
+        // Notify the store owner (admin alert) and the customer via WhatsApp.
+        // Both are fire-and-forget so a failed notification never blocks the response.
+        notifyAdminNewOrder(order).catch(() => {});
+        notifyCustomerOrderCreated(order).catch(() => {});
 
         return response.json({
             message: "Order created successfully",
@@ -120,7 +166,9 @@ export const updateOrderStatusController = async (request, response) => {
         // rest). Fire-and-forget + best-effort so it never delays or breaks the
         // admin response.
         if (previousStatus !== orderStatus) {
-            sendOrderStatusEmail(order).catch(() => {});
+            sendOrderStatusEmail(order).catch((err) => logger.warn({ err }, 'Order status email failed'));
+            // WhatsApp status alert — best-effort, never blocks the response.
+            notifyCustomerStatusChange(order).catch(() => {});
         }
 
         return response.json({
@@ -454,6 +502,120 @@ export const confirmOrderController = async (request, response) => {
             data: order,
             error: false,
             success: true
+        });
+
+    } catch (error) {
+        return response.status(500).json({
+            message: error.message || error,
+            error: true,
+            success: false
+        });
+    }
+};
+
+export const bulkUpdateOrderStatusController = async (request, response) => {
+    try {
+        const { orderIds, status } = request.body;
+
+        if (!Array.isArray(orderIds) || orderIds.length === 0) {
+            return response.status(400).json({
+                message: "orderIds must be a non-empty array",
+                error: true,
+                success: false
+            });
+        }
+
+        if (orderIds.length > 100) {
+            return response.status(400).json({
+                message: "Cannot update more than 100 orders at once",
+                error: true,
+                success: false
+            });
+        }
+
+        const VALID_STATUSES = ['pending', 'confirmed', 'processing', 'shipped', 'delivered', 'cancelled', 'returned', 'return_requested'];
+        if (!status || !VALID_STATUSES.includes(status)) {
+            return response.status(400).json({
+                message: `status must be one of: ${VALID_STATUSES.join(', ')}`,
+                error: true,
+                success: false
+            });
+        }
+
+        const orders = await OrderModel.find({ orderId: { $in: orderIds } });
+
+        const failed = [];
+        const toUpdate = [];
+
+        for (const order of orders) {
+            // Skip orders already in the target status
+            if (order.orderStatus === status) {
+                failed.push({ orderId: order.orderId, reason: 'already in that status' });
+                continue;
+            }
+            // Cancelled orders cannot be moved to any other status
+            if (order.orderStatus === 'cancelled' && status !== 'cancelled') {
+                failed.push({ orderId: order.orderId, reason: 'cannot change status of a cancelled order' });
+                continue;
+            }
+            toUpdate.push(order);
+        }
+
+        // IDs that were requested but not found in DB
+        const foundIds = new Set(orders.map((o) => o.orderId));
+        for (const id of orderIds) {
+            if (!foundIds.has(id)) {
+                failed.push({ orderId: id, reason: 'not found' });
+            }
+        }
+
+        // Bulk update via updateMany for performance; also collect cancellation
+        // restocks that must be applied individually.
+        const successIds = toUpdate.map((o) => o.orderId);
+        let updated = 0;
+
+        if (successIds.length > 0) {
+            const result = await OrderModel.updateMany(
+                { orderId: { $in: successIds } },
+                { $set: { orderStatus: status } }
+            );
+            updated = result.modifiedCount;
+
+            // Restock for any orders being cancelled
+            if (status === 'cancelled') {
+                const cancellations = toUpdate.filter((o) => o.orderStatus !== 'cancelled');
+                for (const order of cancellations) {
+                    const deltas = order.items
+                        .filter((i) => i.weightIndex !== undefined)
+                        .map((i) => ({ productId: i.productId, weightIndex: i.weightIndex, delta: i.quantity }));
+                    if (deltas.length > 0) {
+                        await applyStockDeltas(deltas);
+                        await recordStockMovements(
+                            order.items.map((i) => ({
+                                productId: i.productId,
+                                productName: i.productName,
+                                weightIndex: i.weightIndex,
+                                weight: i.weight,
+                                delta: i.quantity,
+                            })),
+                            { reason: 'cancel', channel: 'admin', orderId: order.orderId, actor: actorFromReq(request), note: 'Bulk cancel' }
+                        );
+                    }
+                }
+            }
+
+            // Fire-and-forget status emails for all successfully updated orders
+            const updatedOrders = await OrderModel.find({ orderId: { $in: successIds } }).lean();
+            for (const order of updatedOrders) {
+                sendOrderStatusEmail(order).catch((err) => logger.warn({ err, orderId: order.orderId }, 'Bulk status email failed'));
+            }
+        }
+
+        return response.json({
+            message: `Bulk update complete: ${updated} updated, ${failed.length} failed`,
+            error: false,
+            success: true,
+            data: { updated, failed }
         });
 
     } catch (error) {

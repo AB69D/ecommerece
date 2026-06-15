@@ -133,7 +133,8 @@ const orderSchema = new Schema({
     paymentMethod: {
         type: String,
         // cash_on_delivery / online -> e-commerce; cash / card -> POS counter
-        enum: ['cash_on_delivery', 'online', 'cash', 'card'],
+        // bkash / nagad / rocket -> manual mobile money (send to number, attach screenshot)
+        enum: ['cash_on_delivery', 'online', 'cash', 'card', 'bkash', 'nagad', 'rocket'],
         default: 'cash_on_delivery'
     },
     paymentStatus: {

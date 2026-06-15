@@ -1,15 +1,21 @@
 name: ab9d-ecommerce
 
 services:
-  mongo:
+  # ── MongoDB Replica Set (3-member, single-VPS) ───────────────────────────────
+  # All three nodes share the same Docker host. mongo1 is the primary.
+  # The init container waits for all three to be healthy, then calls
+  # rs.initiate() exactly once; subsequent restarts are idempotent because
+  # a replica set that is already initiated rejects a second initiate().
+  mongo1:
     image: mongo:7
     restart: unless-stopped
+    command: ["mongod", "--replSet", "rs0", "--bind_ip_all"]
     environment:
       MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USER}
       MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD}
     volumes:
-      - mongo-data:/data/db
-      - mongo-config:/data/configdb
+      - mongo1-data:/data/db
+      - mongo1-config:/data/configdb
     networks:
       - app
     healthcheck:
@@ -19,12 +25,104 @@ services:
       retries: 10
       start_period: 20s
 
+  mongo2:
+    image: mongo:7
+    restart: unless-stopped
+    command: ["mongod", "--replSet", "rs0", "--bind_ip_all"]
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USER}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD}
+    volumes:
+      - mongo2-data:/data/db
+      - mongo2-config:/data/configdb
+    networks:
+      - app
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.runCommand({ping:1}).ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  mongo3:
+    image: mongo:7
+    restart: unless-stopped
+    command: ["mongod", "--replSet", "rs0", "--bind_ip_all"]
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USER}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD}
+    volumes:
+      - mongo3-data:/data/db
+      - mongo3-config:/data/configdb
+    networks:
+      - app
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.runCommand({ping:1}).ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  # One-shot init container: configures the replica set then exits (restart: no).
+  mongo-rs-init:
+    image: mongo:7
+    restart: "no"
+    depends_on:
+      mongo1:
+        condition: service_healthy
+      mongo2:
+        condition: service_healthy
+      mongo3:
+        condition: service_healthy
+    networks:
+      - app
+    entrypoint: ["/bin/bash", "-c"]
+    command:
+      - |
+        set -e
+        echo "[rs-init] initiating replica set rs0"
+        mongosh --host mongo1:27017 \
+          -u "$$MONGO_ROOT_USER" -p "$$MONGO_ROOT_PASSWORD" \
+          --authenticationDatabase admin \
+          --eval '
+            var status = rs.status();
+            if (status.ok === 1) {
+              print("[rs-init] replica set already initiated, skipping");
+            } else {
+              rs.initiate({
+                _id: "rs0",
+                members: [
+                  { _id: 0, host: "mongo1:27017", priority: 2 },
+                  { _id: 1, host: "mongo2:27017", priority: 1 },
+                  { _id: 2, host: "mongo3:27017", priority: 1 }
+                ]
+              });
+              print("[rs-init] rs.initiate() sent, waiting for PRIMARY...");
+              var tries = 30;
+              while (tries-- > 0) {
+                var s = rs.status();
+                if (s.members && s.members.some(function(m){ return m.stateStr === "PRIMARY"; })) {
+                  print("[rs-init] PRIMARY elected");
+                  break;
+                }
+                sleep(2000);
+              }
+            }
+          '
+    environment:
+      MONGO_ROOT_USER: ${MONGO_ROOT_USER}
+      MONGO_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD}
+
   backend:
     build:
       context: ./backend
     restart: unless-stopped
     depends_on:
-      mongo:
+      mongo1:
+        condition: service_healthy
+      mongo2:
+        condition: service_healthy
+      mongo3:
         condition: service_healthy
     environment:
       NODE_ENV: production
@@ -32,7 +130,9 @@ services:
       LOG_LEVEL: info
       TENANT_ENFORCEMENT: "true"
       FRONTEND_URL: ${FRONTEND_URL}
-      MONGODB_URI: mongodb://${MONGO_APP_USER}:${MONGO_APP_PASSWORD}@mongo:27017/${MONGO_APP_DB}?authSource=admin
+      # Replica-set connection string: driver will automatically discover the
+      # primary and route writes there; reads default to primary as well.
+      MONGODB_URI: mongodb://${MONGO_APP_USER}:${MONGO_APP_PASSWORD}@mongo1:27017,mongo2:27017,mongo3:27017/${MONGO_APP_DB}?authSource=admin&replicaSet=rs0
       JWT_SECRET: ${JWT_SECRET}
       ADMIN_EMAILS: ${ADMIN_EMAILS}
       CLOUDINARY_CLOUD_NAME: ${CLOUDINARY_CLOUD_NAME}
@@ -64,15 +164,29 @@ services:
     networks:
       - app
 
+  # ── Backup: local 7-day retention + remote sync to Backblaze B2 ─────────────
+  # Uses rclone (bundled in the rclone/rclone image) so we don't need to bolt
+  # a second binary onto the mongo image. The mongo shell for mongodump is
+  # provided by a separate mongodump-only image or we install it via the
+  # rclone image. We use a two-stage approach: dump with mongo:7 tools then
+  # sync with rclone, keeping both images' surfaces minimal.
+  #
+  # For simplicity we use a single container built from mongo:7 and install
+  # rclone at runtime from the static binary (no extra Dockerfile needed).
+  # The rclone config is built from env vars each run (no config file on disk).
   mongo-backup:
     image: mongo:7
     restart: unless-stopped
     depends_on:
-      mongo:
+      mongo1:
         condition: service_healthy
     environment:
       MONGO_ROOT_USER: ${MONGO_ROOT_USER}
       MONGO_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD}
+      # Backblaze B2 credentials — set these in your .env / VPS secrets
+      BACKUP_B2_BUCKET: ${BACKUP_B2_BUCKET}
+      B2_ACCOUNT_ID: ${B2_ACCOUNT_ID}
+      B2_ACCOUNT_KEY: ${B2_ACCOUNT_KEY}
     volumes:
       - ./backups:/backups
     networks:
@@ -81,21 +195,60 @@ services:
     command:
       - |
         set -e
+        # Install rclone static binary on first run (cached in the container layer).
+        if ! command -v rclone &>/dev/null; then
+          echo "[backup] installing rclone..."
+          curl -fsSL https://downloads.rclone.org/rclone-current-linux-amd64.zip -o /tmp/rclone.zip
+          unzip -qo /tmp/rclone.zip -d /tmp/rclone-bin
+          install -m 755 /tmp/rclone-bin/rclone-*/rclone /usr/local/bin/rclone
+          rm -rf /tmp/rclone.zip /tmp/rclone-bin
+          echo "[backup] rclone installed: $$(rclone version | head -1)"
+        fi
+
         mkdir -p /backups
+
         while true; do
           TS=$$(date -u +%Y%m%dT%H%M%SZ)
           OUT=/backups/mongo-$$TS.archive.gz
+
+          # ── 1. Dump ────────────────────────────────────────────────────────
           echo "[backup] dumping to $$OUT"
-          mongodump --host mongo:27017 -u "$$MONGO_ROOT_USER" -p "$$MONGO_ROOT_PASSWORD" --authenticationDatabase admin --archive=$$OUT --gzip
-          echo "[backup] pruning older than 7 days"
+          mongodump \
+            --host "mongo1:27017,mongo2:27017,mongo3:27017" \
+            --replicaSet rs0 \
+            -u "$$MONGO_ROOT_USER" -p "$$MONGO_ROOT_PASSWORD" \
+            --authenticationDatabase admin \
+            --archive=$$OUT --gzip
+          echo "[backup] dump complete: $$(du -sh $$OUT | cut -f1)"
+
+          # ── 2. Local retention: delete archives older than 7 days ──────────
+          echo "[backup] pruning local archives older than 7 days"
           find /backups -name 'mongo-*.archive.gz' -mtime +7 -delete
+
+          # ── 3. Remote sync to Backblaze B2 ────────────────────────────────
+          if [ -n "$$BACKUP_B2_BUCKET" ] && [ -n "$$B2_ACCOUNT_ID" ] && [ -n "$$B2_ACCOUNT_KEY" ]; then
+            echo "[backup] syncing to B2 bucket: $$BACKUP_B2_BUCKET"
+            rclone copy $$OUT \
+              ":b2,account=$$B2_ACCOUNT_ID,key=$$B2_ACCOUNT_KEY:$$BACKUP_B2_BUCKET/mongo/" \
+              --b2-hard-delete \
+              --stats 30s \
+              --log-level INFO
+            echo "[backup] B2 sync complete"
+          else
+            echo "[backup] B2 credentials not set — skipping remote sync"
+          fi
+
           # sleep 24h
           sleep 86400
         done
 
 volumes:
-  mongo-data:
-  mongo-config:
+  mongo1-data:
+  mongo1-config:
+  mongo2-data:
+  mongo2-config:
+  mongo3-data:
+  mongo3-config:
   caddy-data:
   caddy-config:
   uploads:

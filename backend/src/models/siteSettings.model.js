@@ -55,6 +55,100 @@ const siteSettingsSchema = new mongoose.Schema(
             whatsapp: { type: Boolean, default: false },
             analytics: { type: Boolean, default: true },
             productReviews: { type: Boolean, default: true },
+            reviewModeration: { type: Boolean, default: false },
+        },
+
+        // ── Announcement bar ──────────────────────────────────────────────────
+        // Slim banner shown at the very top of every storefront page. Disabled
+        // by default so it doesn't appear until an admin writes a message.
+        announcement: {
+            enabled: { type: Boolean, default: false },
+            message: { type: String, default: '', trim: true },
+            bgColor: { type: String, default: '#1e40af' },
+            textColor: { type: String, default: '#ffffff' },
+            link: { type: String, default: '' },
+        },
+
+        // ── Offline / manual payment methods ────────────────────────────────
+        // Store-configured options shown at checkout alongside SSLCommerz.
+        // COD defaults on (most stores want it); mobile money options default off.
+        paymentMethods: {
+            cod: {
+                enabled: { type: Boolean, default: true },
+                instructions: { type: String, default: '' },
+            },
+            bkash: {
+                enabled: { type: Boolean, default: false },
+                number: { type: String, default: '' },
+                instructions: { type: String, default: '' },
+            },
+            nagad: {
+                enabled: { type: Boolean, default: false },
+                number: { type: String, default: '' },
+                instructions: { type: String, default: '' },
+            },
+            rocket: {
+                enabled: { type: Boolean, default: false },
+                number: { type: String, default: '' },
+                instructions: { type: String, default: '' },
+            },
+        },
+
+        // ── Store hours ───────────────────────────────────────────────────────
+        // Shown on the contact page and used to flag "Open now" in the storefront.
+        storeHours: {
+            enabled: { type: Boolean, default: false },
+            timezone: { type: String, default: 'Asia/Dhaka' },
+            schedule: [
+                {
+                    day: { type: String, required: true }, // 'Monday', 'Tuesday', …
+                    open: { type: String, default: '09:00' },
+                    close: { type: String, default: '18:00' },
+                    closed: { type: Boolean, default: false },
+                },
+            ],
+        },
+
+        // ── Live chat embed ───────────────────────────────────────────────────
+        // Injects the chosen chat widget script into every storefront page.
+        liveChat: {
+            provider: { type: String, enum: ['tawkto', 'crisp', 'none'], default: 'none' },
+            // Tawk.to: the property ID from Dashboard → Administration → Chat Widget.
+            // Crisp: the website ID from Settings → Website Settings.
+            propertyId: { type: String, default: '' },
+            enabled: { type: Boolean, default: false },
+        },
+
+        // ── Return policy ─────────────────────────────────────────────────────
+        // Rich-text policy shown on a dedicated /return-policy page and linked
+        // from the checkout summary and footer.
+        returnPolicy: {
+            enabled: { type: Boolean, default: false },
+            content: { type: String, default: '' },
+            lastUpdated: { type: Date, default: null },
+        },
+
+        // ── Minimum order amount ──────────────────────────────────────────────
+        // Checkout is blocked (or warned) until the cart total meets this floor.
+        minimumOrder: {
+            enabled: { type: Boolean, default: false },
+            amount: { type: Number, default: 0 },
+            message: { type: String, default: 'Minimum order amount is {amount}.' },
+        },
+
+        // ── Trust badges ──────────────────────────────────────────────────────
+        // Small icons shown in the checkout sidebar and/or product pages to
+        // reassure buyers (secure payment, free returns, etc.).
+        trustBadges: {
+            enabled: { type: Boolean, default: false },
+            items: [
+                {
+                    key: { type: String, required: true },
+                    label: { type: String, required: true },
+                    icon: { type: String, default: '' }, // emoji or icon name
+                    enabled: { type: Boolean, default: true },
+                },
+            ],
         },
 
         // POS receipt + storefront invoice customization.

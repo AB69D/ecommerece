@@ -40,7 +40,16 @@ const reviewSchema = new mongoose.Schema({
         required: true,
         trim: true
     },
-    media: [mediaSchema]
+    media: [mediaSchema],
+    // When reviewModeration feature flag is on, new reviews land here as
+    // false and stay hidden from the storefront until an admin approves them.
+    // Defaults true so existing reviews stay visible and existing stores that
+    // don't enable moderation are completely unaffected.
+    approved: {
+        type: Boolean,
+        default: true,
+        index: true,
+    },
 }, {
     timestamps: true
 });
