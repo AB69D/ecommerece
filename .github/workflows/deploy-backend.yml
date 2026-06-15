@@ -26,7 +26,7 @@ jobs:
     steps:
       - name: Set up SSH
         env:
-          SSH_PRIVATE_KEY: ${{ secrets.VPS_SSH_PRIVATE_KEY }}
+          SSH_KEY_B64: ${{ secrets.VPS_SSH_PRIVATE_KEY_B64 }}
         run: |
           set -euo pipefail
 
@@ -34,24 +34,22 @@ jobs:
             echo "::error::VPS_HOST secret is not set."
             exit 1
           fi
-          if [ -z "${SSH_PRIVATE_KEY}" ]; then
-            echo "::error::VPS_SSH_PRIVATE_KEY secret is not set."
+          if [ -z "${SSH_KEY_B64}" ]; then
+            echo "::error::VPS_SSH_PRIVATE_KEY_B64 secret is not set."
             exit 1
           fi
 
           mkdir -p ~/.ssh
           chmod 700 ~/.ssh
 
-          # Write key via env var — avoids template-expansion line-ending issues.
+          # Decode base64 key — zero newline/encoding issues.
           install -m 600 /dev/null ~/.ssh/id_deploy
-          printf '%s\n' "${SSH_PRIVATE_KEY}" > ~/.ssh/id_deploy
-          sed -i 's/\r//' ~/.ssh/id_deploy
+          echo "${SSH_KEY_B64}" | base64 -d > ~/.ssh/id_deploy
 
           echo "Key: $(wc -l < ~/.ssh/id_deploy) lines, $(wc -c < ~/.ssh/id_deploy) bytes"
 
           if ! ssh-keygen -y -f ~/.ssh/id_deploy >/dev/null 2>&1; then
-            echo "::error::VPS_SSH_PRIVATE_KEY is not a valid private key."
-            head -3 ~/.ssh/id_deploy
+            echo "::error::VPS_SSH_PRIVATE_KEY_B64 decoded key is invalid."
             exit 1
           fi
           echo "SSH key validated OK"
