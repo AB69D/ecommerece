@@ -30,12 +30,13 @@ export default function ProductReviews({ productId, productName }) {
         if (!productId) return;
         try {
             const res = await fetch(`/api/client/review/product/${productId}`, {
-                headers: { 'X-Tenant': store }
+                headers: { 'X-Tenant': store },
+                cache: 'no-store',
             });
             const json = res.ok ? await res.json() : null;
             if (json?.success) setData(json.data);
-        } catch {
-            // leave data as-is
+        } catch (err) {
+            console.error('Failed to fetch reviews:', err);
         } finally {
             setLoading(false);
         }
@@ -88,7 +89,7 @@ export default function ProductReviews({ productId, productName }) {
                 setMedia([]);
                 setPreviews([]);
                 invalidateRating(productId);
-                fetchReviews();
+                await fetchReviews();
                 setTimeout(() => {
                     setSubmitted(false);
                     setShowForm(false);
