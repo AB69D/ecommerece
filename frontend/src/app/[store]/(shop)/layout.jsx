@@ -1,5 +1,7 @@
 import Navbar from "@/components/Navbar.jsx";
 import HeaderTop from "@/components/Header-top.jsx";
+import AnnouncementBar from "@/components/AnnouncementBar.jsx";
+import LiveChat from "@/components/LiveChat.jsx";
 import Footer from "@/components/Footer.jsx";
 import OrderChatbot from "@/components/OrderChatbot.jsx";
 import PwaRegister from "@/components/PwaRegister.jsx";
@@ -96,6 +98,8 @@ export default async function ShopLayout({ children, params }) {
   const analytics = settings?.analytics || {};
   const siteJsonLd = buildSiteJsonLd(settings || {});
   const theme = resolveTheme(settings);
+  const announcement = settings?.announcement || {};
+  const liveChat = settings?.liveChat || {};
 
   return (
     <>
@@ -109,8 +113,10 @@ export default async function ShopLayout({ children, params }) {
       {siteJsonLd.map((node, i) => (
         <JsonLd key={i} data={node} />
       ))}
+      <LiveChat liveChat={liveChat} />
       <CurrencyProvider initialSymbol={currencySymbol} initialCode={currencyCode}>
         <CustomerAuthProvider>
+          <AnnouncementBar announcement={announcement} />
           <HeaderTop />
           <Navbar />
           <main className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">

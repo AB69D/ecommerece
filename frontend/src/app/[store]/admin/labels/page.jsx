@@ -1,6 +1,7 @@
 "use client";
 import { authFetch } from "@/services/api";
 import { getSiteSettings } from "@/services/siteSettings";
+import { useCurrency } from "@/context/CurrencyContext";
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { FiSearch, FiPlus, FiX, FiPrinter, FiTag, FiTrash2, FiMinus } from "react-icons/fi";
 import Barcode from "@/components/Barcode";
@@ -9,6 +10,7 @@ import Barcode from "@/components/Barcode";
 // labels of each you want, and print a tiled sheet sized to the label stock
 // configured in Site Settings → Barcode (labelWidthMm × labelHeightMm).
 export default function LabelsPage() {
+    const { symbol: currencySymbol } = useCurrency();
     const [products, setProducts] = useState([]);
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState("");
@@ -17,11 +19,11 @@ export default function LabelsPage() {
     const [expanded, setExpanded] = useState(null); // productId currently expanded
     const [queue, setQueue] = useState([]); // [{ key, name, weight, sku, barcode, price, qty }]
     const [cfg, setCfg] = useState({
-        labelWidthMm: 40, labelHeightMm: 30, showName: true, showPrice: true, currencySymbol: "$",
+        labelWidthMm: 40, labelHeightMm: 30, showName: true, showPrice: true,
     });
     const sheetRef = useRef(null);
 
-    // Load barcode/label config + currency from site settings.
+    // Load barcode/label config from site settings (currency comes from CurrencyContext).
     useEffect(() => {
         getSiteSettings()
             .then((res) => {
@@ -32,7 +34,6 @@ export default function LabelsPage() {
                     labelHeightMm: Number(b.labelHeightMm) || 30,
                     showName: b.showName !== false,
                     showPrice: b.showPrice !== false,
-                    currencySymbol: s.currencySymbol || "$",
                 });
             })
             .catch(() => { /* keep defaults */ });
@@ -64,8 +65,8 @@ export default function LabelsPage() {
     }, [page, search]);
 
     const money = useCallback(
-        (v) => `${cfg.currencySymbol}${Number(v || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}`,
-        [cfg.currencySymbol]
+        (v) => `${currencySymbol}${Number(v || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}`,
+        [currencySymbol]
     );
 
     const addVariant = (product, w) => {

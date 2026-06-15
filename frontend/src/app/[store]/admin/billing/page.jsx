@@ -6,8 +6,9 @@ import {
 } from "react-icons/fi";
 import { getMyBilling } from "@/services/billing";
 import { useAdminAuth } from "@/context/AdminAuthContext";
+import { useCurrency } from "@/context/CurrencyContext";
 
-const fmtMoney = (amount, currency = "BDT") => {
+const fmtMoney = (amount, currency = "USD") => {
     const n = Number(amount || 0);
     try {
         return new Intl.NumberFormat(undefined, { style: "currency", currency, maximumFractionDigits: 2 }).format(n);
@@ -54,6 +55,7 @@ const BILLING_STATE = {
 };
 
 export default function BillingPage() {
+    const { code: currencyCode } = useCurrency();
     const { can } = useAdminAuth();
     const canBilling = can("settings:manage"); // owner-only
     const [data, setData] = useState(null);
@@ -104,7 +106,7 @@ export default function BillingPage() {
     }
 
     const { plan, billing, subscription, usage, store } = data || {};
-    const currency = plan?.currency || "BDT";
+    const currency = currencyCode || plan?.currency || "USD";
     const state = BILLING_STATE[billing?.status || "active"] || BILLING_STATE.active;
     const limits = plan?.limits || {};
 

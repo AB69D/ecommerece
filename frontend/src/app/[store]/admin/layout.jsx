@@ -11,6 +11,7 @@ import { isAuthenticated, logout, fetchMe } from "@/services/adminAuth";
 import { AdminAuthContext, buildCan } from "@/context/AdminAuthContext";
 import { hasAnyPermission } from "@/lib/permissions";
 import AnnouncementBanner from "@/components/admin/AnnouncementBanner";
+import { CurrencyProvider } from "@/context/CurrencyContext";
 
 // "Log in as" leaves the platform owner's own token under admin_owner_token while
 // the store session takes over admin_token. Reading that backup tells us we're in
@@ -179,6 +180,7 @@ export default function AdminLayout({ children }) {
     const ctxValue = { me, loading: false, can: buildCan(me), refresh: loadMe };
 
     return (
+        <CurrencyProvider>
         <AdminAuthContext.Provider value={ctxValue}>
             <div className="min-h-screen bg-gray-100 flex overflow-x-hidden">
                 <button
@@ -313,5 +315,6 @@ export default function AdminLayout({ children }) {
                 </div>
             </div>
         </AdminAuthContext.Provider>
+        </CurrencyProvider>
     );
 }

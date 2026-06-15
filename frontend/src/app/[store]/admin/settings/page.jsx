@@ -17,10 +17,16 @@ const TABS = [
     { id: "contact", label: "Contact & Social", icon: <FiPhone className="w-4 h-4" /> },
     { id: "seo", label: "SEO & Currency", icon: <FiSearch className="w-4 h-4" /> },
     { id: "features", label: "Features", icon: <FiToggleRight className="w-4 h-4" /> },
+    { id: "announcement", label: "Announcement", icon: <FiActivity className="w-4 h-4" /> },
+    { id: "delivery", label: "Delivery", icon: <FiTag className="w-4 h-4" /> },
+    { id: "payments", label: "Payments", icon: <FiCreditCard className="w-4 h-4" /> },
+    { id: "paymentmethods", label: "Pay Methods", icon: <FiCreditCard className="w-4 h-4" /> },
+    { id: "storehours", label: "Store Hours", icon: <FiActivity className="w-4 h-4" /> },
+    { id: "livechat", label: "Live Chat", icon: <FiPhone className="w-4 h-4" /> },
+    { id: "policies", label: "Policies", icon: <FiSettings className="w-4 h-4" /> },
     { id: "pos", label: "POS & Receipt", icon: <FiPrinter className="w-4 h-4" /> },
     { id: "barcode", label: "Barcode & Labels", icon: <FiTag className="w-4 h-4" /> },
     { id: "integrations", label: "Analytics & WhatsApp", icon: <FiActivity className="w-4 h-4" /> },
-    { id: "payments", label: "Payments", icon: <FiCreditCard className="w-4 h-4" /> },
     { id: "footer", label: "Footer", icon: <FiLayout className="w-4 h-4" /> },
 ];
 
@@ -38,6 +44,24 @@ const FEATURE_FLAGS = [
     ["whatsapp", "WhatsApp notifications", "Send order updates over WhatsApp."],
     ["analytics", "Web analytics", "Inject GA4 / Pixel / GTM tags into the storefront."],
     ["productReviews", "Product reviews", "Let shoppers rate and review products."],
+    ["reviewModeration", "Review moderation", "New reviews are held for approval before appearing publicly."],
+];
+
+const DAYS_OF_WEEK = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+
+const DEFAULT_STORE_HOURS = DAYS_OF_WEEK.map((day) => ({
+    day,
+    open: "09:00",
+    close: "18:00",
+    closed: day === "Friday",
+}));
+
+const DEFAULT_TRUST_BADGES = [
+    { key: "secure_payment", label: "Secure Payment", icon: "🔒", enabled: true },
+    { key: "easy_returns", label: "Easy Returns", icon: "↩️", enabled: true },
+    { key: "fast_delivery", label: "Fast Delivery", icon: "🚚", enabled: true },
+    { key: "authentic", label: "100% Authentic", icon: "✅", enabled: true },
+    { key: "support", label: "24/7 Support", icon: "💬", enabled: false },
 ];
 
 // Common currencies for the settings dropdown. Picking one auto-fills BOTH the
@@ -302,6 +326,25 @@ export default function SettingsPage() {
     const setPayment = (patch) => setSettings((p) => ({ ...p, payment: { ...(p.payment || {}), ...patch } }));
     const setTheme = (patch) => setSettings((p) => ({ ...p, theme: { ...(p.theme || {}), ...patch } }));
     const resetTheme = () => setSettings((p) => ({ ...p, theme: { ...THEME_DEFAULTS } }));
+    const setAnnouncement = (patch) => setSettings((p) => ({ ...p, announcement: { ...(p.announcement || {}), ...patch } }));
+    const setPaymentMethods = (patch) => setSettings((p) => ({ ...p, paymentMethods: { ...(p.paymentMethods || {}), ...patch } }));
+    const setPaymentMethod = (method, patch) => setSettings((p) => ({ ...p, paymentMethods: { ...(p.paymentMethods || {}), [method]: { ...(p.paymentMethods?.[method] || {}), ...patch } } }));
+    const setStoreHours = (patch) => setSettings((p) => ({ ...p, storeHours: { ...(p.storeHours || {}), ...patch } }));
+    const setStoreHourEntry = (idx, patch) => setSettings((p) => {
+        const schedule = [...(p.storeHours?.schedule || DEFAULT_STORE_HOURS)];
+        schedule[idx] = { ...schedule[idx], ...patch };
+        return { ...p, storeHours: { ...(p.storeHours || {}), schedule } };
+    });
+    const setLiveChat = (patch) => setSettings((p) => ({ ...p, liveChat: { ...(p.liveChat || {}), ...patch } }));
+    const setReturnPolicy = (patch) => setSettings((p) => ({ ...p, returnPolicy: { ...(p.returnPolicy || {}), ...patch } }));
+    const setMinimumOrder = (patch) => setSettings((p) => ({ ...p, minimumOrder: { ...(p.minimumOrder || {}), ...patch } }));
+    const setTrustBadges = (patch) => setSettings((p) => ({ ...p, trustBadges: { ...(p.trustBadges || {}), ...patch } }));
+    const setTrustBadgeItem = (idx, patch) => setSettings((p) => {
+        const items = [...(p.trustBadges?.items || DEFAULT_TRUST_BADGES)];
+        items[idx] = { ...items[idx], ...patch };
+        return { ...p, trustBadges: { ...(p.trustBadges || {}), items } };
+    });
+    const setDelivery = (patch) => setSettings((p) => ({ ...p, delivery: { ...(p.delivery || {}), ...patch } }));
 
     const save = async () => {
         setSaving(true); setMsg({ type: "", text: "" }); setFieldErrors({});
@@ -373,6 +416,71 @@ export default function SettingsPage() {
                     storePassword: settings.payment?.storePassword || "",
                 },
                 theme: sanitizeTheme(settings.theme),
+                delivery: {
+                    localCharge: Number(settings.delivery?.localCharge) || 70,
+                    regionalCharge: Number(settings.delivery?.regionalCharge) || 100,
+                },
+                announcement: {
+                    enabled: !!settings.announcement?.enabled,
+                    message: settings.announcement?.message || "",
+                    bgColor: settings.announcement?.bgColor || "#1e40af",
+                    textColor: settings.announcement?.textColor || "#ffffff",
+                    link: settings.announcement?.link || "",
+                },
+                paymentMethods: {
+                    cod: {
+                        enabled: settings.paymentMethods?.cod?.enabled !== false,
+                        instructions: settings.paymentMethods?.cod?.instructions || "",
+                    },
+                    bkash: {
+                        enabled: !!settings.paymentMethods?.bkash?.enabled,
+                        number: settings.paymentMethods?.bkash?.number || "",
+                        instructions: settings.paymentMethods?.bkash?.instructions || "",
+                    },
+                    nagad: {
+                        enabled: !!settings.paymentMethods?.nagad?.enabled,
+                        number: settings.paymentMethods?.nagad?.number || "",
+                        instructions: settings.paymentMethods?.nagad?.instructions || "",
+                    },
+                    rocket: {
+                        enabled: !!settings.paymentMethods?.rocket?.enabled,
+                        number: settings.paymentMethods?.rocket?.number || "",
+                        instructions: settings.paymentMethods?.rocket?.instructions || "",
+                    },
+                },
+                storeHours: {
+                    enabled: !!settings.storeHours?.enabled,
+                    timezone: settings.storeHours?.timezone || "Asia/Dhaka",
+                    schedule: (settings.storeHours?.schedule || DEFAULT_STORE_HOURS).map((e) => ({
+                        day: e.day,
+                        open: e.open || "09:00",
+                        close: e.close || "18:00",
+                        closed: !!e.closed,
+                    })),
+                },
+                liveChat: {
+                    provider: settings.liveChat?.provider || "none",
+                    propertyId: settings.liveChat?.propertyId || "",
+                    enabled: !!settings.liveChat?.enabled,
+                },
+                returnPolicy: {
+                    enabled: !!settings.returnPolicy?.enabled,
+                    content: settings.returnPolicy?.content || "",
+                },
+                minimumOrder: {
+                    enabled: !!settings.minimumOrder?.enabled,
+                    amount: Number(settings.minimumOrder?.amount) || 0,
+                    message: settings.minimumOrder?.message || "Minimum order amount is {amount}.",
+                },
+                trustBadges: {
+                    enabled: !!settings.trustBadges?.enabled,
+                    items: (settings.trustBadges?.items || DEFAULT_TRUST_BADGES).map((b) => ({
+                        key: b.key,
+                        label: b.label,
+                        icon: b.icon || "",
+                        enabled: !!b.enabled,
+                    })),
+                },
                 maintenanceMode: !!settings.maintenanceMode,
             };
             const fPayload = {
@@ -812,6 +920,320 @@ export default function SettingsPage() {
                             </Field>
                         </div>
                     </>
+                )}
+
+                {tab === "announcement" && (
+                    <div className="space-y-4">
+                        <div className="bg-gray-50 border border-gray-100 rounded-xl p-4 space-y-3">
+                            <Toggle
+                                label="Show announcement bar"
+                                hint="A slim banner shown at the very top of every storefront page."
+                                checked={!!settings.announcement?.enabled}
+                                onChange={(v) => setAnnouncement({ enabled: v })}
+                            />
+                            {settings.announcement?.enabled && (
+                                <>
+                                    <div className="rounded-xl border border-gray-200 overflow-hidden">
+                                        <div
+                                            className="px-4 py-2 text-sm text-center"
+                                            style={{ backgroundColor: settings.announcement?.bgColor || "#1e40af", color: settings.announcement?.textColor || "#ffffff" }}
+                                        >
+                                            {settings.announcement?.message || "Your announcement text here"}
+                                        </div>
+                                    </div>
+                                    <Field label="Message" hint="Keep it short — under 200 characters.">
+                                        <input
+                                            className={inputCls}
+                                            maxLength={300}
+                                            value={settings.announcement?.message || ""}
+                                            onChange={(e) => setAnnouncement({ message: e.target.value })}
+                                            placeholder="Free delivery on orders over ৳500 🎉"
+                                        />
+                                    </Field>
+                                    <Field label="Link (optional)" hint="Where to send visitors who click the bar.">
+                                        <input
+                                            className={inputCls}
+                                            value={settings.announcement?.link || ""}
+                                            onChange={(e) => setAnnouncement({ link: e.target.value })}
+                                            placeholder="https://... or /products"
+                                        />
+                                    </Field>
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div>
+                                            <span className="block text-sm font-medium text-gray-700 mb-1">Background colour</span>
+                                            <div className="flex items-center gap-2">
+                                                <input type="color" value={settings.announcement?.bgColor || "#1e40af"} onChange={(e) => setAnnouncement({ bgColor: e.target.value })} className="h-10 w-12 shrink-0 rounded-lg border border-gray-200 bg-white p-1 cursor-pointer" />
+                                                <input type="text" value={settings.announcement?.bgColor || "#1e40af"} onChange={(e) => setAnnouncement({ bgColor: e.target.value })} maxLength={7} className={`${inputCls} font-mono uppercase`} />
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <span className="block text-sm font-medium text-gray-700 mb-1">Text colour</span>
+                                            <div className="flex items-center gap-2">
+                                                <input type="color" value={settings.announcement?.textColor || "#ffffff"} onChange={(e) => setAnnouncement({ textColor: e.target.value })} className="h-10 w-12 shrink-0 rounded-lg border border-gray-200 bg-white p-1 cursor-pointer" />
+                                                <input type="text" value={settings.announcement?.textColor || "#ffffff"} onChange={(e) => setAnnouncement({ textColor: e.target.value })} maxLength={7} className={`${inputCls} font-mono uppercase`} />
+                                            </div>
+                                        </div>
+                                    </div>
+                                </>
+                            )}
+                        </div>
+                    </div>
+                )}
+
+                {tab === "delivery" && (
+                    <div className="space-y-4">
+                        <div className="bg-gray-50 border border-gray-100 rounded-xl p-4 space-y-3">
+                            <h3 className="text-sm font-semibold text-gray-700">Delivery charges</h3>
+                            <p className="text-xs text-gray-500">These rates appear at checkout. Customers choose between local (same city) and regional (nationwide).</p>
+                            <div className="grid grid-cols-2 gap-3">
+                                <Field label="Local delivery charge" hint="Same city / district.">
+                                    <input
+                                        type="number"
+                                        min="0"
+                                        className={inputCls}
+                                        value={settings.delivery?.localCharge ?? 70}
+                                        onChange={(e) => setDelivery({ localCharge: e.target.value })}
+                                    />
+                                </Field>
+                                <Field label="Regional delivery charge" hint="Outside the city / nationwide.">
+                                    <input
+                                        type="number"
+                                        min="0"
+                                        className={inputCls}
+                                        value={settings.delivery?.regionalCharge ?? 100}
+                                        onChange={(e) => setDelivery({ regionalCharge: e.target.value })}
+                                    />
+                                </Field>
+                            </div>
+                        </div>
+
+                        <div className="bg-gray-50 border border-gray-100 rounded-xl p-4 space-y-3">
+                            <h3 className="text-sm font-semibold text-gray-700">Minimum order amount</h3>
+                            <Toggle
+                                label="Enforce minimum order amount"
+                                hint="Block checkout if the cart total is below this amount."
+                                checked={!!settings.minimumOrder?.enabled}
+                                onChange={(v) => setMinimumOrder({ enabled: v })}
+                            />
+                            {settings.minimumOrder?.enabled && (
+                                <>
+                                    <Field label="Minimum amount" hint="In your store currency.">
+                                        <input
+                                            type="number"
+                                            min="0"
+                                            className={inputCls}
+                                            value={settings.minimumOrder?.amount ?? 0}
+                                            onChange={(e) => setMinimumOrder({ amount: e.target.value })}
+                                        />
+                                    </Field>
+                                    <Field label="Error message" hint="Use {amount} to include the formatted minimum.">
+                                        <input
+                                            className={inputCls}
+                                            value={settings.minimumOrder?.message || ""}
+                                            onChange={(e) => setMinimumOrder({ message: e.target.value })}
+                                            placeholder="Minimum order amount is {amount}."
+                                        />
+                                    </Field>
+                                </>
+                            )}
+                        </div>
+
+                        <div className="bg-gray-50 border border-gray-100 rounded-xl p-4 space-y-3">
+                            <h3 className="text-sm font-semibold text-gray-700">Trust badges</h3>
+                            <Toggle
+                                label="Show trust badges"
+                                hint="Small icons on the checkout page to reassure buyers."
+                                checked={!!settings.trustBadges?.enabled}
+                                onChange={(v) => setTrustBadges({ enabled: v })}
+                            />
+                            {settings.trustBadges?.enabled && (
+                                <div className="space-y-2">
+                                    {(settings.trustBadges?.items || DEFAULT_TRUST_BADGES).map((badge, i) => (
+                                        <div key={badge.key} className="flex items-center gap-3 bg-white border border-gray-200 rounded-xl px-3 py-2">
+                                            <input
+                                                type="text"
+                                                value={badge.icon || ""}
+                                                onChange={(e) => setTrustBadgeItem(i, { icon: e.target.value })}
+                                                className="w-12 text-center text-xl bg-transparent border-none outline-none"
+                                                placeholder="🔒"
+                                            />
+                                            <input
+                                                className="flex-1 bg-transparent border-none outline-none text-sm text-gray-700"
+                                                value={badge.label}
+                                                onChange={(e) => setTrustBadgeItem(i, { label: e.target.value })}
+                                            />
+                                            <button
+                                                type="button"
+                                                onClick={() => setTrustBadgeItem(i, { enabled: !badge.enabled })}
+                                                className={`relative w-11 h-6 rounded-full transition-colors shrink-0 ${badge.enabled ? "bg-indigo-600" : "bg-gray-300"}`}
+                                            >
+                                                <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full transition-transform ${badge.enabled ? "translate-x-5" : ""}`} />
+                                            </button>
+                                        </div>
+                                    ))}
+                                    <button
+                                        type="button"
+                                        onClick={() => setTrustBadges({ items: [...(settings.trustBadges?.items || DEFAULT_TRUST_BADGES), { key: `badge_${Date.now()}`, label: "New badge", icon: "⭐", enabled: true }] })}
+                                        className="inline-flex items-center gap-1 text-sm text-indigo-600 hover:text-indigo-700 font-medium"
+                                    >
+                                        <FiPlus className="w-4 h-4" /> Add badge
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                )}
+
+                {tab === "paymentmethods" && (
+                    <div className="space-y-4">
+                        <p className="text-xs text-gray-500">Configure which payment options appear at checkout. Cash on Delivery is shown by default; enable mobile money options by adding a number.</p>
+                        <div className="bg-gray-50 border border-gray-100 rounded-xl p-4 space-y-3">
+                            <h3 className="text-sm font-semibold text-gray-700">Cash on Delivery (COD)</h3>
+                            <Toggle
+                                label="Enable Cash on Delivery"
+                                hint="Customers pay in cash when the order arrives."
+                                checked={settings.paymentMethods?.cod?.enabled !== false}
+                                onChange={(v) => setPaymentMethod("cod", { enabled: v })}
+                            />
+                            <Field label="Instructions (optional)" hint="Shown to the customer at checkout.">
+                                <input className={inputCls} value={settings.paymentMethods?.cod?.instructions || ""} onChange={(e) => setPaymentMethod("cod", { instructions: e.target.value })} placeholder="Pay cash when your order arrives." />
+                            </Field>
+                        </div>
+                        {[
+                            { key: "bkash", label: "bKash", placeholder: "01XXXXXXXXX" },
+                            { key: "nagad", label: "Nagad", placeholder: "01XXXXXXXXX" },
+                            { key: "rocket", label: "Rocket", placeholder: "01XXXXXXXXX" },
+                        ].map(({ key, label, placeholder }) => (
+                            <div key={key} className="bg-gray-50 border border-gray-100 rounded-xl p-4 space-y-3">
+                                <h3 className="text-sm font-semibold text-gray-700">{label}</h3>
+                                <Toggle
+                                    label={`Enable ${label}`}
+                                    hint={`Customers can send money to your ${label} number and upload a screenshot.`}
+                                    checked={!!settings.paymentMethods?.[key]?.enabled}
+                                    onChange={(v) => setPaymentMethod(key, { enabled: v })}
+                                />
+                                {settings.paymentMethods?.[key]?.enabled && (
+                                    <>
+                                        <Field label={`${label} number`}>
+                                            <input className={inputCls} value={settings.paymentMethods?.[key]?.number || ""} onChange={(e) => setPaymentMethod(key, { number: e.target.value })} placeholder={placeholder} />
+                                        </Field>
+                                        <Field label="Instructions (optional)">
+                                            <input className={inputCls} value={settings.paymentMethods?.[key]?.instructions || ""} onChange={(e) => setPaymentMethod(key, { instructions: e.target.value })} placeholder={`Send to ${placeholder} and attach the screenshot.`} />
+                                        </Field>
+                                    </>
+                                )}
+                            </div>
+                        ))}
+                    </div>
+                )}
+
+                {tab === "storehours" && (
+                    <div className="space-y-4">
+                        <div className="bg-gray-50 border border-gray-100 rounded-xl p-4 space-y-3">
+                            <Toggle
+                                label="Show store hours"
+                                hint="Display opening times on the contact page and storefront."
+                                checked={!!settings.storeHours?.enabled}
+                                onChange={(v) => setStoreHours({ enabled: v })}
+                            />
+                            {settings.storeHours?.enabled && (
+                                <>
+                                    <Field label="Timezone">
+                                        <select className={inputCls} value={settings.storeHours?.timezone || "Asia/Dhaka"} onChange={(e) => setStoreHours({ timezone: e.target.value })}>
+                                            <option value="Asia/Dhaka">Bangladesh (UTC+6)</option>
+                                            <option value="Asia/Kolkata">India (UTC+5:30)</option>
+                                            <option value="Asia/Karachi">Pakistan (UTC+5)</option>
+                                            <option value="Asia/Dubai">UAE (UTC+4)</option>
+                                            <option value="Asia/Riyadh">Saudi Arabia (UTC+3)</option>
+                                            <option value="Europe/London">London (UTC+0/+1)</option>
+                                            <option value="America/New_York">New York (UTC-5/-4)</option>
+                                            <option value="America/Los_Angeles">Los Angeles (UTC-8/-7)</option>
+                                        </select>
+                                    </Field>
+                                    <div className="space-y-2">
+                                        {(settings.storeHours?.schedule || DEFAULT_STORE_HOURS).map((entry, i) => (
+                                            <div key={entry.day} className="flex items-center gap-3 bg-white border border-gray-200 rounded-xl px-3 py-2">
+                                                <span className="w-24 text-sm font-medium text-gray-700 shrink-0">{entry.day}</span>
+                                                <Toggle
+                                                    label=""
+                                                    checked={!entry.closed}
+                                                    onChange={(v) => setStoreHourEntry(i, { closed: !v })}
+                                                />
+                                                {!entry.closed ? (
+                                                    <div className="flex items-center gap-2 flex-1">
+                                                        <input type="time" value={entry.open || "09:00"} onChange={(e) => setStoreHourEntry(i, { open: e.target.value })} className="flex-1 px-2 py-1.5 text-sm border border-gray-200 rounded-lg bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                                                        <span className="text-gray-400 text-xs">to</span>
+                                                        <input type="time" value={entry.close || "18:00"} onChange={(e) => setStoreHourEntry(i, { close: e.target.value })} className="flex-1 px-2 py-1.5 text-sm border border-gray-200 rounded-lg bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                                                    </div>
+                                                ) : (
+                                                    <span className="flex-1 text-sm text-gray-400">Closed</span>
+                                                )}
+                                            </div>
+                                        ))}
+                                    </div>
+                                </>
+                            )}
+                        </div>
+                    </div>
+                )}
+
+                {tab === "livechat" && (
+                    <div className="space-y-4">
+                        <div className="bg-gray-50 border border-gray-100 rounded-xl p-4 space-y-3">
+                            <Toggle
+                                label="Enable live chat widget"
+                                hint="Injects the chat script into every storefront page."
+                                checked={!!settings.liveChat?.enabled}
+                                onChange={(v) => setLiveChat({ enabled: v })}
+                            />
+                            {settings.liveChat?.enabled && (
+                                <>
+                                    <Field label="Chat provider">
+                                        <select className={inputCls} value={settings.liveChat?.provider || "none"} onChange={(e) => setLiveChat({ provider: e.target.value })}>
+                                            <option value="none">Select provider…</option>
+                                            <option value="tawkto">Tawk.to</option>
+                                            <option value="crisp">Crisp</option>
+                                        </select>
+                                    </Field>
+                                    {settings.liveChat?.provider === "tawkto" && (
+                                        <Field label="Tawk.to Property ID" hint="Dashboard → Administration → Chat Widget → Direct Chat Link. Copy the ID segment after /tawk.to/.">
+                                            <input className={inputCls} value={settings.liveChat?.propertyId || ""} onChange={(e) => setLiveChat({ propertyId: e.target.value })} placeholder="abc123def456" />
+                                        </Field>
+                                    )}
+                                    {settings.liveChat?.provider === "crisp" && (
+                                        <Field label="Crisp Website ID" hint="Crisp Dashboard → Settings → Website Settings → Setup Instructions.">
+                                            <input className={inputCls} value={settings.liveChat?.propertyId || ""} onChange={(e) => setLiveChat({ propertyId: e.target.value })} placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" />
+                                        </Field>
+                                    )}
+                                </>
+                            )}
+                        </div>
+                    </div>
+                )}
+
+                {tab === "policies" && (
+                    <div className="space-y-4">
+                        <div className="bg-gray-50 border border-gray-100 rounded-xl p-4 space-y-3">
+                            <h3 className="text-sm font-semibold text-gray-700">Return & Refund Policy</h3>
+                            <Toggle
+                                label="Enable return policy page"
+                                hint="Creates a /return-policy page on your storefront and links it in the footer."
+                                checked={!!settings.returnPolicy?.enabled}
+                                onChange={(v) => setReturnPolicy({ enabled: v })}
+                            />
+                            {settings.returnPolicy?.enabled && (
+                                <Field label="Policy content" hint="You can use plain text. This is shown on the /return-policy page.">
+                                    <textarea
+                                        rows={10}
+                                        className={inputCls}
+                                        value={settings.returnPolicy?.content || ""}
+                                        onChange={(e) => setReturnPolicy({ content: e.target.value })}
+                                        placeholder="Our return policy: products can be returned within 7 days of delivery if..."
+                                    />
+                                </Field>
+                            )}
+                        </div>
+                    </div>
                 )}
 
                 {tab === "payments" && (

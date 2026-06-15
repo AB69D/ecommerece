@@ -24,6 +24,7 @@ export default function ProductReviews({ productId, productName }) {
     const [previews, setPreviews] = useState([]);
     const [submitting, setSubmitting] = useState(false);
     const [submitted, setSubmitted] = useState(false);
+    const [pendingApproval, setPendingApproval] = useState(false);
     const [error, setError] = useState(null);
 
     const fetchReviews = async () => {
@@ -83,17 +84,19 @@ export default function ProductReviews({ productId, productName }) {
             const json = await res.json();
             if (json?.success) {
                 setSubmitted(true);
+                setPendingApproval(!!json?.pending);
                 setName("");
                 setRating(5);
                 setComment("");
                 setMedia([]);
                 setPreviews([]);
                 invalidateRating(productId);
-                await fetchReviews();
+                if (!json?.pending) await fetchReviews();
                 setTimeout(() => {
                     setSubmitted(false);
+                    setPendingApproval(false);
                     setShowForm(false);
-                }, 1800);
+                }, 2500);
             } else {
                 setError(json?.message || "Failed to submit review");
             }
@@ -159,7 +162,12 @@ export default function ProductReviews({ productId, productName }) {
                     {submitted ? (
                         <div className="text-center py-4">
                             <FiCheck className="w-12 h-12 text-emerald-600 mx-auto mb-3" />
-                            <p className="text-lg font-semibold text-emerald-800">Thank you for your review!</p>
+                            <p className="text-lg font-semibold text-emerald-800">
+                                {pendingApproval ? "Review submitted!" : "Thank you for your review!"}
+                            </p>
+                            {pendingApproval && (
+                                <p className="text-sm text-gray-500 mt-1">Your review is awaiting approval and will appear shortly.</p>
+                            )}
                         </div>
                     ) : (
                         <form onSubmit={handleSubmit}>

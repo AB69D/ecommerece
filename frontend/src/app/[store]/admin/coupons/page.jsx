@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { FiPlus, FiEdit2, FiTrash2, FiX, FiTag, FiSearch, FiPercent, FiDollarSign } from "react-icons/fi";
 import { listCoupons, createCoupon, updateCoupon, deleteCoupon } from "@/services/coupons";
-import { getSiteSettings } from "@/services/siteSettings";
+import { useCurrency } from "@/context/CurrencyContext";
 
 const BLANK = {
     code: "",
@@ -25,7 +25,7 @@ export default function CouponsPage() {
     const [coupons, setCoupons] = useState([]);
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState("");
-    const [symbol, setSymbol] = useState("$");
+    const { symbol } = useCurrency();
     const [modal, setModal] = useState({ show: false, editing: null, form: BLANK });
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState("");
@@ -49,11 +49,6 @@ export default function CouponsPage() {
         return () => clearTimeout(t);
     }, [load]);
 
-    useEffect(() => {
-        getSiteSettings()
-            .then((res) => setSymbol((res?.data || res)?.currencySymbol || "$"))
-            .catch(() => {});
-    }, []);
 
     const flash = (m) => { setMessage(m); setTimeout(() => setMessage(""), 2500); };
 

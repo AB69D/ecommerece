@@ -60,14 +60,28 @@ function storeFromReferer(referer) {
     }
 }
 
+// Normalise an API pathname to its canonical /api/<rest> form regardless of
+// whether the caller used /api/v1/<rest> or /api/<rest>, so the tenant-
+// extraction logic below only needs to check one set of prefixes.
+function canonicalApiPath(pathname) {
+    if (pathname.startsWith('/api/v1/')) {
+        return '/api/' + pathname.slice('/api/v1/'.length);
+    }
+    return pathname;
+}
+
 export function middleware(request) {
     const { pathname } = request.nextUrl;
     const seg = pathname.split('/')[1] || '';
 
     // 1) Backend calls — derive X-Tenant.
+    // Matches both /api/* (legacy) and /api/v1/* (versioned). The canonical
+    // path is used for prefix checks so the logic stays in one place.
     if (seg === 'api') {
+        const canonical = canonicalApiPath(pathname);
+
         let tenant = tenantFromHost(request.headers.get('host'));
-        if (!tenant && pathname.startsWith('/api/client/')) {
+        if (!tenant && canonical.startsWith('/api/client/')) {
             // Referer (the calling page) is authoritative and multi-tab safe; the
             // cookie is only a fallback for when the Referer is stripped.
             tenant = storeFromReferer(request.headers.get('referer'));
@@ -86,8 +100,8 @@ export function middleware(request) {
         // and is how the app itself detects a store mismatch.
         if (
             !tenant &&
-            pathname.startsWith('/api/admin/') &&
-            !pathname.startsWith('/api/admin/auth/')
+            canonical.startsWith('/api/admin/') &&
+            !canonical.startsWith('/api/admin/auth/')
         ) {
             tenant = storeFromReferer(request.headers.get('referer'));
         }

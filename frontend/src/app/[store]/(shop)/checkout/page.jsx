@@ -45,6 +45,15 @@ export default function CheckoutPage() {
     const onlinePaymentEnabled = Boolean(settings?.payment?.enabled);
     const [onlineNote, setOnlineNote] = useState("");
 
+    const paymentMethods = settings?.paymentMethods || {};
+    const codEnabled = paymentMethods?.cod?.enabled !== false;
+    const bkashEnabled = Boolean(paymentMethods?.bkash?.enabled && paymentMethods?.bkash?.number);
+    const nagadEnabled = Boolean(paymentMethods?.nagad?.enabled && paymentMethods?.nagad?.number);
+    const rocketEnabled = Boolean(paymentMethods?.rocket?.enabled && paymentMethods?.rocket?.number);
+
+    const minimumOrder = settings?.minimumOrder || {};
+    const trustBadges = settings?.trustBadges || {};
+
     const getGuestId = () => {
         if (typeof window === 'undefined') return null;
         let guestId = localStorage.getItem('guestId');
@@ -211,6 +220,17 @@ export default function CheckoutPage() {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
+
+        if (minimumOrder?.enabled && minimumOrder?.amount > 0) {
+            const cartNetTotal = afterDiscount - couponDiscount;
+            if (cartNetTotal < minimumOrder.amount) {
+                const msg = (minimumOrder.message || "Minimum order amount is {amount}.")
+                    .replace("{amount}", `${symbol}${minimumOrder.amount}`);
+                alert(msg);
+                return;
+            }
+        }
+
         setPlacingOrder(true);
 
         // Generate the idempotency key once and reuse it across retries of this
@@ -541,26 +561,75 @@ export default function CheckoutPage() {
                         <div className="bg-white border rounded-lg p-4 sm:p-6">
                             <h2 className="text-lg font-bold text-gray-800 mb-4">Payment Method</h2>
                             <div className="space-y-3">
-                                <label
-                                    className={`flex items-start gap-3 rounded-xl border p-4 cursor-pointer transition-all ${
-                                        formData.paymentMethod === 'cash_on_delivery'
-                                            ? 'border-emerald-500 ring-1 ring-emerald-500 bg-emerald-50/50'
-                                            : 'border-gray-200 hover:border-emerald-300'
-                                    }`}
-                                >
-                                    <input
-                                        type="radio"
-                                        name="paymentMethod"
-                                        value="cash_on_delivery"
-                                        checked={formData.paymentMethod === 'cash_on_delivery'}
-                                        onChange={handleChange}
-                                        className="mt-1 accent-emerald-600"
-                                    />
-                                    <span>
-                                        <span className="block text-sm font-semibold text-gray-800">Cash on Delivery</span>
-                                        <span className="block text-xs text-gray-500 mt-0.5">Pay in cash when your order is delivered.</span>
-                                    </span>
-                                </label>
+                                {codEnabled && (
+                                    <label
+                                        className={`flex items-start gap-3 rounded-xl border p-4 cursor-pointer transition-all ${
+                                            formData.paymentMethod === 'cash_on_delivery'
+                                                ? 'border-emerald-500 ring-1 ring-emerald-500 bg-emerald-50/50'
+                                                : 'border-gray-200 hover:border-emerald-300'
+                                        }`}
+                                    >
+                                        <input
+                                            type="radio"
+                                            name="paymentMethod"
+                                            value="cash_on_delivery"
+                                            checked={formData.paymentMethod === 'cash_on_delivery'}
+                                            onChange={handleChange}
+                                            className="mt-1 accent-emerald-600"
+                                        />
+                                        <span>
+                                            <span className="block text-sm font-semibold text-gray-800">Cash on Delivery</span>
+                                            <span className="block text-xs text-gray-500 mt-0.5">
+                                                {paymentMethods?.cod?.instructions || "Pay in cash when your order is delivered."}
+                                            </span>
+                                        </span>
+                                    </label>
+                                )}
+
+                                {bkashEnabled && (
+                                    <label className={`flex items-start gap-3 rounded-xl border p-4 cursor-pointer transition-all ${formData.paymentMethod === 'bkash' ? 'border-pink-500 ring-1 ring-pink-500 bg-pink-50/50' : 'border-gray-200 hover:border-pink-300'}`}>
+                                        <input type="radio" name="paymentMethod" value="bkash" checked={formData.paymentMethod === 'bkash'} onChange={handleChange} className="mt-1 accent-pink-600" />
+                                        <span>
+                                            <span className="block text-sm font-semibold text-gray-800">bKash</span>
+                                            <span className="block text-xs text-gray-500 mt-0.5">
+                                                {paymentMethods?.bkash?.instructions || `Send payment to ${paymentMethods?.bkash?.number} and attach the transaction screenshot.`}
+                                            </span>
+                                            {formData.paymentMethod === 'bkash' && (
+                                                <span className="block text-xs font-semibold text-pink-700 mt-1">Number: {paymentMethods?.bkash?.number}</span>
+                                            )}
+                                        </span>
+                                    </label>
+                                )}
+
+                                {nagadEnabled && (
+                                    <label className={`flex items-start gap-3 rounded-xl border p-4 cursor-pointer transition-all ${formData.paymentMethod === 'nagad' ? 'border-orange-500 ring-1 ring-orange-500 bg-orange-50/50' : 'border-gray-200 hover:border-orange-300'}`}>
+                                        <input type="radio" name="paymentMethod" value="nagad" checked={formData.paymentMethod === 'nagad'} onChange={handleChange} className="mt-1 accent-orange-600" />
+                                        <span>
+                                            <span className="block text-sm font-semibold text-gray-800">Nagad</span>
+                                            <span className="block text-xs text-gray-500 mt-0.5">
+                                                {paymentMethods?.nagad?.instructions || `Send payment to ${paymentMethods?.nagad?.number} and attach the transaction screenshot.`}
+                                            </span>
+                                            {formData.paymentMethod === 'nagad' && (
+                                                <span className="block text-xs font-semibold text-orange-700 mt-1">Number: {paymentMethods?.nagad?.number}</span>
+                                            )}
+                                        </span>
+                                    </label>
+                                )}
+
+                                {rocketEnabled && (
+                                    <label className={`flex items-start gap-3 rounded-xl border p-4 cursor-pointer transition-all ${formData.paymentMethod === 'rocket' ? 'border-purple-500 ring-1 ring-purple-500 bg-purple-50/50' : 'border-gray-200 hover:border-purple-300'}`}>
+                                        <input type="radio" name="paymentMethod" value="rocket" checked={formData.paymentMethod === 'rocket'} onChange={handleChange} className="mt-1 accent-purple-600" />
+                                        <span>
+                                            <span className="block text-sm font-semibold text-gray-800">Rocket</span>
+                                            <span className="block text-xs text-gray-500 mt-0.5">
+                                                {paymentMethods?.rocket?.instructions || `Send payment to ${paymentMethods?.rocket?.number} and attach the transaction screenshot.`}
+                                            </span>
+                                            {formData.paymentMethod === 'rocket' && (
+                                                <span className="block text-xs font-semibold text-purple-700 mt-1">Number: {paymentMethods?.rocket?.number}</span>
+                                            )}
+                                        </span>
+                                    </label>
+                                )}
 
                                 {onlinePaymentEnabled && (
                                     <label
@@ -588,6 +657,17 @@ export default function CheckoutPage() {
                                 )}
                             </div>
                         </div>
+
+                        {trustBadges?.enabled && (trustBadges?.items || []).some((b) => b.enabled) && (
+                            <div className="flex flex-wrap gap-3 py-2">
+                                {(trustBadges?.items || []).filter((b) => b.enabled).map((badge) => (
+                                    <div key={badge.key} className="flex items-center gap-1.5 text-xs text-gray-600 bg-gray-50 border border-gray-200 rounded-lg px-3 py-1.5">
+                                        {badge.icon && <span>{badge.icon}</span>}
+                                        <span>{badge.label}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
 
                         <button
                             type="submit"

@@ -1,8 +1,8 @@
 "use client";
 import { authFetch } from "@/services/api";
 import { listAdminUsers } from "@/services/adminUsers";
-import React, { useState, useEffect } from "react";
-import { FiSearch, FiEye, FiCheck, FiX, FiPackage, FiTruck, FiClock, FiChevronRight, FiDollarSign, FiCalendar, FiUser, FiMapPin, FiPhone, FiMail, FiShoppingBag, FiGlobe } from "react-icons/fi";
+import React, { useState, useEffect, useCallback } from "react";
+import { FiSearch, FiEye, FiCheck, FiX, FiPackage, FiTruck, FiClock, FiChevronRight, FiDollarSign, FiCalendar, FiUser, FiMapPin, FiPhone, FiMail, FiShoppingBag, FiGlobe, FiCheckSquare } from "react-icons/fi";
 import { PiWhatsappLogoBold } from "react-icons/pi";
 import { useWhatsApp } from "@/hooks/useWhatsApp";
 import { useAdminAuth } from "@/context/AdminAuthContext";
@@ -27,6 +27,11 @@ export default function AdminOrdersPage() {
     const [confirmModal, setConfirmModal] = useState({ show: false, order: null, deliveryDate: "", adminNotes: "" });
     const [processing, setProcessing] = useState(false);
     const [stats, setStats] = useState({ total: 0, pending: 0, confirmed: 0, delivered: 0, cancelled: 0 });
+
+    // Bulk selection state
+    const [selectedIds, setSelectedIds] = useState(new Set());
+    const [bulkProcessing, setBulkProcessing] = useState(false);
+    const [bulkResult, setBulkResult] = useState(null); // { updated, failed }
 
     useEffect(() => {
         fetchOrders();
@@ -142,6 +147,58 @@ export default function AdminOrdersPage() {
             }
         } catch (error) {
             console.error("Failed to update order status:", error);
+        }
+    };
+
+    // Bulk selection helpers
+    const allFilteredIds = filteredOrders?.map((o) => o.orderId) ?? [];
+    const allSelected = allFilteredIds.length > 0 && allFilteredIds.every((id) => selectedIds.has(id));
+    const someSelected = allFilteredIds.some((id) => selectedIds.has(id));
+
+    const toggleSelectAll = () => {
+        if (allSelected) {
+            setSelectedIds(new Set());
+        } else {
+            setSelectedIds(new Set(allFilteredIds));
+        }
+    };
+
+    const toggleSelectOne = (orderId, e) => {
+        e.stopPropagation();
+        setSelectedIds((prev) => {
+            const next = new Set(prev);
+            if (next.has(orderId)) next.delete(orderId);
+            else next.add(orderId);
+            return next;
+        });
+    };
+
+    const clearSelection = () => setSelectedIds(new Set());
+
+    const handleBulkStatus = async (status) => {
+        const ids = Array.from(selectedIds);
+        if (ids.length === 0) return;
+        setBulkProcessing(true);
+        setBulkResult(null);
+        try {
+            const res = await authFetch(`/api/admin/order/bulk-status`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ orderIds: ids, status })
+            });
+            const data = await res.json();
+            if (data.success) {
+                setBulkResult(data.data);
+                clearSelection();
+                fetchOrders();
+            } else {
+                alert(data.message || "Bulk update failed");
+            }
+        } catch (error) {
+            console.error("Bulk status update failed:", error);
+            alert("Bulk update failed. Please try again.");
+        } finally {
+            setBulkProcessing(false);
         }
     };
 
@@ -400,6 +457,18 @@ export default function AdminOrdersPage() {
                         <table className="w-full">
                             <thead className="bg-gray-50 border-b border-gray-200">
                                 <tr>
+                                    {canWrite && (
+                                        <th className="px-4 py-3 w-10">
+                                            <input
+                                                type="checkbox"
+                                                checked={allSelected}
+                                                ref={(el) => { if (el) el.indeterminate = someSelected && !allSelected; }}
+                                                onChange={toggleSelectAll}
+                                                className="w-4 h-4 rounded border-gray-300 text-emerald-600 cursor-pointer accent-emerald-600"
+                                                title="Select all visible orders"
+                                            />
+                                        </th>
+                                    )}
                                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Order ID</th>
                                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Customer</th>
                                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Channel</th>
@@ -411,53 +480,66 @@ export default function AdminOrdersPage() {
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-100">
-                                {filteredOrders.map((order) => (
-                                    <tr 
-                                        key={order._id} 
-                                        onClick={() => handleRowClick(order)}
-                                        className="cursor-pointer hover:bg-emerald-50/50 transition-colors"
-                                    >
-                                        <td className="px-4 py-4">
-                                            <span className="font-mono text-sm font-semibold text-emerald-700">{order.orderId}</span>
-                                        </td>
-                                        <td className="px-4 py-4">
-                                            <div className="flex items-center gap-3">
-                                                <div className="w-8 h-8 bg-emerald-100 rounded-full flex items-center justify-center">
-                                                    <FiUser className="w-4 h-4 text-emerald-600" />
+                                {filteredOrders.map((order) => {
+                                    const isChecked = selectedIds.has(order.orderId);
+                                    return (
+                                        <tr
+                                            key={order._id}
+                                            onClick={() => handleRowClick(order)}
+                                            className={`cursor-pointer transition-colors ${isChecked ? 'bg-emerald-50 hover:bg-emerald-50' : 'hover:bg-emerald-50/50'}`}
+                                        >
+                                            {canWrite && (
+                                                <td className="px-4 py-4" onClick={(e) => e.stopPropagation()}>
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={isChecked}
+                                                        onChange={(e) => toggleSelectOne(order.orderId, e)}
+                                                        className="w-4 h-4 rounded border-gray-300 text-emerald-600 cursor-pointer accent-emerald-600"
+                                                    />
+                                                </td>
+                                            )}
+                                            <td className="px-4 py-4">
+                                                <span className="font-mono text-sm font-semibold text-emerald-700">{order.orderId}</span>
+                                            </td>
+                                            <td className="px-4 py-4">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="w-8 h-8 bg-emerald-100 rounded-full flex items-center justify-center">
+                                                        <FiUser className="w-4 h-4 text-emerald-600" />
+                                                    </div>
+                                                    <div>
+                                                        <p className="font-medium text-gray-900 text-sm">{order.customerName}</p>
+                                                        <p className="text-xs text-gray-500">{order.customerPhone}</p>
+                                                    </div>
                                                 </div>
-                                                <div>
-                                                    <p className="font-medium text-gray-900 text-sm">{order.customerName}</p>
-                                                    <p className="text-xs text-gray-500">{order.customerPhone}</p>
-                                                </div>
-                                            </div>
-                                        </td>
-                                        <td className="px-4 py-4">
-                                            {getChannelBadge(order)}
-                                        </td>
-                                        <td className="px-4 py-4">
-                                            <span className="text-sm text-gray-600">{order.items?.length || 0} items</span>
-                                        </td>
-                                        <td className="px-4 py-4">
-                                            <span className="font-bold text-gray-900">{symbol}{order.totalAmount}</span>
-                                        </td>
-                                        <td className="px-4 py-4">
-                                            {getStatusBadge(order.orderStatus)}
-                                        </td>
-                                        <td className="px-4 py-4">
-                                            <span className="text-sm text-gray-500">
-                                                {new Date(order.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
-                                            </span>
-                                        </td>
-                                        <td className="px-4 py-4">
-                                            <button
-                                                onClick={(e) => handleViewOrder(order, e)}
-                                                className="p-2 text-emerald-600 hover:bg-emerald-100 rounded-lg transition-colors"
-                                            >
-                                                <FiEye className="w-4 h-4" />
-                                            </button>
-                                        </td>
-                                    </tr>
-                                ))}
+                                            </td>
+                                            <td className="px-4 py-4">
+                                                {getChannelBadge(order)}
+                                            </td>
+                                            <td className="px-4 py-4">
+                                                <span className="text-sm text-gray-600">{order.items?.length || 0} items</span>
+                                            </td>
+                                            <td className="px-4 py-4">
+                                                <span className="font-bold text-gray-900">{symbol}{order.totalAmount}</span>
+                                            </td>
+                                            <td className="px-4 py-4">
+                                                {getStatusBadge(order.orderStatus)}
+                                            </td>
+                                            <td className="px-4 py-4">
+                                                <span className="text-sm text-gray-500">
+                                                    {new Date(order.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                                                </span>
+                                            </td>
+                                            <td className="px-4 py-4">
+                                                <button
+                                                    onClick={(e) => handleViewOrder(order, e)}
+                                                    className="p-2 text-emerald-600 hover:bg-emerald-100 rounded-lg transition-colors"
+                                                >
+                                                    <FiEye className="w-4 h-4" />
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
                             </tbody>
                         </table>
                     </div>
@@ -599,6 +681,26 @@ export default function AdminOrdersPage() {
                                         <span className="text-gray-500">Delivery Charge</span>
                                         <span className="font-medium">{symbol}{selectedOrder.deliveryCharge}</span>
                                     </div>
+                                    {selectedOrder.discount > 0 && (
+                                        <div className="flex justify-between text-sm">
+                                            <span className="text-gray-500">Discount {selectedOrder.couponCode ? `(${selectedOrder.couponCode})` : ""}</span>
+                                            <span className="font-medium text-emerald-600">-{symbol}{selectedOrder.discount}</span>
+                                        </div>
+                                    )}
+                                    <div className="flex justify-between text-sm">
+                                        <span className="text-gray-500">Payment Method</span>
+                                        <span className="font-medium capitalize">
+                                            {({
+                                                cash_on_delivery: "Cash on Delivery",
+                                                bkash: "bKash",
+                                                nagad: "Nagad",
+                                                rocket: "Rocket",
+                                                online: "Online (SSLCommerz)",
+                                                cash: "Cash",
+                                                card: "Card",
+                                            })[selectedOrder.paymentMethod] || selectedOrder.paymentMethod || "—"}
+                                        </span>
+                                    </div>
                                     <div className="flex justify-between font-bold text-lg pt-2 border-t">
                                         <span>Total Amount</span>
                                         <span className="text-emerald-700">{symbol}{selectedOrder.totalAmount}</span>
@@ -687,6 +789,92 @@ export default function AdminOrdersPage() {
                                 <p className="text-center text-xs text-gray-400 pt-2">You have view-only access to orders.</p>
                             )}
                         </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Floating Bulk Action Bar */}
+            {canWrite && selectedIds.size > 0 && (
+                <div
+                    className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 w-full max-w-xl px-4"
+                    style={{ pointerEvents: 'auto' }}
+                >
+                    <div
+                        className="bg-gray-900 text-white rounded-2xl shadow-2xl px-5 py-3.5 flex flex-wrap items-center gap-3"
+                        style={{
+                            animation: 'slideUpFadeIn 0.22s cubic-bezier(0.22,1,0.36,1) both',
+                        }}
+                    >
+                        <style>{`
+                            @keyframes slideUpFadeIn {
+                                from { opacity: 0; transform: translateY(16px); }
+                                to   { opacity: 1; transform: translateY(0); }
+                            }
+                        `}</style>
+
+                        <span className="text-sm font-semibold text-gray-100 flex-1 min-w-0 truncate">
+                            <span className="inline-flex items-center justify-center bg-emerald-500 text-white text-xs font-bold rounded-full w-6 h-6 mr-2">
+                                {selectedIds.size}
+                            </span>
+                            order{selectedIds.size === 1 ? '' : 's'} selected
+                        </span>
+
+                        <div className="flex items-center gap-2 flex-wrap">
+                            <button
+                                onClick={() => handleBulkStatus('confirmed')}
+                                disabled={bulkProcessing}
+                                className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 text-white text-sm font-semibold rounded-xl transition-colors"
+                            >
+                                <FiCheck className="w-4 h-4" />
+                                Mark Confirmed
+                            </button>
+                            <button
+                                onClick={() => handleBulkStatus('shipped')}
+                                disabled={bulkProcessing}
+                                className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-indigo-500 hover:bg-indigo-400 disabled:opacity-50 text-white text-sm font-semibold rounded-xl transition-colors"
+                            >
+                                <FiTruck className="w-4 h-4" />
+                                Mark Shipped
+                            </button>
+                            <button
+                                onClick={clearSelection}
+                                disabled={bulkProcessing}
+                                className="p-2 text-gray-400 hover:text-white hover:bg-white/10 rounded-xl transition-colors"
+                                title="Clear selection"
+                            >
+                                <FiX className="w-4 h-4" />
+                            </button>
+                        </div>
+
+                        {bulkProcessing && (
+                            <div className="w-full flex items-center gap-2 pt-1 border-t border-white/10 mt-1">
+                                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                <span className="text-xs text-gray-300">Updating orders…</span>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
+
+            {/* Bulk result toast */}
+            {bulkResult && (
+                <div className="fixed bottom-6 right-6 z-50 bg-white border border-gray-200 rounded-2xl shadow-2xl p-4 w-72"
+                    style={{ animation: 'slideUpFadeIn 0.22s cubic-bezier(0.22,1,0.36,1) both' }}
+                >
+                    <div className="flex items-start justify-between gap-3">
+                        <div>
+                            <p className="font-semibold text-gray-800 text-sm">Bulk update done</p>
+                            <p className="text-xs text-emerald-600 mt-0.5">{bulkResult.updated} order{bulkResult.updated === 1 ? '' : 's'} updated</p>
+                            {bulkResult.failed?.length > 0 && (
+                                <p className="text-xs text-red-500 mt-0.5">{bulkResult.failed.length} skipped</p>
+                            )}
+                        </div>
+                        <button
+                            onClick={() => setBulkResult(null)}
+                            className="p-1 text-gray-400 hover:text-gray-600 rounded-lg"
+                        >
+                            <FiX className="w-4 h-4" />
+                        </button>
                     </div>
                 </div>
             )}
