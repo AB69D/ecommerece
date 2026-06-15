@@ -180,11 +180,15 @@ app.use('/api', resolveTenant, withTenant);
 // resolved tenant. A request with no X-Tenant header / subdomain signal is
 // rejected 400 here rather than silently served under the primary store.
 // /api/platform/* is mounted before this and never reaches it.
-// /api/admin/auth is also before this (the auth limiter is applied first in
-// the block above), but it too sets a tenant from the JWT — keep it exempt
-// here since it runs before requireAuth can bind the tenant.
+//
+// /api/admin/auth/* is exempt: login is global-by-email (no tenant needed to
+// authenticate); the JWT returned carries the tenantId and requireAuth binds
+// it via setRequestTenant() on every subsequent request. The Next.js middleware
+// also deliberately omits X-Tenant on auth calls for the same reason.
 app.use('/api/client', requireTenant);
-app.use('/api/admin', requireTenant);
+app.use('/api/admin', (req, _res, next) =>
+    req.path.startsWith('/auth/') ? next() : requireTenant(req, _res, next)
+);
 
 // Auth (stricter rate limit)
 app.use('/api/admin/auth', authLimiter, authRouter);
