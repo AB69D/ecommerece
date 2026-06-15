@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import CartModel from '../models/cart.model.js';
 import ProductModel from '../models/product.model.js';
+import { logger } from '../lib/logger.js';
 
 const clientCartRouter = Router();
 
@@ -46,20 +47,22 @@ clientCartRouter.get('/get', async (req, res) => {
 
 clientCartRouter.post('/add', async (req, res) => {
     try {
-        const { productId, productName, productImage, quantity = 1, weight, weightIndex = 0, price, discountPercent = 0 } = req.body;
+        const { productId, productName, productImage, quantity = 1, weight, weightIndex = 0 } = req.body;
+        // price and discountPercent are intentionally NOT read from req.body —
+        // always sourced from the DB below so clients cannot manipulate pricing.
         let guestId = getGuestId(req);
-        
+
         // Ensure weightIndex is a number
         const weightIdx = Number(weightIndex) || 0;
         const qty = Number(quantity) || 1;
-        
+
         if (!guestId) {
             guestId = `guest_${Date.now()}`;
         }
 
-        if (!productId || !price) {
+        if (!productId) {
             return res.status(400).json({
-                message: "Product ID and price are required",
+                message: "Product ID is required",
                 error: true,
                 success: false
             });
@@ -67,7 +70,7 @@ clientCartRouter.post('/add', async (req, res) => {
 
         // Check stock before adding - convert productId to ObjectId if needed
         const product = await ProductModel.findById(productId);
-        
+
         if (!product || !product.weights || !product.weights[weightIdx]) {
             return res.status(400).json({
                 message: "Product or weight variant not found",
@@ -76,7 +79,14 @@ clientCartRouter.post('/add', async (req, res) => {
             });
         }
 
-        const availableStock = product.weights[weightIdx]?.stock || 0;
+        // Always use authoritative price + discountPercent from the database.
+        // Never trust the client-supplied values — a user with DevTools can
+        // POST price=1 for a ₹5000 product and pay almost nothing.
+        const variant = product.weights[weightIdx];
+        const dbPrice = Number(variant.price) || 0;
+        const dbDiscountPercent = Number(variant.discountPercent) || 0;
+
+        const availableStock = variant.stock || 0;
         if (availableStock < qty) {
             return res.status(400).json({
                 message: `Only ${availableStock} items available in stock`,
@@ -86,7 +96,7 @@ clientCartRouter.post('/add', async (req, res) => {
         }
 
         let cart = await CartModel.findOne({ guestId });
-        
+
         if (!cart) {
             cart = new CartModel({
                 guestId: guestId,
@@ -115,7 +125,7 @@ clientCartRouter.post('/add', async (req, res) => {
         if (existingItemIndex > -1) {
             newQuantity = cart.items[existingItemIndex].quantity + qty;
             // Check stock for total quantity
-            const currentStock = product.weights[weightIdx]?.stock || 0;
+            const currentStock = variant.stock || 0;
             if (newQuantity > currentStock) {
                 return res.status(400).json({
                     message: `Only ${currentStock} items available. You already have ${cart.items[existingItemIndex].quantity} in cart.`,
@@ -124,7 +134,10 @@ clientCartRouter.post('/add', async (req, res) => {
                 });
             }
             cart.items[existingItemIndex].quantity = newQuantity;
-            cart.items[existingItemIndex].discountPercent = discountPercent || 0;
+            // Refresh price + discount from DB in case admin changed them since
+            // the item was first added.
+            cart.items[existingItemIndex].price = dbPrice;
+            cart.items[existingItemIndex].discountPercent = dbDiscountPercent;
         } else {
             cart.items.push({
                 productId: productId,
@@ -133,8 +146,8 @@ clientCartRouter.post('/add', async (req, res) => {
                 quantity: qty,
                 weight: weight || '',
                 weightIndex: weightIdx,
-                price: price,
-                discountPercent: discountPercent || 0
+                price: dbPrice,
+                discountPercent: dbDiscountPercent
             });
         }
 
@@ -192,22 +205,35 @@ clientCartRouter.put('/update', async (req, res) => {
             const newQty = Number(quantity) || 0;
             
             // Check stock availability when increasing quantity
+            // Always re-fetch the product to pin authoritative price + discountPercent
+            // and to validate stock. Pre-fix cart documents may have tampered prices
+            // stored; refreshing here ensures /update can't amplify a stale value.
+            const product = await ProductModel.findById(cartItem.productId);
+            const variant = product?.weights?.[cartItem.weightIndex];
+            if (!variant) {
+                return res.status(400).json({
+                    message: `Product variant not found. Please remove and re-add this item.`,
+                    error: true,
+                    success: false
+                });
+            }
+
             if (newQty > cartItem.quantity) {
-                const product = await ProductModel.findById(cartItem.productId);
-                if (product && product.weights && product.weights[cartItem.weightIndex] !== undefined) {
-                    const availableStock = product.weights[cartItem.weightIndex]?.stock || 0;
-                    if (newQty > availableStock) {
-                        return res.status(400).json({
-                            message: `Only ${availableStock} items available in stock`,
-                            error: true,
-                            success: false
-                        });
-                    }
+                const availableStock = variant.stock || 0;
+                if (newQty > availableStock) {
+                    return res.status(400).json({
+                        message: `Only ${availableStock} items available in stock`,
+                        error: true,
+                        success: false
+                    });
                 }
             }
-            
+
             if (newQty > 0) {
                 cart.items[itemIndex].quantity = newQty;
+                // Refresh price + discount from DB on every update
+                cart.items[itemIndex].price = Number(variant.price) || 0;
+                cart.items[itemIndex].discountPercent = Number(variant.discountPercent) || 0;
             } else {
                 cart.items.splice(itemIndex, 1);
             }
@@ -225,9 +251,9 @@ clientCartRouter.put('/update', async (req, res) => {
             success: true
         });
     } catch (error) {
-        console.error('Cart update error:', error);
+        logger.error({ err: error }, 'Cart update error');
         res.status(500).json({
-            message: error.message,
+            message: 'An error occurred while updating your cart. Please try again.',
             error: true,
             success: false
         });

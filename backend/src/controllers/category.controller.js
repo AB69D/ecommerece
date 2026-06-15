@@ -1,5 +1,6 @@
 import CategoryModel from "../models/category.model.js";
 import mongoose from 'mongoose';
+import { logger } from '../lib/logger.js';
 
 
 export const AddCategoryController = async (req, res) => {
@@ -7,8 +8,6 @@ export const AddCategoryController = async (req, res) => {
 
         const { category_name } = req.body;
         const file = req.file;
-        console.log(`category_name: ${category_name}`)
-        console.log(`file: ${file}`)
 
         if (!category_name || !file) {
             return res.status(400).json({
@@ -33,7 +32,7 @@ export const AddCategoryController = async (req, res) => {
         });
 
     } catch (error) {
-        console.error(error);
+        logger.error({ err: error }, 'AddCategoryController error');
         return res.status(500).json({
             message: error.message || "Internal Server Error",
             error: true,

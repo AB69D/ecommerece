@@ -3,14 +3,14 @@ import mongoose from 'mongoose';
 import multer from 'multer';
 import cloudinary from '../config/cloudinary.js';
 import ReviewModel from '../models/review.model.js';
-import { isFeatureEnabled } from '../lib/siteSettings.js';
-// reAttachTenant is now applied globally for all /api/client/* routes in
-// server.js, so no per-route import is needed here.
+import { isFeatureEnabled, getSettings } from '../lib/siteSettings.js';
+import { wrapMulter } from '../tenancy/tenantContext.js';
 import { tenantAggregate } from '../tenancy/tenantAggregate.js';
 
-const storage = multer.memoryStorage();
-const upload = multer({
-    storage,
+// wrapMulter restores AsyncLocalStorage after multer's busboy callbacks break
+// it — no reAttachTenant needed anywhere in this router.
+const upload = wrapMulter(multer({
+    storage: multer.memoryStorage(),
     limits: { fileSize: 50 * 1024 * 1024 },
     fileFilter: (req, file, cb) => {
         if (file.mimetype.startsWith('image/') || file.mimetype.startsWith('video/')) {
@@ -19,7 +19,7 @@ const upload = multer({
             cb(new Error('Only image and video files are allowed'), false);
         }
     }
-});
+}));
 
 const uploadToCloudinary = async (file) => {
     const isVideo = file.mimetype.startsWith('video/');
@@ -99,14 +99,19 @@ clientReviewRouter.post('/create', upload.array('media', 5), async (req, res) =>
             media = uploads;
         }
 
-        const review = new ReviewModel({ name, rating: numericRating, comment, media, product });
+        const settings = await getSettings();
+        const moderationOn = settings?.features?.reviewModeration === true;
+        const review = new ReviewModel({ name, rating: numericRating, comment, media, product, approved: !moderationOn });
         await review.save();
 
         return res.status(201).json({
-            message: "Review submitted successfully",
+            message: moderationOn
+                ? "Review submitted and awaiting approval."
+                : "Review submitted successfully",
             error: false,
             success: true,
-            data: review
+            data: review,
+            pending: moderationOn,
         });
 
     } catch (error) {
@@ -142,7 +147,9 @@ clientReviewRouter.get('/product/:productId', async (req, res) => {
         }
 
         const objectId = new mongoose.Types.ObjectId(productId);
-        const reviews = await ReviewModel.find({ product: objectId }).sort({ createdAt: -1 });
+        const moderationSettings = await getSettings();
+        const moderationFilter = moderationSettings?.features?.reviewModeration ? { approved: true } : {};
+        const reviews = await ReviewModel.find({ product: objectId, ...moderationFilter }).sort({ createdAt: -1 });
 
         const count = reviews.length;
         const sum = reviews.reduce((acc, r) => acc + (r.rating || 0), 0);
@@ -199,8 +206,10 @@ clientReviewRouter.get('/summary', async (req, res) => {
         }
 
         const objectIds = ids.map((id) => new mongoose.Types.ObjectId(id));
+        const summarySettings = await getSettings();
+        const approvedMatch = summarySettings?.features?.reviewModeration ? { approved: true } : {};
         const rows = await tenantAggregate(ReviewModel, [
-            { $match: { product: { $in: objectIds } } },
+            { $match: { product: { $in: objectIds }, ...approvedMatch } },
             { $group: { _id: '$product', average: { $avg: '$rating' }, count: { $sum: 1 } } },
         ], req.tenant?._id);
 
@@ -238,7 +247,9 @@ clientReviewRouter.get('/reviews', async (req, res) => {
         // Cap to the most recent 100 so an ever-growing reviews collection can't
         // turn every page-load into a full-collection scan + unbounded payload;
         // the carousel only rotates through a recent sample anyway.
-        const reviews = await ReviewModel.find().sort({ createdAt: -1 }).limit(100).lean();
+        const homepageSettings = await getSettings();
+        const homepageModFilter = homepageSettings?.features?.reviewModeration ? { approved: true } : {};
+        const reviews = await ReviewModel.find(homepageModFilter).sort({ createdAt: -1 }).limit(100).lean();
 
         return res.json({
             message: "Reviews fetched successfully",

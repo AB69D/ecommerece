@@ -81,16 +81,47 @@ export const reAttachTenant = (req, _res, next) => {
     return tenantStore.run({ tenantId, system: false }, () => next());
 };
 
-// ── Dev-only multer guard ────────────────────────────────────────────────────
-// Wraps a multer middleware and warns when the AsyncLocalStorage tenant context
-// is missing AFTER multer finishes — which means reAttachTenant was forgotten.
-// Attach to any multer instance in development:
+// ── Tenant-aware multer wrapper (use this instead of raw multer) ─────────────
+// multer processes multipart/form-data via busboy event emitters that run in
+// Node's ROOT async context — outside the AsyncLocalStorage chain that
+// withTenant established. This breaks tenant scoping for every query that runs
+// inside the route handler.
 //
-//   import cloudinaryUpload, { wrapMulterForDev } from './uploadImage.js';
-//   const upload = wrapMulterForDev(cloudinaryUpload);
-//   router.post('/upload', upload.array('files', 5), reAttachTenant, handler);
+// wrapMulter solves this ONCE at the point where multer is created, so no
+// route ever needs to remember to add reAttachTenant between multer and the
+// handler. The wrapper intercepts multer's "done" callback and re-runs
+// tenantStore.run() from req.tenant (always on the req object, survives multer).
 //
-// In production this is a transparent pass-through — zero overhead.
+// Usage — replace multer({...}) with wrapMulter(multer({...})):
+//
+//   import multer from 'multer';
+//   import { wrapMulter } from '../tenancy/tenantContext.js';
+//
+//   const upload = wrapMulter(multer({ storage, limits }));
+//   router.post('/create', upload.array('media', 5), handler);
+//   //                                                ↑ ALS is intact here ✓
+//
+// No reAttachTenant in the route chain needed — ever.
+export const wrapMulter = (multerMiddleware) => {
+    const fix = (handler) => (req, res, next) =>
+        handler(req, res, (err) => {
+            if (err) return next(err);
+            // multer finished; restore the ALS context from req.tenant which
+            // resolveTenant always sets and multer never touches.
+            const tenantId = (req.tenant && req.tenant._id) || req.tenantId || null;
+            tenantStore.run({ tenantId, system: false }, () => next());
+        });
+    return {
+        ...multerMiddleware,
+        single: (f) => fix(multerMiddleware.single(f)),
+        array: (f, n) => fix(multerMiddleware.array(f, n)),
+        fields: (f) => fix(multerMiddleware.fields(f)),
+        none: () => fix(multerMiddleware.none()),
+        any: () => fix(multerMiddleware.any()),
+    };
+};
+
+// ── Dev-only multer guard (legacy — prefer wrapMulter above) ─────────────────
 export const wrapMulterForDev = (multerMiddleware) => {
     if (process.env.NODE_ENV === 'production') return multerMiddleware;
     return {

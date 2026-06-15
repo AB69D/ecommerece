@@ -8,6 +8,7 @@ import { SiteSettings } from '../models/siteSettings.model.js';
 import { evaluateCoupon } from '../lib/coupon.js';
 import { recordStockMovements } from '../lib/stockLedger.js';
 import { sendOrderConfirmationEmail } from '../lib/orderEmail.js';
+import { notifyAdminNewOrder, notifyCustomerOrderCreated } from '../lib/notify.js';
 import { optionalCustomer } from '../middlewares/clientAuth.middleware.js';
 
 const clientOrderRouter = Router();
@@ -95,6 +96,42 @@ clientOrderRouter.post('/create', optionalCustomer, async (req, res) => {
             return Math.round((Number(w?.costPrice) || 0) * 100) / 100;
         };
 
+        // Defense-in-depth: recalculate the subtotal from authoritative DB prices
+        // and reject the order if cart.totalAmount deviates by more than ₹1.
+        // The cart /add endpoint already pins prices to DB values, but this guard
+        // catches any residual mismatch (e.g. price changed after item was added,
+        // or a tampered cart document in the database).
+        let serverSubtotal = 0;
+        for (const item of cart.items) {
+            const weights = weightsByProductId.get(String(item.productId));
+            const variant = weights?.[item.weightIndex || 0];
+            if (!variant) {
+                return res.status(400).json({
+                    message: `Product variant not found for "${item.productName}". Please refresh your cart.`,
+                    error: true,
+                    success: false
+                });
+            }
+            const unitPrice = Number(variant.price) || 0;
+            const discount = Number(variant.discountPercent) || 0;
+            const effectivePrice = unitPrice * (1 - discount / 100);
+            serverSubtotal += effectivePrice * (Number(item.quantity) || 1);
+        }
+        serverSubtotal = Math.round(serverSubtotal * 100) / 100;
+        const cartSubtotal = Math.round((Number(cart.totalAmount) || 0) * 100) / 100;
+        // Allow up to 1 BDT difference to absorb floating-point drift, admin
+        // price changes that occurred after items were added, and carts created
+        // before server-side price pinning was introduced. The order always uses
+        // serverSubtotal (the authoritative figure), so this guard is only a
+        // user-facing hint for large manipulations — not the security boundary.
+        if (Math.abs(serverSubtotal - cartSubtotal) > 1) {
+            return res.status(400).json({
+                message: "Cart total mismatch. Please refresh your cart and try again.",
+                error: true,
+                success: false
+            });
+        }
+
         // Use stored product info directly
         const orderItems = cart.items.map(item => ({
             productId: item.productId,
@@ -108,7 +145,9 @@ clientOrderRouter.post('/create', optionalCustomer, async (req, res) => {
             costPrice: costFor(item.productId, item.weightIndex || 0)
         }));
 
-        const subtotal = cart.totalAmount;
+        // Use the server-verified subtotal rather than cart.totalAmount so any
+        // DB rounding is consistent with what was validated above.
+        const subtotal = serverSubtotal;
 
         // Re-validate any coupon server-side (never trust a client discount).
         // A now-invalid code is simply ignored so the order still goes through.
@@ -255,6 +294,15 @@ clientOrderRouter.post('/create', optionalCustomer, async (req, res) => {
         // delays or breaks the checkout response.
         if (order.paymentMethod === 'cash_on_delivery') {
             sendOrderConfirmationEmail(order).catch(() => {});
+        }
+
+        // WhatsApp notifications — fire-and-forget, never block the response.
+        // Admin alert fires regardless of payment method (merchant needs to know
+        // the moment an order lands). Customer confirmation follows the same gate
+        // as email: only for COD (confirmed) — online orders get notified after payment.
+        notifyAdminNewOrder(order).catch(() => {});
+        if (order.paymentMethod === 'cash_on_delivery') {
+            notifyCustomerOrderCreated(order).catch(() => {});
         }
 
         res.json({
