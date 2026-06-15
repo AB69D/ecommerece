@@ -9,7 +9,7 @@ on:
       - 'Caddyfile'
       - '.github/workflows/deploy-backend.yml'
   workflow_dispatch: # allow manual trigger from the Actions tab
-  # last triggered: 2026-06-15
+  # last triggered: 2026-06-15 retry-2
 
 concurrency:
   group: deploy-backend
