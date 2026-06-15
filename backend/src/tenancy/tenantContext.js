@@ -66,6 +66,21 @@ export const withTenant = (req, _res, next) => {
     tenantStore.run({ tenantId, system: false }, () => next());
 };
 
+// Re-establish the tenant context after a middleware that breaks AsyncLocalStorage
+// propagation (e.g. multer processes multipart/form-data via busboy event emitters
+// that don't inherit the current async context). Insert this between any such
+// middleware and the route handler on CLIENT routes that skip requireAuth:
+//
+//   router.post('/upload', upload.array('files', 5), reAttachTenant, handler)
+//
+// Admin routes are unaffected — requireAuth always calls setRequestTenant which
+// re-binds the context from the JWT. Uses req.tenant / req.tenantId (set by
+// resolveTenant, always on the req object) rather than ALS.
+export const reAttachTenant = (req, _res, next) => {
+    const tenantId = (req.tenant && req.tenant._id) || req.tenantId || null;
+    return tenantStore.run({ tenantId, system: false }, () => next());
+};
+
 // Re-bind the CURRENT request to a specific tenant AFTER its context was created
 // — used once auth has decoded the JWT's tenantId. On the shared domain there is
 // no subdomain, so withTenant leaves tenantId null and the plugin falls back to
