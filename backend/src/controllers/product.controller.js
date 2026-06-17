@@ -431,6 +431,7 @@ export const getTopSellingProducts = async (request, response) => {
         const limitNum = limit ? parseInt(limit) : 20;
 
         const topSelling = await OrderModel.aggregate([
+            { $match: { tenantId: new mongoose.Types.ObjectId(request.tenantId) } },
             { $unwind: '$items' },
             {
                 $group: {

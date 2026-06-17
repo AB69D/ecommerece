@@ -4,7 +4,7 @@ import { useParams } from "next/navigation";
 import Link from "@/components/StoreLink";
 import {
     FiDollarSign, FiShoppingCart, FiPackage, FiAlertTriangle, FiTrendingUp, FiTrendingDown,
-    FiGrid, FiTruck, FiStar, FiArrowRight, FiShoppingBag, FiGlobe, FiUsers,
+    FiGrid, FiTruck, FiStar, FiArrowRight, FiShoppingBag, FiGlobe, FiUsers, FiCreditCard,
 } from "react-icons/fi";
 import { authFetch } from "@/services/api";
 import { getDashboardOverview } from "@/services/analytics";
@@ -64,6 +64,7 @@ export default function DashboardPage() {
     const [recentOrders, setRecentOrders] = useState([]);
     const [loading, setLoading] = useState(true);
     const [denied, setDenied] = useState(false);
+    const [remittance, setRemittance] = useState(null);
     const money = useMoney();
 
     const load = useCallback(async () => {
@@ -96,6 +97,16 @@ export default function DashboardPage() {
                 const d = await r.json();
                 if (d?.success) setRecentOrders(d.data || []);
             } catch { /* ignore */ }
+        })();
+    }, []);
+
+    useEffect(() => {
+        (async () => {
+            try {
+                const r = await authFetch(`/api/v1/admin/courier/cod-summary`);
+                const d = await r.json();
+                if (d?.success && d.data) setRemittance(d.data);
+            } catch { /* silent — courier may not be configured */ }
         })();
     }, []);
 
@@ -442,6 +453,47 @@ export default function DashboardPage() {
                             </div>
                         )}
                     </div>
+
+                    {/* COD Remittance widget — only shown when at least one courier has pending COD */}
+                    {remittance && (remittance.pathao?.orderCount > 0 || remittance.steadfast?.orderCount > 0) && (
+                        <div className="bg-white border border-gray-200 rounded-2xl p-4 sm:p-5">
+                            <div className="flex items-center justify-between mb-4">
+                                <div className="flex items-center gap-2">
+                                    <span className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                                        <FiCreditCard className="w-5 h-5" />
+                                    </span>
+                                    <div>
+                                        <h3 className="font-semibold text-gray-800">COD Remittance Pending</h3>
+                                        <p className="text-xs text-gray-400">Cash held by couriers, not yet bank-transferred</p>
+                                    </div>
+                                </div>
+                                <Link href="/admin/remittance" className="text-sm text-emerald-600 hover:text-emerald-700 font-medium flex items-center gap-1">
+                                    View details <FiArrowRight className="w-4 h-4" />
+                                </Link>
+                            </div>
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                <div className="bg-gray-50 rounded-xl p-3">
+                                    <p className="text-xs text-gray-500 mb-1">Pathao</p>
+                                    <p className="text-lg font-bold text-gray-800">{money(remittance.pathao?.totalCOD || 0)}</p>
+                                    <p className="text-xs text-gray-400 mt-0.5">{remittance.pathao?.orderCount || 0} orders</p>
+                                </div>
+                                <div className="bg-gray-50 rounded-xl p-3">
+                                    <p className="text-xs text-gray-500 mb-1">Steadfast</p>
+                                    <p className="text-lg font-bold text-gray-800">{money(remittance.steadfast?.totalCOD || 0)}</p>
+                                    <p className="text-xs text-gray-400 mt-0.5">{remittance.steadfast?.orderCount || 0} orders</p>
+                                </div>
+                                <div className="bg-emerald-50 rounded-xl p-3">
+                                    <p className="text-xs text-emerald-600 mb-1 font-medium">Total pending</p>
+                                    <p className="text-lg font-bold text-emerald-700">
+                                        {money((remittance.pathao?.totalCOD || 0) + (remittance.steadfast?.totalCOD || 0))}
+                                    </p>
+                                    <p className="text-xs text-emerald-500 mt-0.5">
+                                        {(remittance.pathao?.orderCount || 0) + (remittance.steadfast?.orderCount || 0)} orders total
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    )}
 
                     {/* Quick actions */}
                     <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">

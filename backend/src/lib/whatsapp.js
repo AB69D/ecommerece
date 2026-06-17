@@ -159,3 +159,27 @@ export const sendCustomerOrderConfirmation = async (order, template) => {
 
     return sendWhatsAppTemplate({ to: order.customerPhone, template, vars });
 };
+
+// Send an abandoned-cart recovery WhatsApp message to a checkout lead.
+//
+// @param {string} phone        — customer phone (E.164 without '+')
+// @param {string} name         — customer name
+// @param {number} itemCount    — number of items in cart
+// @param {number} cartValue    — cart total value
+// @param {string} checkoutUrl  — full URL of the storefront checkout page
+// @param {string} template     — recoveryTemplate from siteSettings.whatsapp
+//
+// Returns { ok, messageId } or { ok: false, error, skipped }.
+export const sendAbandonedCartRecovery = async (phone, name, itemCount, cartValue, checkoutUrl, template) => {
+    if (!phone) return { ok: false, skipped: true, error: 'no-recipient' };
+    if (!template) return { ok: false, skipped: true, error: 'no-template' };
+
+    const vars = {
+        name: name || 'there',
+        itemCount: String(itemCount || 1),
+        cartValue: Number(cartValue || 0).toFixed(0),
+        checkoutUrl: checkoutUrl || '',
+    };
+
+    return sendWhatsAppTemplate({ to: phone, template, vars });
+};

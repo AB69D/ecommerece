@@ -57,6 +57,9 @@ import billingRouter from './routes/billing.route.js';
 import announcementRouter from './routes/announcement.route.js';
 import platformRouter from './routes/platform.route.js';
 import notificationRouter from './routes/notification.route.js';
+import flashSaleRouter from './routes/flashSale.route.js';
+import courierRouter from './routes/courier.route.js';
+import { recoverAbandonedCarts } from './lib/abandonedCart.js';
 
 const app = express();
 
@@ -341,6 +344,8 @@ const mountApiRoutes = (prefix) => {
     app.use(`${prefix}/admin/page`, requireAuth, pageRouter.admin);
     app.use(`${prefix}/admin/nav-menu`, requireAuth, navMenuRouter.admin);
     app.use(`${prefix}/admin/notifications`, requireAuth, notificationRouter);
+    app.use(`${prefix}/admin/flash-sale`, requireAuth, flashSaleRouter.admin);
+    app.use(`${prefix}/admin/courier`, requireAuth, courierRouter);
 
     // Public / client routes
     // NOTE: multer-based routes must use wrapMulter() from tenantContext.js so
@@ -363,6 +368,7 @@ const mountApiRoutes = (prefix) => {
     app.use(`${prefix}/client/nav-menu`, navMenuRouter.client);
     app.use(`${prefix}/client/chatbot`, chatbotRouter);
     app.use(`${prefix}/client/track`, trackingRouter);
+    app.use(`${prefix}/client/flash-sale`, flashSaleRouter.client);
 };
 
 // ── Primary versioned API: /api/v1/* ─────────────────────────────────────────
@@ -420,6 +426,17 @@ const start = async () => {
         const server = app.listen(env.PORT, () => {
             logger.info(`Server listening on port ${env.PORT} [${env.NODE_ENV}]`);
         });
+
+        // Abandoned cart recovery — runs every 30 minutes.
+        // Fire once after 1 minute on startup to catch leads from any downtime,
+        // then repeat on the interval. Wrapped in a system context so the
+        // cross-tenant aggregate inside the job bypasses the tenant plugin.
+        const runRecovery = () =>
+            recoverAbandonedCarts().catch((err) =>
+                logger.error({ err }, 'Abandoned cart recovery job error'),
+            );
+        setTimeout(runRecovery, 60_000);
+        setInterval(runRecovery, 30 * 60 * 1_000);
 
         const shutdown = (signal) => {
             logger.info(`${signal} received, shutting down gracefully`);

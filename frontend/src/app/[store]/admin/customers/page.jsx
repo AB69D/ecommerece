@@ -14,7 +14,7 @@ export default function AdminCustomersPage() {
     const [debounced, setDebounced] = useState("");
     const [ordered, setOrdered] = useState([]);
     const [abandoned, setAbandoned] = useState([]);
-    const [stats, setStats] = useState({ orderedCustomers: 0, abandonedCheckouts: 0 });
+    const [stats, setStats] = useState({ orderedCustomers: 0, abandonedCheckouts: 0, totalRecoveryMessages: 0 });
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
@@ -88,6 +88,14 @@ export default function AdminCustomersPage() {
                     );
                 })}
             </div>
+
+            {/* Recovery stat (shown on abandoned tab only) */}
+            {tab === "abandoned" && stats.totalRecoveryMessages > 0 && (
+                <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-green-50 border border-green-200 rounded-lg text-sm text-green-700">
+                    <span className="font-semibold">{stats.totalRecoveryMessages}</span>
+                    recovery message{stats.totalRecoveryMessages !== 1 ? "s" : ""} sent via WhatsApp
+                </div>
+            )}
 
             {/* Search */}
             <div className="relative max-w-sm">
@@ -188,6 +196,7 @@ function AbandonedTable({ rows, symbol }) {
                         <th className="px-4 py-3 font-medium text-center">Cart</th>
                         <th className="px-4 py-3 font-medium text-right">Cart Value</th>
                         <th className="px-4 py-3 font-medium">Last Activity</th>
+                        <th className="px-4 py-3 font-medium text-center">Recovery</th>
                     </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
@@ -224,6 +233,15 @@ function AbandonedTable({ rows, symbol }) {
                             </td>
                             <td className="px-4 py-3 text-gray-500">
                                 <span className="flex items-center gap-1"><FiClock className="w-3 h-3 text-gray-400" /> {formatDate(l.lastActivityAt)}</span>
+                            </td>
+                            <td className="px-4 py-3 text-center">
+                                {l.recoveryAttempts > 0 ? (
+                                    <span className="text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-700">
+                                        {l.recoveryAttempts} sent
+                                    </span>
+                                ) : (
+                                    <span className="text-gray-300 text-xs">—</span>
+                                )}
                             </td>
                         </tr>
                     ))}

@@ -2,7 +2,7 @@
 import { authFetch } from "@/services/api";
 import { listAdminUsers } from "@/services/adminUsers";
 import React, { useState, useEffect, useCallback } from "react";
-import { FiSearch, FiEye, FiCheck, FiX, FiPackage, FiTruck, FiClock, FiChevronRight, FiDollarSign, FiCalendar, FiUser, FiMapPin, FiPhone, FiMail, FiShoppingBag, FiGlobe, FiCheckSquare } from "react-icons/fi";
+import { FiSearch, FiEye, FiCheck, FiX, FiPackage, FiTruck, FiClock, FiChevronRight, FiDollarSign, FiCalendar, FiUser, FiMapPin, FiPhone, FiMail, FiShoppingBag, FiGlobe, FiCheckSquare, FiDownload, FiRotateCcw, FiRefreshCw } from "react-icons/fi";
 import { PiWhatsappLogoBold } from "react-icons/pi";
 import { useWhatsApp } from "@/hooks/useWhatsApp";
 import { useAdminAuth } from "@/context/AdminAuthContext";
@@ -32,6 +32,25 @@ export default function AdminOrdersPage() {
     const [selectedIds, setSelectedIds] = useState(new Set());
     const [bulkProcessing, setBulkProcessing] = useState(false);
     const [bulkResult, setBulkResult] = useState(null); // { updated, failed }
+
+    // CSV export state
+    const [exporting, setExporting] = useState(false);
+    const [exportMsg, setExportMsg] = useState({ type: '', text: '' });
+
+    // Return management state
+    const [returnProcessing, setReturnProcessing] = useState(false);
+    const [rejectModal, setRejectModal] = useState({ show: false, order: null, reason: '' });
+
+    // COD deposit verification state
+    const [depositVerifying, setDepositVerifying] = useState(false);
+    const [depositMsg, setDepositMsg] = useState({ type: '', text: '' });
+
+    // Courier dispatch state
+    const [courierDispatch, setCourierDispatch] = useState({ courier: 'steadfast', processing: false, msg: { type: '', text: '' } });
+
+    // Courier tracking state
+    const [trackingData, setTrackingData] = useState(null);
+    const [trackingLoading, setTrackingLoading] = useState(false);
 
     useEffect(() => {
         fetchOrders();
@@ -89,14 +108,20 @@ export default function AdminOrdersPage() {
     const handleViewOrder = (order, e) => {
         e.stopPropagation();
         setSelectedOrder(order);
+        setTrackingData(null);
+        setCourierDispatch((p) => ({ ...p, msg: { type: '', text: '' } }));
     };
 
     const handleRowClick = (order) => {
         setSelectedOrder(order);
+        setTrackingData(null);
+        setCourierDispatch((p) => ({ ...p, msg: { type: '', text: '' } }));
     };
 
     const handleCloseDetail = () => {
         setSelectedOrder(null);
+        setTrackingData(null);
+        setCourierDispatch((p) => ({ ...p, msg: { type: '', text: '' } }));
     };
 
     const handleConfirmOrder = async (e) => {
@@ -202,6 +227,40 @@ export default function AdminOrdersPage() {
         }
     };
 
+    const handleExportCsv = async () => {
+        setExporting(true);
+        setExportMsg({ type: '', text: '' });
+        try {
+            const params = new URLSearchParams();
+            if (statusFilter && statusFilter !== 'all') params.set('status', statusFilter);
+            if (sourceFilter && sourceFilter !== 'all') params.set('source', sourceFilter);
+            if (dateFrom) params.set('startDate', dateFrom);
+            if (dateTo) params.set('endDate', dateTo);
+
+            const res = await authFetch(`/api/admin/order/export-csv?${params.toString()}`);
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({}));
+                setExportMsg({ type: 'error', text: err.message || 'Export failed' });
+                return;
+            }
+            const blob = await res.blob();
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `orders-${new Date().toISOString().slice(0, 10)}.csv`;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            URL.revokeObjectURL(url);
+            setExportMsg({ type: 'success', text: 'Export downloaded successfully' });
+            setTimeout(() => setExportMsg({ type: '', text: '' }), 3000);
+        } catch {
+            setExportMsg({ type: 'error', text: 'Export failed. Please try again.' });
+        } finally {
+            setExporting(false);
+        }
+    };
+
     const toLocalYMD = (iso) => {
         const d = new Date(iso);
         return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -244,14 +303,17 @@ export default function AdminOrdersPage() {
             processing: { bg: "bg-purple-100 text-purple-700 border-purple-200", icon: FiPackage },
             shipped: { bg: "bg-indigo-100 text-indigo-700 border-indigo-200", icon: FiTruck },
             delivered: { bg: "bg-green-100 text-green-700 border-green-700", icon: FiCheck },
-            cancelled: { bg: "bg-red-100 text-red-700 border-red-200", icon: FiX }
+            cancelled: { bg: "bg-red-100 text-red-700 border-red-200", icon: FiX },
+            return_requested: { bg: "bg-amber-100 text-amber-700 border-amber-200", icon: FiRotateCcw },
+            returned: { bg: "bg-gray-100 text-gray-600 border-gray-200", icon: FiRotateCcw },
         };
         const style = statusStyles[status] || statusStyles.pending;
         const Icon = style.icon;
+        const label = String(status || "pending").replace(/_/g, " ");
         return (
             <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium border ${style.bg}`}>
                 <Icon className="w-3 h-3" />
-                <span className="capitalize">{status}</span>
+                <span className="capitalize">{label}</span>
             </span>
         );
     };
@@ -286,10 +348,127 @@ export default function AdminOrdersPage() {
             confirmed: [{ key: 'processing', label: 'Process', color: 'bg-blue-600 hover:bg-blue-700 text-white' }],
             processing: [{ key: 'shipped', label: 'Ship', color: 'bg-indigo-600 hover:bg-indigo-700 text-white' }],
             shipped: [{ key: 'delivered', label: 'Deliver', color: 'bg-green-600 hover:bg-green-700 text-white' }],
-            delivered: [{ key: 'return_requested', label: 'Return', color: 'bg-orange-100 hover:bg-orange-200 text-orange-700' }],
-            cancelled: []
+            delivered: [],
+            cancelled: [],
+            returned: [],
         };
         return flow[currentStatus] || [];
+    };
+
+    // Handle return approval (PATCH /:orderId/return-approve)
+    const handleReturnApprove = async (order) => {
+        setReturnProcessing(true);
+        try {
+            const res = await authFetch(`/api/admin/order/${order.orderId}/return-approve`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ restock: true })
+            });
+            const data = await res.json();
+            if (data.success) {
+                fetchOrders();
+                setSelectedOrder(data.data?.order || null);
+            }
+        } catch (error) {
+            console.error("Return approve failed:", error);
+        } finally {
+            setReturnProcessing(false);
+        }
+    };
+
+    // Handle return rejection — opens the reject reason modal
+    const openRejectModal = (order) => {
+        setRejectModal({ show: true, order, reason: '' });
+    };
+
+    const handleReturnReject = async (e) => {
+        e.preventDefault();
+        if (!rejectModal.order) return;
+        setReturnProcessing(true);
+        try {
+            const res = await authFetch(`/api/admin/order/${rejectModal.order.orderId}/return-reject`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ reason: rejectModal.reason })
+            });
+            const data = await res.json();
+            if (data.success) {
+                fetchOrders();
+                setSelectedOrder(data.data);
+                setRejectModal({ show: false, order: null, reason: '' });
+            }
+        } catch (error) {
+            console.error("Return reject failed:", error);
+        } finally {
+            setReturnProcessing(false);
+        }
+    };
+
+    // Verify a COD deposit transaction (PATCH /:orderId/verify-deposit)
+    const handleVerifyDeposit = async (order) => {
+        setDepositVerifying(true);
+        setDepositMsg({ type: '', text: '' });
+        try {
+            const res = await authFetch(`/api/admin/order/${order.orderId}/verify-deposit`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+            });
+            const data = await res.json();
+            if (data.success) {
+                fetchOrders();
+                setSelectedOrder(data.data);
+                setDepositMsg({ type: 'success', text: 'Deposit verified successfully.' });
+            } else {
+                setDepositMsg({ type: 'error', text: data.message || 'Verification failed.' });
+            }
+        } catch {
+            setDepositMsg({ type: 'error', text: 'Verification failed. Please try again.' });
+        } finally {
+            setDepositVerifying(false);
+        }
+    };
+
+    // Dispatch order via selected courier
+    const handleCourierDispatch = async (order) => {
+        setCourierDispatch((p) => ({ ...p, processing: true, msg: { type: '', text: '' } }));
+        try {
+            const res = await authFetch(`/api/admin/courier/dispatch/${order.orderId}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ courier: courierDispatch.courier }),
+            });
+            const data = await res.json();
+            if (data.success) {
+                fetchOrders();
+                setSelectedOrder(data.data);
+                setCourierDispatch((p) => ({ ...p, msg: { type: 'success', text: `Dispatched via ${courierDispatch.courier === 'pathao' ? 'Pathao' : 'Steadfast'}` } }));
+            } else {
+                setCourierDispatch((p) => ({ ...p, msg: { type: 'error', text: data.message || 'Dispatch failed' } }));
+            }
+        } catch {
+            setCourierDispatch((p) => ({ ...p, msg: { type: 'error', text: 'Dispatch failed. Please try again.' } }));
+        } finally {
+            setCourierDispatch((p) => ({ ...p, processing: false }));
+        }
+    };
+
+    // Refresh tracking status for an already-dispatched order
+    const handleTrackOrder = async (order) => {
+        setTrackingLoading(true);
+        setTrackingData(null);
+        try {
+            const res = await authFetch(`/api/admin/courier/track/${order.orderId}`);
+            const data = await res.json();
+            if (data.success) {
+                setTrackingData(data.data);
+            } else {
+                setTrackingData({ error: data.message || 'Tracking failed' });
+            }
+        } catch {
+            setTrackingData({ error: 'Tracking request failed' });
+        } finally {
+            setTrackingLoading(false);
+        }
     };
 
     return (
@@ -321,7 +500,28 @@ export default function AdminOrdersPage() {
             {/* Header */}
             <div className="space-y-3">
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                    <h3 className="text-2xl font-bold text-gray-800">Orders Management</h3>
+                    <div className="flex items-center gap-4 flex-wrap">
+                        <h3 className="text-2xl font-bold text-gray-800">Orders Management</h3>
+                        {can('order:read') && (
+                            <div className="flex items-center gap-2">
+                                <button
+                                    type="button"
+                                    onClick={handleExportCsv}
+                                    disabled={exporting}
+                                    className="inline-flex items-center gap-2 px-3.5 py-2 text-sm font-medium bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50 transition-colors"
+                                    title="Export filtered orders as CSV"
+                                >
+                                    <FiDownload className="w-4 h-4" />
+                                    {exporting ? 'Exporting...' : 'Export CSV'}
+                                </button>
+                                {exportMsg.text && (
+                                    <span className={`text-xs font-medium ${exportMsg.type === 'error' ? 'text-red-600' : 'text-emerald-700'}`}>
+                                        {exportMsg.text}
+                                    </span>
+                                )}
+                            </div>
+                        )}
+                    </div>
                     <div className="flex flex-col sm:flex-row gap-3">
                         <div className="relative">
                             <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
@@ -345,6 +545,7 @@ export default function AdminOrdersPage() {
                             <option value="shipped">Shipped</option>
                             <option value="delivered">Delivered</option>
                             <option value="cancelled">Cancelled</option>
+                            <option value="return_requested">Return Requested</option>
                             <option value="returned">Returned</option>
                         </select>
                         <select
@@ -728,6 +929,123 @@ export default function AdminOrdersPage() {
                                 </div>
                             )}
 
+                            {/* COD Deposit Verification */}
+                            {selectedOrder.depositAmount > 0 && (
+                                <div className={`rounded-xl border p-4 space-y-2 ${selectedOrder.depositVerified ? 'bg-emerald-50 border-emerald-200' : 'bg-amber-50 border-amber-200'}`}>
+                                    <p className={`text-sm font-semibold flex items-center gap-2 ${selectedOrder.depositVerified ? 'text-emerald-800' : 'text-amber-800'}`}>
+                                        <FiDollarSign className="w-4 h-4" />
+                                        {selectedOrder.depositVerified ? 'Deposit Verified' : 'Deposit Pending Verification'}
+                                    </p>
+                                    <div className="text-xs space-y-0.5">
+                                        <p className={selectedOrder.depositVerified ? 'text-emerald-700' : 'text-amber-700'}>
+                                            Amount: <span className="font-semibold">{symbol}{selectedOrder.depositAmount}</span>{' '}
+                                            via <span className="font-semibold capitalize">{selectedOrder.depositPaymentMethod === 'bkash' ? 'bKash' : selectedOrder.depositPaymentMethod}</span>
+                                        </p>
+                                        <p className={selectedOrder.depositVerified ? 'text-emerald-700' : 'text-amber-700'}>
+                                            Tx ID: <span className="font-mono font-semibold">{selectedOrder.depositTransactionId}</span>
+                                        </p>
+                                        {selectedOrder.depositVerified && selectedOrder.depositVerifiedBy && (
+                                            <p className="text-emerald-600">
+                                                Verified by {selectedOrder.depositVerifiedBy}
+                                                {selectedOrder.depositVerifiedAt && (
+                                                    <> on {new Date(selectedOrder.depositVerifiedAt).toLocaleDateString('en-GB')}</>
+                                                )}
+                                            </p>
+                                        )}
+                                    </div>
+                                    {depositMsg.text && (
+                                        <p className={`text-xs px-2 py-1 rounded ${depositMsg.type === 'error' ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                                            {depositMsg.text}
+                                        </p>
+                                    )}
+                                    {canWrite && !selectedOrder.depositVerified && (
+                                        <button
+                                            onClick={() => handleVerifyDeposit(selectedOrder)}
+                                            disabled={depositVerifying}
+                                            className="mt-1 px-4 py-2 bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white text-xs font-semibold rounded-lg transition-colors flex items-center gap-2"
+                                        >
+                                            <FiCheck className="w-3.5 h-3.5" />
+                                            {depositVerifying ? 'Verifying…' : 'Mark Deposit Verified'}
+                                        </button>
+                                    )}
+                                </div>
+                            )}
+
+                            {/* Courier Dispatch / Tracking */}
+                            {canWrite && !selectedOrder.courierProvider && ['confirmed', 'processing'].includes(selectedOrder.orderStatus) && (
+                                <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 space-y-3">
+                                    <p className="text-sm font-semibold text-blue-800 flex items-center gap-2">
+                                        <FiTruck className="w-4 h-4" />
+                                        Dispatch via Courier
+                                    </p>
+                                    <div className="flex items-center gap-3">
+                                        <select
+                                            value={courierDispatch.courier}
+                                            onChange={(e) => setCourierDispatch((p) => ({ ...p, courier: e.target.value }))}
+                                            className="flex-1 px-3 py-2 border border-blue-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        >
+                                            <option value="pathao">Pathao</option>
+                                            <option value="steadfast">Steadfast</option>
+                                        </select>
+                                        <button
+                                            onClick={() => handleCourierDispatch(selectedOrder)}
+                                            disabled={courierDispatch.processing}
+                                            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-sm font-semibold rounded-lg transition-colors flex items-center gap-2 shrink-0"
+                                        >
+                                            <FiTruck className="w-3.5 h-3.5" />
+                                            {courierDispatch.processing ? 'Dispatching…' : 'Dispatch'}
+                                        </button>
+                                    </div>
+                                    {courierDispatch.msg.text && (
+                                        <p className={`text-xs px-2 py-1 rounded ${courierDispatch.msg.type === 'error' ? 'bg-red-100 text-red-700' : 'bg-blue-100 text-blue-800'}`}>
+                                            {courierDispatch.msg.text}
+                                        </p>
+                                    )}
+                                </div>
+                            )}
+
+                            {/* Courier tracking info (already dispatched) */}
+                            {selectedOrder.courierProvider && (
+                                <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-4 space-y-3">
+                                    <div className="flex items-center justify-between">
+                                        <p className="text-sm font-semibold text-indigo-800 flex items-center gap-2 capitalize">
+                                            <FiTruck className="w-4 h-4" />
+                                            {selectedOrder.courierProvider} — {selectedOrder.courierStatus || 'pending'}
+                                        </p>
+                                        <button
+                                            onClick={() => handleTrackOrder(selectedOrder)}
+                                            disabled={trackingLoading}
+                                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-xs font-semibold rounded-lg transition-colors"
+                                        >
+                                            <FiRefreshCw className={`w-3 h-3 ${trackingLoading ? 'animate-spin' : ''}`} />
+                                            {trackingLoading ? 'Checking…' : 'Refresh Status'}
+                                        </button>
+                                    </div>
+                                    <div className="text-xs space-y-0.5 text-indigo-700">
+                                        {selectedOrder.courierConsignmentId && (
+                                            <p>Consignment ID: <span className="font-mono font-semibold">{selectedOrder.courierConsignmentId}</span></p>
+                                        )}
+                                        {selectedOrder.courierTrackingCode && selectedOrder.courierTrackingCode !== selectedOrder.courierConsignmentId && (
+                                            <p>Tracking Code: <span className="font-mono font-semibold">{selectedOrder.courierTrackingCode}</span></p>
+                                        )}
+                                        {selectedOrder.courierDispatchedAt && (
+                                            <p>Dispatched: {new Date(selectedOrder.courierDispatchedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
+                                        )}
+                                    </div>
+                                    {trackingData && !trackingData.error && (
+                                        <div className="bg-white rounded-lg px-3 py-2 text-xs space-y-0.5 text-indigo-900">
+                                            <p className="font-semibold">Live status: <span className="capitalize">{trackingData.status?.replace(/_/g, ' ')}</span></p>
+                                            {trackingData.rawStatus && trackingData.rawStatus !== trackingData.status && (
+                                                <p className="text-indigo-500">Courier says: {trackingData.rawStatus}</p>
+                                            )}
+                                        </div>
+                                    )}
+                                    {trackingData?.error && (
+                                        <p className="text-xs text-red-600 bg-red-50 rounded px-2 py-1">{trackingData.error}</p>
+                                    )}
+                                </div>
+                            )}
+
                             {/* Notes */}
                             {(selectedOrder.notes || selectedOrder.adminNotes) && (
                                 <div className="space-y-3">
@@ -762,7 +1080,38 @@ export default function AdminOrdersPage() {
                                 </button>
                             )}
 
-                            {canChangeStatus && selectedOrder.orderStatus !== 'pending' && selectedOrder.orderStatus !== 'cancelled' && selectedOrder.orderStatus !== 'delivered' && (
+                            {/* Return request: approve / reject buttons */}
+                            {canWrite && selectedOrder.orderStatus === 'return_requested' && (
+                                <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 space-y-3">
+                                    <p className="text-sm font-semibold text-amber-800 flex items-center gap-2">
+                                        <FiRotateCcw className="w-4 h-4" />
+                                        Return Request Pending
+                                    </p>
+                                    {selectedOrder.adminNotes && (
+                                        <p className="text-xs text-amber-700 bg-amber-100 rounded-lg px-3 py-2 whitespace-pre-wrap">{selectedOrder.adminNotes}</p>
+                                    )}
+                                    <div className="flex gap-3">
+                                        <button
+                                            onClick={() => handleReturnApprove(selectedOrder)}
+                                            disabled={returnProcessing}
+                                            className="flex-1 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded-xl font-medium text-sm transition-colors flex items-center justify-center gap-2"
+                                        >
+                                            <FiCheck className="w-4 h-4" />
+                                            Approve Return
+                                        </button>
+                                        <button
+                                            onClick={() => openRejectModal(selectedOrder)}
+                                            disabled={returnProcessing}
+                                            className="flex-1 px-4 py-2.5 border border-red-200 text-red-600 hover:bg-red-50 disabled:opacity-50 rounded-xl font-medium text-sm transition-colors flex items-center justify-center gap-2"
+                                        >
+                                            <FiX className="w-4 h-4" />
+                                            Reject Return
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+
+                            {canChangeStatus && selectedOrder.orderStatus !== 'pending' && selectedOrder.orderStatus !== 'cancelled' && selectedOrder.orderStatus !== 'delivered' && selectedOrder.orderStatus !== 'return_requested' && selectedOrder.orderStatus !== 'returned' && (
                                 <div className="flex gap-3">
                                     {getNextStatuses(selectedOrder.orderStatus).map((action) => (
                                         <button
@@ -776,7 +1125,7 @@ export default function AdminOrdersPage() {
                                 </div>
                             )}
 
-                            {canChangeStatus && selectedOrder.orderStatus !== 'cancelled' && selectedOrder.orderStatus !== 'delivered' && (
+                            {canChangeStatus && selectedOrder.orderStatus !== 'cancelled' && selectedOrder.orderStatus !== 'delivered' && selectedOrder.orderStatus !== 'returned' && (
                                 <button
                                     onClick={() => handleUpdateStatus(selectedOrder.orderId, 'cancelled')}
                                     className="w-full border border-red-200 text-red-600 px-4 py-3 rounded-xl hover:bg-red-50 font-medium"
@@ -875,6 +1224,47 @@ export default function AdminOrdersPage() {
                         >
                             <FiX className="w-4 h-4" />
                         </button>
+                    </div>
+                </div>
+            )}
+
+            {/* Reject Return Modal */}
+            {rejectModal.show && (
+                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[70] p-4">
+                    <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl">
+                        <div className="p-6">
+                            <h3 className="text-lg font-bold text-gray-800 mb-1">Reject Return Request</h3>
+                            <p className="text-sm text-gray-500 mb-6">Provide a reason so the customer understands why their return was declined.</p>
+                            <form onSubmit={handleReturnReject} className="space-y-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Reason (optional)</label>
+                                    <textarea
+                                        value={rejectModal.reason}
+                                        onChange={(e) => setRejectModal({ ...rejectModal, reason: e.target.value })}
+                                        rows={3}
+                                        placeholder="e.g. Return window has expired, product shows signs of use..."
+                                        className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-400 focus:border-red-400 resize-none text-sm"
+                                    />
+                                </div>
+                                <div className="flex gap-3 pt-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => setRejectModal({ show: false, order: null, reason: '' })}
+                                        disabled={returnProcessing}
+                                        className="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg hover:bg-gray-50 font-medium text-sm"
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button
+                                        type="submit"
+                                        disabled={returnProcessing}
+                                        className="flex-1 px-4 py-2.5 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 font-medium text-sm"
+                                    >
+                                        {returnProcessing ? 'Processing…' : 'Reject Return'}
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
                     </div>
                 </div>
             )}

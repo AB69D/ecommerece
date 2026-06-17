@@ -56,6 +56,10 @@ const siteSettingsSchema = new mongoose.Schema(
             analytics: { type: Boolean, default: true },
             productReviews: { type: Boolean, default: true },
             reviewModeration: { type: Boolean, default: false },
+            codOtpVerification: { type: Boolean, default: false },
+            flashSales: { type: Boolean, default: false },
+            codPartialDeposit: { type: Boolean, default: false },
+            abandonedCartRecovery: { type: Boolean, default: false },
         },
 
         // ── Announcement bar ──────────────────────────────────────────────────
@@ -210,6 +214,11 @@ const siteSettingsSchema = new mongoose.Schema(
                 type: String,
                 default: 'Hi {{name}}, your order {{orderId}} is now {{status}}.',
             },
+            // {{name}} {{itemCount}} {{cartValue}} {{checkoutUrl}} are substituted at send time.
+            recoveryTemplate: {
+                type: String,
+                default: 'আস্সালামুয়ালাইকুম {{name}}! আপনার কার্টে {{itemCount}}টি পণ্য আছে (৳{{cartValue}})। অর্ডার সম্পূর্ণ করতে এই লিংকে যান: {{checkoutUrl}}',
+            },
         },
 
         // ── Storefront appearance / theme ──────────────────────────────────
@@ -252,6 +261,15 @@ const siteSettingsSchema = new mongoose.Schema(
             storePassword: { type: String, default: '' },
         },
 
+        // ── COD partial deposit ────────────────────────────────────────────
+        // When codPartialDeposit feature is ON, the checkout prompts COD customers
+        // to optionally send a small advance payment via bKash/Nagad/Rocket to
+        // reduce fake orders. The amount and supporting instructions live here.
+        codDeposit: {
+            amount: { type: Number, default: 100 },   // advance in store currency
+            instructions: { type: String, default: '' },
+        },
+
         // ── Delivery / shipping charges ────────────────────────────────────
         // Admin-configurable per-store delivery rates shown at checkout.
         // localCharge: within the same city/district (default 70 BDT).
@@ -259,6 +277,31 @@ const siteSettingsSchema = new mongoose.Schema(
         delivery: {
             localCharge: { type: Number, default: 70 },
             regionalCharge: { type: Number, default: 100 },
+        },
+
+        // ── Courier integrations ───────────────────────────────────────────────
+        // Credentials stored per-tenant so each store can use their own accounts.
+        // Tokens (Pathao only) are refreshed automatically by the courier lib and
+        // persisted back here. ALL credential fields are SECRETS — they must be
+        // stripped from the public /client/site-settings endpoint.
+        couriers: {
+            pathao: {
+                enabled: { type: Boolean, default: false },
+                clientId: { type: String, default: '' },
+                clientSecret: { type: String, default: '' },
+                username: { type: String, default: '' },
+                password: { type: String, default: '' },
+                storeId: { type: String, default: '' },
+                // Cached OAuth tokens — managed by the courier lib automatically
+                accessToken: { type: String, default: '' },
+                refreshToken: { type: String, default: '' },
+                tokenExpiresAt: { type: Date, default: null },
+            },
+            steadfast: {
+                enabled: { type: Boolean, default: false },
+                apiKey: { type: String, default: '' },
+                secretKey: { type: String, default: '' },
+            },
         },
 
         maintenanceMode: { type: Boolean, default: false },

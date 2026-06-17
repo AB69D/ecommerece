@@ -12,6 +12,7 @@
 // `pos.requireShift` config (enforced in pos.controller) decides
 // whether a sale demands an open shift.
 // ---------------------------------------------------------------
+import mongoose from 'mongoose';
 import ShiftModel from '../models/shift.model.js';
 import OrderModel from '../models/order.model.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
@@ -47,9 +48,9 @@ const findOpenShift = (req) =>
 
 // Total POS takings attributed to a shift, split by payment method.
 // Excludes returned orders so a refunded sale does not inflate the drawer.
-const computeShiftSales = async (shiftId) => {
+const computeShiftSales = async (shiftId, tenantId) => {
     const rows = await OrderModel.aggregate([
-        { $match: { source: 'pos', shiftId: String(shiftId), orderStatus: { $ne: 'returned' } } },
+        { $match: { tenantId: new mongoose.Types.ObjectId(tenantId), source: 'pos', shiftId: String(shiftId), orderStatus: { $ne: 'returned' } } },
         { $group: { _id: '$paymentMethod', total: { $sum: '$totalAmount' }, count: { $sum: 1 } } },
     ]);
 
@@ -86,7 +87,7 @@ const sumMovements = (movements = []) => {
 
 // Live drawer figures for an open shift (sales + movements + expected cash).
 const summarizeShift = async (shift) => {
-    const sales = await computeShiftSales(shift._id);
+    const sales = await computeShiftSales(shift._id, shift.tenantId);
     const { cashIn, cashOut } = sumMovements(shift.movements);
     const expectedCash = Math.round((shift.openingFloat + sales.cashSales + cashIn - cashOut) * 100) / 100;
     return { ...sales, cashIn, cashOut, expectedCash };

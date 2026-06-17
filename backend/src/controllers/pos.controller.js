@@ -9,6 +9,7 @@
 // A POS order is "instant": rung up, paid, and handed over at the counter,
 // so it is created already delivered/paid with no delivery charge.
 // ---------------------------------------------------------------
+import mongoose from 'mongoose';
 import OrderModel from '../models/order.model.js';
 import ProductModel from '../models/product.model.js';
 import CouponModel from '../models/coupon.model.js';
@@ -438,7 +439,7 @@ export const getPosSales = asyncHandler(async (req, res) => {
 // Scoped to the seller unless they have pos:manage.
 // ---------------------------------------------------------------
 export const getPosReport = asyncHandler(async (req, res) => {
-    const scope = { source: 'pos', orderStatus: { $ne: 'returned' } };
+    const scope = { tenantId: new mongoose.Types.ObjectId(req.tenantId), source: 'pos', orderStatus: { $ne: 'returned' } };
     if (!canManageAll(req)) scope['soldBy.id'] = String(req.adminDoc?._id);
 
     const now = new Date();
@@ -460,6 +461,7 @@ export const getPosReport = asyncHandler(async (req, res) => {
             { $group: { _id: '$saleType', count: { $sum: 1 }, revenue: { $sum: '$totalAmount' } } },
         ]),
         OrderModel.countDocuments({
+            tenantId: new mongoose.Types.ObjectId(req.tenantId),
             source: 'pos',
             orderStatus: 'returned',
             ...(canManageAll(req) ? {} : { 'soldBy.id': String(req.adminDoc?._id) }),

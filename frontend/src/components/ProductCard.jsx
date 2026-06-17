@@ -1,10 +1,11 @@
 "use client";
 import { useState } from "react";
 import { useStorePush } from "@/components/StoreLink";
-import { FiEye, FiPlus } from "react-icons/fi";
+import { FiEye, FiPlus, FiZap } from "react-icons/fi";
 import { useCurrency } from "@/context/CurrencyContext.jsx";
 import ProductRating from "./ProductRating.jsx";
 import WishlistButton from "./WishlistButton.jsx";
+import { useFlashSales } from "@/hooks/useFlashSales";
 
 // The cheapest variant once its own discount is applied — this is the "from"
 // price the storefront shows (and what the server sorts price_asc/desc on).
@@ -24,6 +25,7 @@ export default function ProductCard({ product, showCategory = true }) {
     const [hovered, setHovered] = useState(false);
     const { symbol } = useCurrency();
     const goTo = useStorePush();
+    const { flashMap } = useFlashSales();
 
     const goToProduct = () => goTo(`/product/${product._id}`);
 
@@ -31,6 +33,12 @@ export default function ProductCard({ product, showCategory = true }) {
         product.cover_image || (product.weights && product.weights[0]?.images?.[0]) || null;
     const minWeight = getMinDiscountedWeight(product.weights);
     const hasDiscount = minWeight && minWeight.discountPercent > 0;
+
+    // Find the cheapest flash price across all variants of this product.
+    const minWeightIndex = product.weights
+        ? product.weights.indexOf(minWeight)
+        : 0;
+    const flashEntry = flashMap.get(`${product._id}:${minWeightIndex >= 0 ? minWeightIndex : 0}`);
 
     return (
         <div
@@ -78,11 +86,15 @@ export default function ProductCard({ product, showCategory = true }) {
                     </div>
                 )}
 
-                {hasDiscount && (
+                {flashEntry ? (
+                    <div className="absolute top-2 left-2 bg-amber-500 text-white text-[10px] sm:text-xs font-bold px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full flex items-center gap-0.5">
+                        <FiZap className="w-2.5 h-2.5" /> Flash
+                    </div>
+                ) : hasDiscount ? (
                     <div className="absolute top-2 left-2 bg-red-500 text-white text-[10px] sm:text-xs font-bold px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full">
                         -{minWeight.discountPercent}%
                     </div>
-                )}
+                ) : null}
 
                 <WishlistButton product={product} className="absolute top-2 right-2" />
             </div>
@@ -103,8 +115,17 @@ export default function ProductCard({ product, showCategory = true }) {
                 )}
                 <ProductRating productId={product._id} className="mt-1" />
                 <div className="mt-1.5 sm:mt-2 text-center">
-                    {minWeight &&
-                        (hasDiscount ? (
+                    {minWeight && (
+                        flashEntry ? (
+                            <div className="flex items-center justify-center gap-1.5 sm:gap-2 flex-wrap">
+                                <p className="text-[11px] sm:text-sm text-gray-400 line-through">
+                                    {symbol}{minWeight.price}
+                                </p>
+                                <p className="text-sm sm:text-base font-bold text-amber-600">
+                                    {symbol}{flashEntry.salePrice}
+                                </p>
+                            </div>
+                        ) : hasDiscount ? (
                             <div className="flex items-center justify-center gap-1.5 sm:gap-2 flex-wrap">
                                 <p className="text-[11px] sm:text-sm text-gray-400 line-through">
                                     {symbol}
@@ -120,7 +141,8 @@ export default function ProductCard({ product, showCategory = true }) {
                                 {symbol}
                                 {minWeight.price}
                             </p>
-                        ))}
+                        )
+                    )}
                 </div>
             </div>
         </div>

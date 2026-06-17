@@ -189,7 +189,44 @@ const orderSchema = new Schema({
     // uniqueness is enforced only when present (partial index below).
     idempotencyKey: {
         type: String
-    }
+    },
+
+    // ── COD partial deposit (bKash / Nagad / Rocket manual flow) ────────────
+    // When the codPartialDeposit feature is enabled, a COD customer can opt to
+    // send a small advance to secure their order. Admin manually verifies the
+    // transaction ID and flips depositVerified. All fields default to empty/false
+    // so legacy and non-deposit orders are unaffected.
+    depositAmount: { type: Number, default: 0 },
+    depositPaymentMethod: {
+        type: String,
+        enum: ['bkash', 'nagad', 'rocket', null],
+        default: null,
+    },
+    depositTransactionId: { type: String, default: '' },
+    depositVerified: { type: Boolean, default: false },
+    depositVerifiedAt: { type: Date, default: null },
+    depositVerifiedBy: { type: String, default: '' },
+
+    // ── Courier dispatch (Pathao / Steadfast) ────────────────────────────────
+    // Set when the admin dispatches the order via a third-party courier service.
+    // All fields default to empty/null so historical and non-courier orders are
+    // unaffected.
+    courierProvider: {
+        type: String,
+        enum: ['pathao', 'steadfast', null],
+        default: null,
+        index: true,
+    },
+    courierConsignmentId: { type: String, default: '' },  // Pathao consignment_id
+    courierTrackingCode: { type: String, default: '' },   // Steadfast tracking_code (Pathao uses consignment_id)
+    courierStatus: { type: String, default: '' },          // last-known raw status from the courier
+    courierDispatchedAt: { type: Date, default: null },
+    courierLastCheckedAt: { type: Date, default: null },
+
+    // ── COD remittance tracking ───────────────────────────────────────────────
+    // Flipped by admin after receiving the courier's COD bank transfer.
+    codRemitted: { type: Boolean, default: false },
+    codRemittedAt: { type: Date, default: null },
 }, {
     timestamps: true
 });

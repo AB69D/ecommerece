@@ -4,12 +4,17 @@ import CartModel from '../models/cart.model.js';
 import ProductModel from '../models/product.model.js';
 import CheckoutLeadModel from '../models/checkoutLead.model.js';
 import CouponModel from '../models/coupon.model.js';
+import OrderOtpModel from '../models/orderOtp.model.js';
+import FlashSaleModel from '../models/flashSale.model.js';
 import { SiteSettings } from '../models/siteSettings.model.js';
 import { evaluateCoupon } from '../lib/coupon.js';
 import { recordStockMovements } from '../lib/stockLedger.js';
 import { sendOrderConfirmationEmail } from '../lib/orderEmail.js';
 import { notifyAdminNewOrder, notifyCustomerOrderCreated } from '../lib/notify.js';
-import { optionalCustomer } from '../middlewares/clientAuth.middleware.js';
+import { isFeatureEnabled } from '../lib/siteSettings.js';
+import { sendWhatsAppTemplate } from '../lib/whatsapp.js';
+import { optionalCustomer, requireCustomer } from '../middlewares/clientAuth.middleware.js';
+import { clientReturnRequestController } from '../controllers/order.controller.js';
 
 const clientOrderRouter = Router();
 
@@ -19,15 +24,19 @@ const getGuestId = (req) => {
 
 clientOrderRouter.post('/create', optionalCustomer, async (req, res) => {
     try {
-        const { 
-            customerName, 
-            customerPhone, 
-            customerEmail, 
-            shippingAddress, 
+        const {
+            customerName,
+            customerPhone,
+            customerEmail,
+            shippingAddress,
             deliveryArea = 'local',
             paymentMethod = 'cash_on_delivery',
             notes = '',
-            couponCode = ''
+            couponCode = '',
+            // COD partial deposit fields (optional — only present when the feature
+            // is on and the customer chose to pay an advance).
+            depositPaymentMethod = null,
+            depositTransactionId = '',
         } = req.body;
         
         const siteSettings = await SiteSettings.findOne().lean();
@@ -96,11 +105,43 @@ clientOrderRouter.post('/create', optionalCustomer, async (req, res) => {
             return Math.round((Number(w?.costPrice) || 0) * 100) / 100;
         };
 
+        // Resolve active flash sale prices (if any) for items in this cart.
+        // We load all currently-live flash sales for this tenant and build a
+        // lookup map keyed by `${productId}:${weightIndex}` so the per-item
+        // loop below can do O(1) lookups instead of N+1 queries.
+        const nowForFlash = new Date();
+        const liveFlashSales = await FlashSaleModel.find({
+            active: true,
+            startsAt: { $lte: nowForFlash },
+            endsAt: { $gte: nowForFlash },
+        }).lean();
+
+        // Map: `${productId}:${weightIndex}` -> { saleId, itemId, salePrice, maxQty, soldQty }
+        const flashPriceMap = new Map();
+        for (const sale of liveFlashSales) {
+            for (const si of sale.items) {
+                const key = `${si.productId}:${si.weightIndex}`;
+                // If two overlapping sales apply to the same variant, the lower price wins.
+                if (!flashPriceMap.has(key) || si.salePrice < flashPriceMap.get(key).salePrice) {
+                    flashPriceMap.set(key, {
+                        saleId: sale._id,
+                        itemId: si._id,
+                        salePrice: si.salePrice,
+                        maxQty: si.maxQty,   // null = unlimited
+                        soldQty: si.soldQty,
+                    });
+                }
+            }
+        }
+
         // Defense-in-depth: recalculate the subtotal from authoritative DB prices
         // and reject the order if cart.totalAmount deviates by more than ₹1.
         // The cart /add endpoint already pins prices to DB values, but this guard
         // catches any residual mismatch (e.g. price changed after item was added,
         // or a tampered cart document in the database).
+        // When a flash sale is active, the authoritative server price IS the flash
+        // price — not the product's regular price — so the subtotal guard uses
+        // flash prices where applicable.
         let serverSubtotal = 0;
         for (const item of cart.items) {
             const weights = weightsByProductId.get(String(item.productId));
@@ -112,9 +153,28 @@ clientOrderRouter.post('/create', optionalCustomer, async (req, res) => {
                     success: false
                 });
             }
-            const unitPrice = Number(variant.price) || 0;
-            const discount = Number(variant.discountPercent) || 0;
-            const effectivePrice = unitPrice * (1 - discount / 100);
+
+            const flashKey = `${item.productId}:${item.weightIndex || 0}`;
+            const flashEntry = flashPriceMap.get(flashKey);
+
+            let effectivePrice;
+            if (flashEntry) {
+                // Flash sale price overrides the regular/discounted price.
+                // Validate that the quantity cap has not been exceeded.
+                if (flashEntry.maxQty !== null && (flashEntry.soldQty + (Number(item.quantity) || 1)) > flashEntry.maxQty) {
+                    return res.status(400).json({
+                        message: `Flash sale limit reached for "${item.productName}". Please adjust the quantity or try again later.`,
+                        error: true,
+                        success: false
+                    });
+                }
+                effectivePrice = flashEntry.salePrice;
+            } else {
+                const unitPrice = Number(variant.price) || 0;
+                const discount = Number(variant.discountPercent) || 0;
+                effectivePrice = unitPrice * (1 - discount / 100);
+            }
+
             serverSubtotal += effectivePrice * (Number(item.quantity) || 1);
         }
         serverSubtotal = Math.round(serverSubtotal * 100) / 100;
@@ -124,7 +184,14 @@ clientOrderRouter.post('/create', optionalCustomer, async (req, res) => {
         // before server-side price pinning was introduced. The order always uses
         // serverSubtotal (the authoritative figure), so this guard is only a
         // user-facing hint for large manipulations — not the security boundary.
-        if (Math.abs(serverSubtotal - cartSubtotal) > 1) {
+        //
+        // When a flash sale applies, serverSubtotal < cartSubtotal (the server
+        // gives a lower flash price). We allow serverSubtotal to be less than
+        // cartSubtotal without limit — the buyer pays the lower price. We only
+        // reject when serverSubtotal is MORE than cartSubtotal + 1 (i.e. the
+        // server price is HIGHER than what was shown to the buyer, which
+        // indicates a price-change manipulation or data corruption).
+        if (serverSubtotal - cartSubtotal > 1) {
             return res.status(400).json({
                 message: "Cart total mismatch. Please refresh your cart and try again.",
                 error: true,
@@ -132,18 +199,26 @@ clientOrderRouter.post('/create', optionalCustomer, async (req, res) => {
             });
         }
 
-        // Use stored product info directly
-        const orderItems = cart.items.map(item => ({
-            productId: item.productId,
-            productName: item.productName,
-            productImage: item.productImage,
-            quantity: item.quantity,
-            weight: item.weight,
-            weightIndex: item.weightIndex || 0,
-            price: item.price,
-            totalPrice: item.price * item.quantity,
-            costPrice: costFor(item.productId, item.weightIndex || 0)
-        }));
+        // Build order items. When a flash sale applies to a variant, override the
+        // stored cart price with the flash price so line totals are correct. The
+        // serverSubtotal calculated above already used flash prices for validation,
+        // so these two calculations must stay in sync.
+        const orderItems = cart.items.map(item => {
+            const flashKey = `${item.productId}:${item.weightIndex || 0}`;
+            const flashEntry = flashPriceMap.get(flashKey);
+            const effectivePrice = flashEntry ? flashEntry.salePrice : item.price;
+            return {
+                productId: item.productId,
+                productName: item.productName,
+                productImage: item.productImage,
+                quantity: item.quantity,
+                weight: item.weight,
+                weightIndex: item.weightIndex || 0,
+                price: effectivePrice,
+                totalPrice: effectivePrice * item.quantity,
+                costPrice: costFor(item.productId, item.weightIndex || 0),
+            };
+        });
 
         // Use the server-verified subtotal rather than cart.totalAmount so any
         // DB rounding is consistent with what was validated above.
@@ -202,6 +277,30 @@ clientOrderRouter.post('/create', optionalCustomer, async (req, res) => {
             appliedDecrements.push(item);
         }
 
+        // Resolve COD partial deposit settings. A deposit is recorded when:
+        //   (a) the codPartialDeposit feature is ON for this tenant, AND
+        //   (b) the order uses cash_on_delivery, AND
+        //   (c) the customer provided a depositTransactionId.
+        // We read the amount from SiteSettings so the customer can never
+        // inflate/deflate it client-side.
+        let depositAmountToSave = 0;
+        let depositMethodToSave = null;
+        let depositTxIdToSave = '';
+        if (
+            paymentMethod === 'cash_on_delivery' &&
+            depositPaymentMethod &&
+            String(depositTransactionId || '').trim().length >= 4
+        ) {
+            const depositFeatureOn = await isFeatureEnabled('codPartialDeposit', false);
+            if (depositFeatureOn) {
+                depositAmountToSave = Number(siteSettings?.codDeposit?.amount) || 100;
+                depositMethodToSave = ['bkash', 'nagad', 'rocket'].includes(depositPaymentMethod)
+                    ? depositPaymentMethod
+                    : null;
+                depositTxIdToSave = String(depositTransactionId).trim();
+            }
+        }
+
         // Persist the order. Attach the idempotency key when present so a retried
         // submit can't create a duplicate (enforced by the partial unique index).
         const orderDoc = {
@@ -219,7 +318,10 @@ clientOrderRouter.post('/create', optionalCustomer, async (req, res) => {
             discount,
             totalAmount,
             paymentMethod,
-            notes
+            notes,
+            depositAmount: depositAmountToSave,
+            depositPaymentMethod: depositMethodToSave,
+            depositTransactionId: depositTxIdToSave,
         };
         if (idempotencyKey) orderDoc.idempotencyKey = idempotencyKey;
         // Link the order to the signed-in customer (if any) for order history.
@@ -257,6 +359,44 @@ clientOrderRouter.post('/create', optionalCustomer, async (req, res) => {
                 await CouponModel.updateOne({ _id: couponDoc._id }, { $inc: { usedCount: 1 } });
             } catch {
                 // ignore
+            }
+        }
+
+        // Atomically increment soldQty on each flash sale item that was used in
+        // this order. The $expr guard re-checks the cap so that if two concurrent
+        // checkouts both passed the pre-check above, only one can breach the cap —
+        // the other's increment is silently dropped (the order is already placed,
+        // so the cap is a soft best-effort limit, not a hard stock guard, which
+        // is handled separately by the product stock decrement above).
+        for (const item of orderItems) {
+            const flashKey = `${item.productId}:${item.weightIndex}`;
+            const flashEntry = flashPriceMap.get(flashKey);
+            if (!flashEntry) continue;
+            try {
+                const updateFilter = {
+                    _id: flashEntry.saleId,
+                    'items._id': flashEntry.itemId,
+                };
+                // Only enforce the cap if maxQty is set (not unlimited).
+                if (flashEntry.maxQty !== null) {
+                    updateFilter.$expr = {
+                        $lte: [
+                            { $add: [
+                                { $arrayElemAt: [
+                                    '$items.soldQty',
+                                    { $indexOfArray: ['$items._id', flashEntry.itemId] }
+                                ]},
+                                item.quantity,
+                            ]},
+                            flashEntry.maxQty,
+                        ],
+                    };
+                }
+                await FlashSaleModel.updateOne(updateFilter, {
+                    $inc: { 'items.$.soldQty': item.quantity },
+                });
+            } catch {
+                // Non-fatal — soldQty is a reporting counter, not a hard gate.
             }
         }
 
@@ -303,6 +443,44 @@ clientOrderRouter.post('/create', optionalCustomer, async (req, res) => {
         notifyAdminNewOrder(order).catch(() => {});
         if (order.paymentMethod === 'cash_on_delivery') {
             notifyCustomerOrderCreated(order).catch(() => {});
+        }
+
+        // COD OTP Verification — only for COD orders when the feature is enabled.
+        // We create the OTP doc and send the code via WhatsApp before responding
+        // so the frontend knows immediately whether to show the verification step.
+        if (order.paymentMethod === 'cash_on_delivery') {
+            const otpFeatureOn = await isFeatureEnabled('codOtpVerification', false);
+            if (otpFeatureOn) {
+                try {
+                    const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+                    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 h
+                    await OrderOtpModel.create({
+                        orderId: order._id,
+                        orderRef: order.orderId,
+                        phone: order.customerPhone,
+                        code: otpCode,
+                        expiresAt,
+                    });
+                    // Send the OTP via WhatsApp — best-effort, failure is logged but
+                    // not fatal. The customer can request a resend from the OTP screen.
+                    sendWhatsAppTemplate({
+                        to: order.customerPhone,
+                        template: 'Your {{store}} order verification code is {{otp}}. Valid for 24 hours. Do not share this code.',
+                        vars: { otp: otpCode, store: 'the store' },
+                    }).catch(() => {});
+                    return res.json({
+                        message: 'Order placed. Please verify your phone to confirm.',
+                        data: { ...order.toObject(), requiresOtpVerification: true },
+                        error: false,
+                        success: true,
+                    });
+                } catch (otpErr) {
+                    // OTP creation failed (e.g. DB error). Fall through to the normal
+                    // response so the order is not lost — the customer gets the order
+                    // without the verification step this time.
+                    console.error('COD OTP create error:', otpErr);
+                }
+            }
         }
 
         res.json({
@@ -388,6 +566,100 @@ clientOrderRouter.post('/track', async (req, res) => {
         });
     }
 });
+
+// ── COD OTP Verification ────────────────────────────────────────────────────
+// Verify the 6-digit OTP sent via WhatsApp after a COD order was placed.
+// No auth required — the guest can verify using the orderId (URL param, the
+// human-readable GG-XXXX string) returned by /create.
+clientOrderRouter.post('/:orderId/verify-otp', async (req, res) => {
+    try {
+        const { orderId } = req.params;                          // human-readable GG-XXXX
+        const code = String(req.body.code || '').trim();
+
+        if (!code || code.length !== 6) {
+            return res.status(400).json({ message: 'Please enter the 6-digit code.', success: false, error: true });
+        }
+
+        const otpDoc = await OrderOtpModel.findOne({
+            orderRef: orderId,
+            verified: false,
+            voided: false,
+            expiresAt: { $gt: new Date() },
+        });
+
+        if (!otpDoc) {
+            return res.status(400).json({ message: 'OTP expired or not found. Please request a new code.', success: false, error: true });
+        }
+
+        // Exceeded attempt limit — void and refuse.
+        if (otpDoc.attempts >= 3) {
+            await OrderOtpModel.updateOne({ _id: otpDoc._id }, { $set: { voided: true } });
+            // Cancel the order so stock is not held indefinitely for a fraudulent entry.
+            await OrderModel.updateOne({ _id: otpDoc.orderId }, { $set: { orderStatus: 'cancelled', cancelledAt: new Date(), cancelledReason: 'OTP verification failed — max attempts exceeded' } });
+            return res.status(400).json({ message: 'Too many incorrect attempts. Your order has been cancelled.', success: false, error: true });
+        }
+
+        if (code !== otpDoc.code) {
+            const newAttempts = otpDoc.attempts + 1;
+            await OrderOtpModel.updateOne({ _id: otpDoc._id }, { $inc: { attempts: 1 } });
+            const attemptsLeft = 3 - newAttempts;
+            return res.status(400).json({
+                message: `Incorrect code. ${attemptsLeft} attempt${attemptsLeft === 1 ? '' : 's'} remaining.`,
+                attemptsLeft,
+                success: false,
+                error: true,
+            });
+        }
+
+        // Code is correct — mark verified.
+        await OrderOtpModel.updateOne({ _id: otpDoc._id }, { $set: { verified: true } });
+
+        return res.json({ message: 'Phone verified. Your order is confirmed.', success: true, error: false });
+    } catch (err) {
+        console.error('OTP verify error:', err);
+        res.status(500).json({ message: err.message, success: false, error: true });
+    }
+});
+
+// Resend the OTP for a placed COD order. Generates a new code, resets the
+// attempt counter, and extends expiry by another 24 hours.
+clientOrderRouter.post('/:orderId/resend-otp', async (req, res) => {
+    try {
+        const { orderId } = req.params;
+
+        // Confirm the order exists and is still pending (not cancelled/delivered).
+        const order = await OrderModel.findOne({ orderId, paymentMethod: 'cash_on_delivery', orderStatus: 'pending' });
+        if (!order) {
+            return res.status(404).json({ message: 'Order not found or no longer pending.', success: false, error: true });
+        }
+
+        const newCode = Math.floor(100000 + Math.random() * 900000).toString();
+        const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+
+        // Replace any existing OTP for this order (upsert by orderId).
+        await OrderOtpModel.findOneAndUpdate(
+            { orderId: order._id },
+            { $set: { code: newCode, attempts: 0, verified: false, voided: false, expiresAt, phone: order.customerPhone } },
+            { upsert: true, new: true },
+        );
+
+        sendWhatsAppTemplate({
+            to: order.customerPhone,
+            template: 'Your new verification code is {{otp}}. Valid for 24 hours.',
+            vars: { otp: newCode },
+        }).catch(() => {});
+
+        return res.json({ message: 'A new OTP has been sent to your WhatsApp.', success: true, error: false });
+    } catch (err) {
+        console.error('OTP resend error:', err);
+        res.status(500).json({ message: err.message, success: false, error: true });
+    }
+});
+
+// Customer return request — requires a signed-in customer.
+// The customer must own the order (customerId match), it must be 'delivered',
+// and the returnAvailableUntil window must not have passed.
+clientOrderRouter.post('/:orderId/return-request', requireCustomer, clientReturnRequestController);
 
 clientOrderRouter.get('/:orderId', async (req, res) => {
     try {

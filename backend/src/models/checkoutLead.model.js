@@ -35,7 +35,9 @@ const checkoutLeadSchema = new Schema({
     },
     convertedOrderId: { type: String, default: '' },
     convertedAt: { type: Date, default: null },
-    lastActivityAt: { type: Date, default: Date.now }
+    lastActivityAt: { type: Date, default: Date.now },
+    recoveryAttempts: { type: Number, default: 0 },
+    lastRecoveryAt: { type: Date, default: null },
 }, {
     timestamps: true
 });

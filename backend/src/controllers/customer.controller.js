@@ -1,3 +1,4 @@
+import mongoose from 'mongoose';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { ok } from '../lib/ApiResponse.js';
 import OrderModel from '../models/order.model.js';
@@ -91,16 +92,22 @@ export const getAbandonedLeads = asyncHandler(async (req, res) => {
 
 // Headline counts for the Customers page tabs.
 export const getCustomerStats = asyncHandler(async (req, res) => {
-    const [orderedAgg, abandonedCount] = await Promise.all([
+    const [orderedAgg, abandonedCount, recoveryAgg] = await Promise.all([
         OrderModel.aggregate([
+            { $match: { tenantId: new mongoose.Types.ObjectId(req.tenantId) } },
             { $group: { _id: '$customerPhone' } },
             { $count: 'count' }
         ]),
-        CheckoutLeadModel.countDocuments({ status: 'abandoned' })
+        CheckoutLeadModel.countDocuments({ tenantId: new mongoose.Types.ObjectId(req.tenantId), status: 'abandoned' }),
+        CheckoutLeadModel.aggregate([
+            { $match: { tenantId: new mongoose.Types.ObjectId(req.tenantId) } },
+            { $group: { _id: null, total: { $sum: '$recoveryAttempts' } } }
+        ])
     ]);
 
     return ok(res, {
         orderedCustomers: orderedAgg[0]?.count || 0,
-        abandonedCheckouts: abandonedCount
+        abandonedCheckouts: abandonedCount,
+        totalRecoveryMessages: recoveryAgg[0]?.total || 0,
     }, 'Customer stats fetched');
 });

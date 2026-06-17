@@ -1,10 +1,13 @@
+import mongoose from 'mongoose';
 import OrderModel from "../models/order.model.js";
 import ProductModel from "../models/product.model.js";
+import PaymentModel from "../models/payment.model.js";
 import { recordStockMovements, applyStockDeltas, actorFromReq } from "../lib/stockLedger.js";
 import { sendOrderStatusEmail } from "../lib/orderEmail.js";
 import { logger } from "../lib/logger.js";
 import { getSettings } from "../lib/siteSettings.js";
 import { notifyAdminNewOrder, notifyCustomerOrderCreated, notifyCustomerStatusChange } from "../lib/notify.js";
+import { refund as sslRefund } from "../lib/sslcommerz.js";
 
 export const createOrderController = async (request, response) => {
     try {
@@ -412,16 +415,17 @@ export const updateStockController = async (request, response) => {
 
 export const getOrderStatsController = async (request, response) => {
     try {
-        const totalOrders = await OrderModel.countDocuments();
-        const pendingOrders = await OrderModel.countDocuments({ orderStatus: 'pending' });
-        const confirmedOrders = await OrderModel.countDocuments({ orderStatus: 'confirmed' });
-        const processingOrders = await OrderModel.countDocuments({ orderStatus: 'processing' });
-        const shippedOrders = await OrderModel.countDocuments({ orderStatus: 'shipped' });
-        const deliveredOrders = await OrderModel.countDocuments({ orderStatus: 'delivered' });
-        const cancelledOrders = await OrderModel.countDocuments({ orderStatus: 'cancelled' });
+        const tenantFilter = { tenantId: new mongoose.Types.ObjectId(request.tenantId) };
+        const totalOrders = await OrderModel.countDocuments(tenantFilter);
+        const pendingOrders = await OrderModel.countDocuments({ ...tenantFilter, orderStatus: 'pending' });
+        const confirmedOrders = await OrderModel.countDocuments({ ...tenantFilter, orderStatus: 'confirmed' });
+        const processingOrders = await OrderModel.countDocuments({ ...tenantFilter, orderStatus: 'processing' });
+        const shippedOrders = await OrderModel.countDocuments({ ...tenantFilter, orderStatus: 'shipped' });
+        const deliveredOrders = await OrderModel.countDocuments({ ...tenantFilter, orderStatus: 'delivered' });
+        const cancelledOrders = await OrderModel.countDocuments({ ...tenantFilter, orderStatus: 'cancelled' });
 
         const totalRevenue = await OrderModel.aggregate([
-            { $match: { orderStatus: { $nin: ['cancelled'] } } },
+            { $match: { tenantId: new mongoose.Types.ObjectId(request.tenantId), orderStatus: { $nin: ['cancelled'] } } },
             { $group: { _id: null, total: { $sum: '$totalAmount' } } }
         ]);
 
@@ -627,6 +631,99 @@ export const bulkUpdateOrderStatusController = async (request, response) => {
     }
 };
 
+export const exportOrdersCsvController = async (request, response) => {
+    try {
+        const { status, source, startDate, endDate } = request.query;
+
+        const match = {};
+        if (status && status !== 'all') match.orderStatus = status;
+        if (source && source !== 'all') match.source = source;
+        if (startDate || endDate) {
+            match.createdAt = {};
+            if (startDate) match.createdAt.$gte = new Date(startDate);
+            if (endDate) {
+                const end = new Date(endDate);
+                end.setHours(23, 59, 59, 999);
+                match.createdAt.$lte = end;
+            }
+        }
+
+        const today = new Date().toISOString().slice(0, 10);
+        response.setHeader('Content-Type', 'text/csv; charset=utf-8');
+        response.setHeader('Content-Disposition', `attachment; filename="orders-${today}.csv"`);
+
+        const HEADERS = [
+            'Order ID', 'Date', 'Customer Name', 'Phone', 'Email',
+            'City', 'Address', 'Items', 'Subtotal', 'Delivery Charge',
+            'Coupon Discount', 'Manual Discount', 'Total Amount',
+            'Payment Method', 'Payment Status', 'Order Status', 'Source', 'Notes'
+        ];
+
+        const escapeCell = (val) => `"${String(val ?? '').replace(/"/g, '""')}"`;
+
+        response.write(HEADERS.map(escapeCell).join(',') + '\r\n');
+
+        const cursor = OrderModel.find(match).sort({ createdAt: -1 }).lean().cursor();
+
+        for await (const order of cursor) {
+            const itemsSummary = (order.items || [])
+                .map((i) => `${i.productName} x${i.quantity}${i.weight ? ` (${i.weight})` : ''}`)
+                .join('; ');
+
+            const couponDiscount = order.couponCode && order.discount
+                ? order.discount - (order.manualDiscount?.amount || 0)
+                : (order.couponCode ? order.discount : 0);
+            const manualDiscount = order.manualDiscount?.amount || 0;
+
+            const paymentMethodLabel = {
+                cash_on_delivery: 'Cash on Delivery',
+                online: 'Online (SSLCommerz)',
+                cash: 'Cash',
+                card: 'Card',
+                bkash: 'bKash',
+                nagad: 'Nagad',
+                rocket: 'Rocket',
+            }[order.paymentMethod] || order.paymentMethod || '';
+
+            const row = [
+                order.orderId,
+                new Date(order.createdAt).toISOString().slice(0, 10),
+                order.customerName,
+                order.customerPhone,
+                order.customerEmail || '',
+                order.city || '',
+                order.shippingAddress,
+                itemsSummary,
+                order.subtotal ?? 0,
+                order.deliveryCharge ?? 0,
+                couponDiscount,
+                manualDiscount,
+                order.totalAmount ?? 0,
+                paymentMethodLabel,
+                order.paymentStatus || '',
+                order.orderStatus || '',
+                order.source || 'ecommerce',
+                order.notes || '',
+            ];
+
+            response.write(row.map(escapeCell).join(',') + '\r\n');
+        }
+
+        response.end();
+
+    } catch (error) {
+        // Headers may already be sent — just end the stream
+        if (!response.headersSent) {
+            return response.status(500).json({
+                message: error.message || error,
+                error: true,
+                success: false
+            });
+        }
+        response.end();
+    }
+};
+
 export const getOrdersByPhoneController = async (request, response) => {
     try {
         const { phone } = request.body;
@@ -644,6 +741,318 @@ export const getOrdersByPhoneController = async (request, response) => {
         return response.json({
             message: "Orders fetched successfully",
             data: orders,
+            error: false,
+            success: true
+        });
+
+    } catch (error) {
+        return response.status(500).json({
+            message: error.message || error,
+            error: true,
+            success: false
+        });
+    }
+};
+
+// ── Client: submit a return request ──────────────────────────────────────────
+//
+// Requires a signed-in customer (requireCustomer middleware).
+// Validates: order belongs to this customer, status === 'delivered',
+// returnAvailableUntil is in the future (return window not expired).
+// Stores reason + description, sets status to 'return_requested'.
+export const clientReturnRequestController = async (request, response) => {
+    try {
+        const { orderId } = request.params;
+        const { reason, description = '' } = request.body;
+
+        if (!reason) {
+            return response.status(400).json({
+                message: "Return reason is required",
+                error: true,
+                success: false
+            });
+        }
+
+        const order = await OrderModel.findOne({ orderId });
+
+        if (!order) {
+            return response.status(404).json({
+                message: "Order not found",
+                error: true,
+                success: false
+            });
+        }
+
+        // Ownership check: the order must belong to the signed-in customer.
+        if (!order.customerId || String(order.customerId) !== String(request.customer._id)) {
+            return response.status(403).json({
+                message: "You do not have permission to request a return for this order",
+                error: true,
+                success: false
+            });
+        }
+
+        if (order.orderStatus !== 'delivered') {
+            return response.status(400).json({
+                message: "Only delivered orders can be returned",
+                error: true,
+                success: false
+            });
+        }
+
+        if (!order.returnAvailableUntil || order.returnAvailableUntil < new Date()) {
+            return response.status(400).json({
+                message: "The return window for this order has expired",
+                error: true,
+                success: false
+            });
+        }
+
+        // Save reason as a prefixed note so it surfaces in the admin notes field
+        // without requiring a schema migration.
+        const returnNote = `[Return Request] Reason: ${reason}${description ? ` — ${description}` : ''}`;
+        order.orderStatus = 'return_requested';
+        order.adminNotes = order.adminNotes
+            ? `${order.adminNotes}\n${returnNote}`
+            : returnNote;
+
+        await order.save();
+
+        // Alert the admin via WhatsApp (best-effort, fire-and-forget).
+        notifyAdminNewOrder(order).catch(() => {});
+
+        return response.json({
+            message: "Return request submitted successfully",
+            data: order,
+            error: false,
+            success: true
+        });
+
+    } catch (error) {
+        return response.status(500).json({
+            message: error.message || error,
+            error: true,
+            success: false
+        });
+    }
+};
+
+// ── Admin: approve a return request ──────────────────────────────────────────
+//
+// Sets status to 'returned', restocks items, and optionally issues a gateway
+// refund for online-paid orders (SSLCommerz only for now).
+export const adminReturnApproveController = async (request, response) => {
+    try {
+        const { orderId } = request.params;
+        const { adminNote = '', restock = true } = request.body;
+
+        const order = await OrderModel.findOne({ orderId });
+
+        if (!order) {
+            return response.status(404).json({
+                message: "Order not found",
+                error: true,
+                success: false
+            });
+        }
+
+        if (order.orderStatus !== 'return_requested') {
+            return response.status(400).json({
+                message: "Order is not in return_requested status",
+                error: true,
+                success: false
+            });
+        }
+
+        order.orderStatus = 'returned';
+        if (adminNote) {
+            order.adminNotes = order.adminNotes
+                ? `${order.adminNotes}\n[Return Approved] ${adminNote}`
+                : `[Return Approved] ${adminNote}`;
+        }
+
+        await order.save();
+
+        // Restock all items (positive delta — trusting admin action).
+        if (restock !== false) {
+            const stockableItems = order.items.filter((i) => i.weightIndex !== undefined);
+            if (stockableItems.length > 0) {
+                await applyStockDeltas(
+                    stockableItems.map((i) => ({
+                        productId: i.productId,
+                        weightIndex: i.weightIndex,
+                        delta: i.quantity
+                    }))
+                );
+                await recordStockMovements(
+                    order.items.map((i) => ({
+                        productId: i.productId,
+                        productName: i.productName,
+                        weightIndex: i.weightIndex,
+                        weight: i.weight,
+                        delta: i.quantity,
+                    })),
+                    { reason: 'return', channel: 'ecommerce', orderId, actor: actorFromReq(request) }
+                );
+            }
+        }
+
+        // Attempt gateway refund for SSLCommerz online orders (best-effort).
+        let refundResult = null;
+        if (order.paymentMethod === 'online') {
+            try {
+                const payment = await PaymentModel.findOne({ orderId, status: 'paid' });
+                if (payment?.bankTranId) {
+                    const settings = await getSettings(request.tenantId);
+                    const result = await sslRefund({
+                        sandbox: settings?.payment?.sandbox ?? true,
+                        storeId: settings?.payment?.storeId || '',
+                        storePassword: settings?.payment?.storePassword || '',
+                        bankTranId: payment.bankTranId,
+                        amount: order.totalAmount,
+                        remarks: adminNote || 'Return approved by admin',
+                    });
+                    refundResult = result;
+
+                    await PaymentModel.updateOne(
+                        { _id: payment._id },
+                        {
+                            $set: {
+                                status: 'refunded',
+                                'refund.refId': result?.refund_ref_id || '',
+                                'refund.amount': order.totalAmount,
+                                'refund.status': result?.status || '',
+                                'refund.remarks': adminNote || 'Return approved',
+                                'refund.at': new Date(),
+                            }
+                        }
+                    );
+
+                    order.paymentStatus = 'refunded';
+                    await order.save();
+                }
+            } catch (refundErr) {
+                logger.warn({ err: refundErr, orderId }, 'Gateway refund attempt failed during return approve');
+            }
+        }
+
+        // Notify customer of status change (best-effort, fire-and-forget).
+        notifyCustomerStatusChange(order).catch(() => {});
+        sendOrderStatusEmail(order).catch((err) => logger.warn({ err }, 'Return status email failed'));
+
+        return response.json({
+            message: "Return approved successfully",
+            data: { order, refundResult },
+            error: false,
+            success: true
+        });
+
+    } catch (error) {
+        return response.status(500).json({
+            message: error.message || error,
+            error: true,
+            success: false
+        });
+    }
+};
+
+// ── Admin: verify a COD partial deposit ──────────────────────────────────────
+//
+// Marks depositVerified = true and stamps who verified it and when.
+// Called from the order detail panel when an admin has manually confirmed
+// the customer's bKash/Nagad/Rocket transaction ID in the merchant app.
+export const adminVerifyDepositController = async (request, response) => {
+    try {
+        const { orderId } = request.params;
+
+        const order = await OrderModel.findOne({ orderId });
+
+        if (!order) {
+            return response.status(404).json({
+                message: "Order not found",
+                error: true,
+                success: false
+            });
+        }
+
+        if (!order.depositTransactionId) {
+            return response.status(400).json({
+                message: "This order has no deposit transaction ID to verify",
+                error: true,
+                success: false
+            });
+        }
+
+        if (order.depositVerified) {
+            return response.status(400).json({
+                message: "Deposit is already verified",
+                error: true,
+                success: false
+            });
+        }
+
+        order.depositVerified = true;
+        order.depositVerifiedAt = new Date();
+        order.depositVerifiedBy = request.admin?.username || request.admin?.email || 'admin';
+        await order.save();
+
+        return response.json({
+            message: "Deposit verified successfully",
+            data: order,
+            error: false,
+            success: true
+        });
+
+    } catch (error) {
+        return response.status(500).json({
+            message: error.message || error,
+            error: true,
+            success: false
+        });
+    }
+};
+
+// ── Admin: reject a return request ───────────────────────────────────────────
+//
+// Restores status to 'delivered' so the customer can't re-request immediately
+// and sees the correct current state. Records the rejection reason in adminNotes.
+export const adminReturnRejectController = async (request, response) => {
+    try {
+        const { orderId } = request.params;
+        const { reason = '' } = request.body;
+
+        const order = await OrderModel.findOne({ orderId });
+
+        if (!order) {
+            return response.status(404).json({
+                message: "Order not found",
+                error: true,
+                success: false
+            });
+        }
+
+        if (order.orderStatus !== 'return_requested') {
+            return response.status(400).json({
+                message: "Order is not in return_requested status",
+                error: true,
+                success: false
+            });
+        }
+
+        const rejectionNote = `[Return Rejected]${reason ? ` ${reason}` : ''}`;
+        order.orderStatus = 'delivered';
+        order.adminNotes = order.adminNotes
+            ? `${order.adminNotes}\n${rejectionNote}`
+            : rejectionNote;
+
+        await order.save();
+
+        // Notify customer (best-effort, fire-and-forget).
+        notifyCustomerStatusChange(order).catch(() => {});
+
+        return response.json({
+            message: "Return request rejected",
+            data: order,
             error: false,
             success: true
         });

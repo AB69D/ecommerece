@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import Link, { useStorePush } from "@/components/StoreLink";
 import { useParams } from "next/navigation";
-import { FiShoppingCart, FiCheck, FiHelpCircle, FiMessageCircle, FiPhoneCall, FiPackage, FiArrowLeft } from "react-icons/fi";
+import { FiShoppingCart, FiCheck, FiHelpCircle, FiMessageCircle, FiPhoneCall, FiPackage, FiArrowLeft, FiZap } from "react-icons/fi";
 import { PiWhatsappLogoBold } from "react-icons/pi";
 import { addToCart } from "@/utils/cart";
 import { trackViewContent, trackAddToCart } from "@/lib/tracking";
@@ -10,6 +10,8 @@ import { useCurrency } from "@/context/CurrencyContext.jsx";
 import ProductReviews from "@/components/ProductReviews.jsx";
 import WishlistButton from "@/components/WishlistButton.jsx";
 import { useWhatsApp } from "@/hooks/useWhatsApp";
+import { useFlashSales } from "@/hooks/useFlashSales";
+import FlashSaleCountdown from "@/components/FlashSaleCountdown.jsx";
 
 export default function ProductClient({ productId }) {
     const wa = useWhatsApp();
@@ -28,6 +30,7 @@ export default function ProductClient({ productId }) {
     const { symbol, code } = useCurrency();
     const goTo = useStorePush();
     const productRef = useRef(null);
+    const { flashMap } = useFlashSales();
 
     useEffect(() => {
         const fetchProduct = async () => {
@@ -252,9 +255,14 @@ export default function ProductClient({ productId }) {
     }
 
     const currentWeight = product.weights?.[selectedWeight];
-    const allImages = currentWeight?.images?.length > 0 
-        ? currentWeight.images 
+    const allImages = currentWeight?.images?.length > 0
+        ? currentWeight.images
         : (product.cover_image ? [product.cover_image] : []);
+
+    // Resolve any active flash sale for the currently-selected variant.
+    const flashEntry = product
+        ? flashMap.get(`${product._id}:${selectedWeight}`)
+        : null;
 
     return (
         <div ref={productRef} className="w-full py-6 sm:py-8 px-4 max-w-7xl mx-auto">
@@ -387,8 +395,35 @@ export default function ProductClient({ productId }) {
                         )}
                     </div>
 
+                    {/* Flash sale banner */}
+                    {flashEntry && (
+                        <div className="mt-4 flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                            <FiZap className="w-4 h-4 text-amber-500 flex-shrink-0" />
+                            <span className="text-sm font-semibold text-amber-700">Flash Sale!</span>
+                            <span className="ml-auto text-xs text-amber-600 font-mono font-medium">
+                                Ends in{" "}
+                                <FlashSaleCountdown
+                                    endsAt={flashEntry.endsAt}
+                                    className="font-bold"
+                                />
+                            </span>
+                        </div>
+                    )}
+
                     <div className="mt-5 sm:mt-6">
-                        {currentWeight?.discountPercent > 0 ? (
+                        {flashEntry ? (
+                            <div className="flex items-center gap-3 flex-wrap">
+                                <p className="text-lg sm:text-xl text-gray-400 line-through">
+                                    {symbol}{currentWeight?.price * quantity || 0}
+                                </p>
+                                <p className="text-2xl sm:text-3xl font-bold text-amber-600">
+                                    {symbol}{(flashEntry.salePrice * quantity).toFixed(0)}
+                                </p>
+                                <span className="bg-amber-100 text-amber-700 text-xs font-bold px-2 py-1 rounded">
+                                    Flash Price
+                                </span>
+                            </div>
+                        ) : currentWeight?.discountPercent > 0 ? (
                             <div className="flex items-center gap-3">
                                 <p className="text-lg sm:text-xl text-gray-400 line-through">
                                     {symbol}{currentWeight?.price * quantity || 0}

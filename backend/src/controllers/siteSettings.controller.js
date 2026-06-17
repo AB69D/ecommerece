@@ -41,6 +41,15 @@ export const getPublicSettings = asyncHandler(async (_req, res) => {
         const { storeId, storePassword, ...paymentPublic } = publicView.payment;
         publicView.payment = paymentPublic;
     }
+    // Courier credentials (API keys, OAuth secrets, passwords, tokens) are
+    // server-side only. Only expose the `enabled` toggle for each courier so
+    // the admin UI can show which couriers are active.
+    if (publicView.couriers) {
+        publicView.couriers = {
+            pathao: { enabled: !!publicView.couriers?.pathao?.enabled },
+            steadfast: { enabled: !!publicView.couriers?.steadfast?.enabled },
+        };
+    }
     return ok(res, publicView);
 });
 

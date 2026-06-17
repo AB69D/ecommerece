@@ -1,5 +1,5 @@
 import { Router } from 'express'
-import { createOrderController, updateOrderStatusController, getAllOrdersController, getOrderDetailsController, getStockReportController, updateStockController, getOrderStatsController, confirmOrderController, getOrdersByPhoneController, bulkUpdateOrderStatusController } from '../controllers/order.controller.js'
+import { createOrderController, updateOrderStatusController, getAllOrdersController, getOrderDetailsController, getStockReportController, updateStockController, getOrderStatsController, confirmOrderController, getOrdersByPhoneController, bulkUpdateOrderStatusController, exportOrdersCsvController, adminReturnApproveController, adminReturnRejectController, adminVerifyDepositController } from '../controllers/order.controller.js'
 import { requirePermission, requireAnyPermission } from '../middlewares/auth.middleware.js'
 
 const orderRouter = Router()
@@ -20,5 +20,15 @@ orderRouter.patch('/bulk-status', requirePermission('order:write'), bulkUpdateOr
 
 // Client track order by phone
 orderRouter.post('/track-by-phone', requirePermission('order:read'), getOrdersByPhoneController)
+
+// CSV export
+orderRouter.get('/export-csv', requirePermission('order:read'), exportOrdersCsvController)
+
+// Return management (admin)
+orderRouter.patch('/:orderId/return-approve', requirePermission('order:write'), adminReturnApproveController)
+orderRouter.patch('/:orderId/return-reject', requirePermission('order:write'), adminReturnRejectController)
+
+// COD partial deposit verification
+orderRouter.patch('/:orderId/verify-deposit', requirePermission('order:write'), adminVerifyDepositController)
 
 export default orderRouter

@@ -5,7 +5,7 @@ import { usePathname, useRouter, useParams } from "next/navigation";
 import {
     FiGrid, FiPackage, FiLayout, FiList, FiTruck, FiMenu, FiX, FiSettings,
     FiHome, FiPercent, FiStar, FiLogOut, FiUsers, FiShield, FiFileText, FiUser,
-    FiShoppingBag, FiTag, FiBarChart2, FiCreditCard,
+    FiShoppingBag, FiTag, FiBarChart2, FiCreditCard, FiZap,
 } from "react-icons/fi";
 import { isAuthenticated, logout, fetchMe } from "@/services/adminAuth";
 import { AdminAuthContext, buildCan } from "@/context/AdminAuthContext";
@@ -151,7 +151,9 @@ export default function AdminLayout({ children }) {
                 { name: 'Stock Ledger', path: '/admin/stock-ledger', icon: <FiList className="w-5 h-5" />, perms: ['inventory:read'] },
                 { name: 'Discounts', path: '/admin/discount', icon: <FiPercent className="w-5 h-5" />, perms: ['discount:read'] },
                 { name: 'Coupons', path: '/admin/coupons', icon: <FiTag className="w-5 h-5" />, perms: ['discount:read'] },
+                { name: 'Flash Sales', path: '/admin/flash-sales', icon: <FiZap className="w-5 h-5" />, perms: ['discount:read'] },
                 { name: 'Profit Report', path: '/admin/profit', icon: <FiBarChart2 className="w-5 h-5" />, perms: ['analytics:read'] },
+                { name: 'COD Remittance', path: '/admin/remittance', icon: <FiCreditCard className="w-5 h-5" />, perms: ['order:read'] },
             ],
         },
         {

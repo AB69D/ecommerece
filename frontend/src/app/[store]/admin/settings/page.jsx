@@ -5,6 +5,7 @@ import {
     FiSettings, FiImage, FiUpload, FiTrash2, FiPlus, FiCheck, FiAlertCircle,
     FiType, FiPhone, FiShare2, FiSearch, FiLayout, FiSave, FiX,
     FiToggleRight, FiPrinter, FiTag, FiActivity, FiDroplet, FiRotateCcw, FiCreditCard,
+    FiTruck,
 } from "react-icons/fi";
 import { getSiteSettings, updateSiteSettings, uploadSiteImage } from "@/services/siteSettings";
 import { getFooterSettings, updateFooterSettings } from "@/services/footer";
@@ -27,6 +28,7 @@ const TABS = [
     { id: "pos", label: "POS & Receipt", icon: <FiPrinter className="w-4 h-4" /> },
     { id: "barcode", label: "Barcode & Labels", icon: <FiTag className="w-4 h-4" /> },
     { id: "integrations", label: "Analytics & WhatsApp", icon: <FiActivity className="w-4 h-4" /> },
+    { id: "couriers", label: "Couriers", icon: <FiTruck className="w-4 h-4" /> },
     { id: "footer", label: "Footer", icon: <FiLayout className="w-4 h-4" /> },
 ];
 
@@ -45,6 +47,9 @@ const FEATURE_FLAGS = [
     ["analytics", "Web analytics", "Inject GA4 / Pixel / GTM tags into the storefront."],
     ["productReviews", "Product reviews", "Let shoppers rate and review products."],
     ["reviewModeration", "Review moderation", "New reviews are held for approval before appearing publicly."],
+    ["codOtpVerification", "COD phone verification (OTP)", "Send a WhatsApp OTP after every Cash on Delivery order to confirm the customer's phone number and reduce fake orders."],
+    ["codPartialDeposit", "COD partial deposit", "Ask COD customers to send a small advance via bKash/Nagad/Rocket to reduce fake orders. Admin verifies the transaction ID manually."],
+    ["abandonedCartRecovery", "Abandoned cart recovery", "Automatically send a WhatsApp reminder to customers who started checkout but never completed their order. Requires WhatsApp to be enabled."],
 ];
 
 const DAYS_OF_WEEK = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
@@ -345,6 +350,13 @@ export default function SettingsPage() {
         return { ...p, trustBadges: { ...(p.trustBadges || {}), items } };
     });
     const setDelivery = (patch) => setSettings((p) => ({ ...p, delivery: { ...(p.delivery || {}), ...patch } }));
+    const setCourier = (provider, patch) => setSettings((p) => ({
+        ...p,
+        couriers: {
+            ...(p.couriers || {}),
+            [provider]: { ...(p.couriers?.[provider] || {}), ...patch },
+        },
+    }));
 
     const save = async () => {
         setSaving(true); setMsg({ type: "", text: "" }); setFieldErrors({});
@@ -407,6 +419,7 @@ export default function SettingsPage() {
                     notifyOnStatusChange: settings.whatsapp?.notifyOnStatusChange !== false,
                     orderTemplate: settings.whatsapp?.orderTemplate || "",
                     statusTemplate: settings.whatsapp?.statusTemplate || "",
+                    recoveryTemplate: settings.whatsapp?.recoveryTemplate || "",
                 },
                 payment: {
                     provider: "sslcommerz",
@@ -482,6 +495,21 @@ export default function SettingsPage() {
                     })),
                 },
                 maintenanceMode: !!settings.maintenanceMode,
+                couriers: {
+                    pathao: {
+                        enabled: !!settings.couriers?.pathao?.enabled,
+                        clientId: settings.couriers?.pathao?.clientId || "",
+                        clientSecret: settings.couriers?.pathao?.clientSecret || "",
+                        username: settings.couriers?.pathao?.username || "",
+                        password: settings.couriers?.pathao?.password || "",
+                        storeId: settings.couriers?.pathao?.storeId || "",
+                    },
+                    steadfast: {
+                        enabled: !!settings.couriers?.steadfast?.enabled,
+                        apiKey: settings.couriers?.steadfast?.apiKey || "",
+                        secretKey: settings.couriers?.steadfast?.secretKey || "",
+                    },
+                },
             };
             const fPayload = {
                 aboutText: footer.aboutText || "",
@@ -918,6 +946,9 @@ export default function SettingsPage() {
                             <Field label="Status message template" hint="Placeholders: {{name}} {{orderId}} {{status}}.">
                                 <textarea rows={2} className={inputCls} value={settings.whatsapp?.statusTemplate || ""} onChange={(e) => setWhatsapp({ statusTemplate: e.target.value })} />
                             </Field>
+                            <Field label="Abandoned cart recovery template" hint="Sent automatically to customers who left items in their cart. Placeholders: {{name}} {{itemCount}} {{cartValue}} {{checkoutUrl}}.">
+                                <textarea rows={2} className={inputCls} value={settings.whatsapp?.recoveryTemplate || ""} onChange={(e) => setWhatsapp({ recoveryTemplate: e.target.value })} />
+                            </Field>
                         </div>
                     </>
                 )}
@@ -1098,6 +1129,27 @@ export default function SettingsPage() {
                             <Field label="Instructions (optional)" hint="Shown to the customer at checkout.">
                                 <input className={inputCls} value={settings.paymentMethods?.cod?.instructions || ""} onChange={(e) => setPaymentMethod("cod", { instructions: e.target.value })} placeholder="Pay cash when your order arrives." />
                             </Field>
+                            {settings.features?.codPartialDeposit && (
+                                <>
+                                    <Field label="Deposit amount" hint="Advance customers must send via bKash/Nagad/Rocket to secure a COD order. Admin verifies each transaction manually.">
+                                        <input
+                                            type="number"
+                                            min="0"
+                                            className={inputCls}
+                                            value={settings.codDeposit?.amount ?? 100}
+                                            onChange={(e) => setSettings((p) => ({ ...p, codDeposit: { ...(p.codDeposit || {}), amount: Number(e.target.value) } }))}
+                                        />
+                                    </Field>
+                                    <Field label="Deposit instructions (optional)" hint="Extra guidance shown above the transaction ID input at checkout.">
+                                        <input
+                                            className={inputCls}
+                                            value={settings.codDeposit?.instructions || ""}
+                                            onChange={(e) => setSettings((p) => ({ ...p, codDeposit: { ...(p.codDeposit || {}), instructions: e.target.value } }))}
+                                            placeholder="Send to your bKash/Nagad/Rocket number and enter the transaction ID."
+                                        />
+                                    </Field>
+                                </>
+                            )}
                         </div>
                         {[
                             { key: "bkash", label: "bKash", placeholder: "01XXXXXXXXX" },
@@ -1267,6 +1319,121 @@ export default function SettingsPage() {
                             </p>
                         </div>
                     </>
+                )}
+
+                {tab === "couriers" && (
+                    <div className="space-y-5">
+                        <p className="text-xs text-gray-500">
+                            Configure your courier integrations. Credentials are stored securely and never sent to the storefront.
+                            Once a courier is enabled, you can dispatch orders from the Orders page.
+                        </p>
+
+                        {/* Pathao */}
+                        <div className="bg-gray-50 border border-gray-100 rounded-xl p-4 space-y-3">
+                            <h3 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                                <FiTruck className="w-4 h-4" /> Pathao Courier
+                            </h3>
+                            <p className="text-xs text-gray-400">
+                                OAuth2 credentials from your Pathao merchant dashboard. Tokens are refreshed automatically.
+                            </p>
+                            <Toggle
+                                label="Enable Pathao"
+                                hint="Allow dispatching orders via Pathao from the Orders page."
+                                checked={!!settings.couriers?.pathao?.enabled}
+                                onChange={(v) => setCourier("pathao", { enabled: v })}
+                            />
+                            {settings.couriers?.pathao?.enabled && (
+                                <div className="space-y-3 pt-1">
+                                    <Field label="Client ID" hint="From Pathao merchant developer settings.">
+                                        <input
+                                            className={inputCls}
+                                            autoComplete="off"
+                                            value={settings.couriers?.pathao?.clientId || ""}
+                                            onChange={(e) => setCourier("pathao", { clientId: e.target.value })}
+                                            placeholder="your-pathao-client-id"
+                                        />
+                                    </Field>
+                                    <Field label="Client Secret">
+                                        <input
+                                            type="password"
+                                            autoComplete="new-password"
+                                            className={inputCls}
+                                            value={settings.couriers?.pathao?.clientSecret || ""}
+                                            onChange={(e) => setCourier("pathao", { clientSecret: e.target.value })}
+                                            placeholder="••••••••"
+                                        />
+                                    </Field>
+                                    <Field label="Pathao account username (email)">
+                                        <input
+                                            className={inputCls}
+                                            autoComplete="off"
+                                            value={settings.couriers?.pathao?.username || ""}
+                                            onChange={(e) => setCourier("pathao", { username: e.target.value })}
+                                            placeholder="merchant@example.com"
+                                        />
+                                    </Field>
+                                    <Field label="Pathao account password">
+                                        <input
+                                            type="password"
+                                            autoComplete="new-password"
+                                            className={inputCls}
+                                            value={settings.couriers?.pathao?.password || ""}
+                                            onChange={(e) => setCourier("pathao", { password: e.target.value })}
+                                            placeholder="••••••••"
+                                        />
+                                    </Field>
+                                    <Field label="Store ID" hint="The numeric store ID from your Pathao merchant dashboard.">
+                                        <input
+                                            className={inputCls}
+                                            value={settings.couriers?.pathao?.storeId || ""}
+                                            onChange={(e) => setCourier("pathao", { storeId: e.target.value })}
+                                            placeholder="12345"
+                                        />
+                                    </Field>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Steadfast */}
+                        <div className="bg-gray-50 border border-gray-100 rounded-xl p-4 space-y-3">
+                            <h3 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                                <FiTruck className="w-4 h-4" /> Steadfast Courier
+                            </h3>
+                            <p className="text-xs text-gray-400">
+                                API key and secret key from your Steadfast merchant portal. No token refresh needed.
+                                Steadfast also exposes your live COD remittance balance via the API.
+                            </p>
+                            <Toggle
+                                label="Enable Steadfast"
+                                hint="Allow dispatching orders via Steadfast from the Orders page."
+                                checked={!!settings.couriers?.steadfast?.enabled}
+                                onChange={(v) => setCourier("steadfast", { enabled: v })}
+                            />
+                            {settings.couriers?.steadfast?.enabled && (
+                                <div className="space-y-3 pt-1">
+                                    <Field label="API Key" hint="From Steadfast merchant portal → Settings.">
+                                        <input
+                                            className={inputCls}
+                                            autoComplete="off"
+                                            value={settings.couriers?.steadfast?.apiKey || ""}
+                                            onChange={(e) => setCourier("steadfast", { apiKey: e.target.value })}
+                                            placeholder="your-steadfast-api-key"
+                                        />
+                                    </Field>
+                                    <Field label="Secret Key">
+                                        <input
+                                            type="password"
+                                            autoComplete="new-password"
+                                            className={inputCls}
+                                            value={settings.couriers?.steadfast?.secretKey || ""}
+                                            onChange={(e) => setCourier("steadfast", { secretKey: e.target.value })}
+                                            placeholder="••••••••"
+                                        />
+                                    </Field>
+                                </div>
+                            )}
+                        </div>
+                    </div>
                 )}
 
                 {tab === "footer" && (

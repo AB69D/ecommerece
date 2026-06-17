@@ -1,3 +1,4 @@
+import mongoose from 'mongoose';
 import AuditLogModel from '../models/auditLog.model.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { ok } from '../lib/ApiResponse.js';
@@ -46,12 +47,14 @@ export const listAuditLogs = asyncHandler(async (req, res) => {
 });
 
 // GET /api/admin/audit-logs/stats — quick summary for dashboards.
-export const auditStats = asyncHandler(async (_req, res) => {
+export const auditStats = asyncHandler(async (req, res) => {
+    const tenantFilter = { tenantId: new mongoose.Types.ObjectId(req.tenantId) };
     const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
     const [total, last24h, byAction] = await Promise.all([
-        AuditLogModel.countDocuments(),
-        AuditLogModel.countDocuments({ createdAt: { $gte: since } }),
+        AuditLogModel.countDocuments(tenantFilter),
+        AuditLogModel.countDocuments({ ...tenantFilter, createdAt: { $gte: since } }),
         AuditLogModel.aggregate([
+            { $match: tenantFilter },
             { $group: { _id: '$action', count: { $sum: 1 } } },
             { $sort: { count: -1 } },
             { $limit: 10 },

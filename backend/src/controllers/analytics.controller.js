@@ -1,3 +1,4 @@
+import mongoose from 'mongoose';
 import OrderModel from '../models/order.model.js';
 import ProductModel from '../models/product.model.js';
 import CategoryModel from '../models/category.model.js';
@@ -30,6 +31,8 @@ export const getDashboardOverview = asyncHandler(async (req, res) => {
     const last7 = new Date(now.getTime() - 7 * 86400000);
     const prev7Start = new Date(now.getTime() - 14 * 86400000);
 
+    const tid = new mongoose.Types.ObjectId(req.tenantId);
+
     const [
         totalOrders,
         totalProducts,
@@ -46,19 +49,20 @@ export const getDashboardOverview = asyncHandler(async (req, res) => {
         sellerAgg,
         posTypeAgg,
     ] = await Promise.all([
-        OrderModel.countDocuments(),
-        ProductModel.countDocuments(),
-        CategoryModel.countDocuments(),
-        ProductModel.countDocuments({ 'weights.stock': { $lte: LOW_STOCK_THRESHOLD } }),
+        OrderModel.countDocuments({ tenantId: tid }),
+        ProductModel.countDocuments({ tenantId: tid }),
+        CategoryModel.countDocuments({ tenantId: tid }),
+        ProductModel.countDocuments({ tenantId: tid, 'weights.stock': { $lte: LOW_STOCK_THRESHOLD } }),
         OrderModel.aggregate([
-            { $match: REVENUE_STATUSES },
+            { $match: { tenantId: tid, ...REVENUE_STATUSES } },
             { $group: { _id: null, total: { $sum: '$totalAmount' }, count: { $sum: 1 } } },
         ]),
         OrderModel.aggregate([
+            { $match: { tenantId: tid } },
             { $group: { _id: '$orderStatus', count: { $sum: 1 } } },
         ]),
         OrderModel.aggregate([
-            { $match: { createdAt: { $gte: since } } },
+            { $match: { tenantId: tid, createdAt: { $gte: since } } },
             {
                 $group: {
                     _id: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } },
@@ -76,6 +80,7 @@ export const getDashboardOverview = asyncHandler(async (req, res) => {
             },
         ]),
         OrderModel.aggregate([
+            { $match: { tenantId: tid } },
             { $unwind: '$items' },
             {
                 $group: {
@@ -89,16 +94,16 @@ export const getDashboardOverview = asyncHandler(async (req, res) => {
             { $limit: 6 },
         ]),
         OrderModel.aggregate([
-            { $match: { ...REVENUE_STATUSES, createdAt: { $gte: last7 } } },
+            { $match: { tenantId: tid, ...REVENUE_STATUSES, createdAt: { $gte: last7 } } },
             { $group: { _id: null, revenue: { $sum: '$totalAmount' }, orders: { $sum: 1 } } },
         ]),
         OrderModel.aggregate([
-            { $match: { ...REVENUE_STATUSES, createdAt: { $gte: prev7Start, $lt: last7 } } },
+            { $match: { tenantId: tid, ...REVENUE_STATUSES, createdAt: { $gte: prev7Start, $lt: last7 } } },
             { $group: { _id: null, revenue: { $sum: '$totalAmount' }, orders: { $sum: 1 } } },
         ]),
         // Channel split: e-commerce vs POS (revenue + order count).
         OrderModel.aggregate([
-            { $match: REVENUE_STATUSES },
+            { $match: { tenantId: tid, ...REVENUE_STATUSES } },
             {
                 $group: {
                     _id: { $ifNull: ['$source', 'ecommerce'] },
@@ -109,7 +114,7 @@ export const getDashboardOverview = asyncHandler(async (req, res) => {
         ]),
         // POS-only daily series for the selected range.
         OrderModel.aggregate([
-            { $match: { ...REVENUE_STATUSES, source: 'pos', createdAt: { $gte: since } } },
+            { $match: { tenantId: tid, ...REVENUE_STATUSES, source: 'pos', createdAt: { $gte: since } } },
             {
                 $group: {
                     _id: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } },
@@ -120,7 +125,7 @@ export const getDashboardOverview = asyncHandler(async (req, res) => {
         ]),
         // POS seller leaderboard.
         OrderModel.aggregate([
-            { $match: { ...REVENUE_STATUSES, source: 'pos' } },
+            { $match: { tenantId: tid, ...REVENUE_STATUSES, source: 'pos' } },
             {
                 $group: {
                     _id: { id: '$soldBy.id', username: '$soldBy.username', fullName: '$soldBy.fullName' },
@@ -133,7 +138,7 @@ export const getDashboardOverview = asyncHandler(async (req, res) => {
         ]),
         // POS retail vs wholesale split.
         OrderModel.aggregate([
-            { $match: { ...REVENUE_STATUSES, source: 'pos' } },
+            { $match: { tenantId: tid, ...REVENUE_STATUSES, source: 'pos' } },
             { $group: { _id: '$saleType', revenue: { $sum: '$totalAmount' }, orders: { $sum: 1 } } },
         ]),
     ]);
@@ -204,12 +209,12 @@ export const getDashboardOverview = asyncHandler(async (req, res) => {
 
         const [profitAgg, profitChannelAgg, discountAgg] = await Promise.all([
             OrderModel.aggregate([
-                { $match: REVENUE_STATUSES },
+                { $match: { tenantId: tid, ...REVENUE_STATUSES } },
                 { $unwind: '$items' },
                 { $group: { _id: null, revenue: { $sum: '$items.totalPrice' }, cost: { $sum: costExpr } } },
             ]),
             OrderModel.aggregate([
-                { $match: REVENUE_STATUSES },
+                { $match: { tenantId: tid, ...REVENUE_STATUSES } },
                 { $unwind: '$items' },
                 {
                     $group: {
@@ -220,7 +225,7 @@ export const getDashboardOverview = asyncHandler(async (req, res) => {
                 },
             ]),
             OrderModel.aggregate([
-                { $match: REVENUE_STATUSES },
+                { $match: { tenantId: tid, ...REVENUE_STATUSES } },
                 { $group: { _id: null, discounts: { $sum: '$discount' } } },
             ]),
         ]);
@@ -299,7 +304,7 @@ export const getProfitReport = asyncHandler(async (req, res) => {
     const since = startOfDay(new Date(now.getTime() - (days - 1) * 86400000));
 
     // Exclude cancelled/failed/returned; optionally scope to one channel.
-    const baseMatch = { ...REVENUE_STATUSES, createdAt: { $gte: since } };
+    const baseMatch = { tenantId: new mongoose.Types.ObjectId(req.tenantId), ...REVENUE_STATUSES, createdAt: { $gte: since } };
     if (channel === 'pos') baseMatch.source = 'pos';
     else if (channel === 'ecommerce') baseMatch.source = { $ne: 'pos' };
 
