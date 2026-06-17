@@ -19,11 +19,11 @@ services:
     networks:
       - app
     healthcheck:
-      test: ["CMD", "mongosh", "--quiet", "--eval", "db.runCommand({ping:1}).ok"]
+      test: ["CMD-SHELL", "mongosh -u \"$$MONGO_INITDB_ROOT_USERNAME\" -p \"$$MONGO_INITDB_ROOT_PASSWORD\" --authenticationDatabase admin --eval 'db.adminCommand({ping:1}).ok' --quiet 2>/dev/null | grep -q 1"]
       interval: 10s
-      timeout: 5s
-      retries: 10
-      start_period: 20s
+      timeout: 8s
+      retries: 15
+      start_period: 30s
 
   mongo2:
     image: mongo:7
@@ -38,11 +38,11 @@ services:
     networks:
       - app
     healthcheck:
-      test: ["CMD", "mongosh", "--quiet", "--eval", "db.runCommand({ping:1}).ok"]
+      test: ["CMD-SHELL", "mongosh -u \"$$MONGO_INITDB_ROOT_USERNAME\" -p \"$$MONGO_INITDB_ROOT_PASSWORD\" --authenticationDatabase admin --eval 'db.adminCommand({ping:1}).ok' --quiet 2>/dev/null | grep -q 1"]
       interval: 10s
-      timeout: 5s
-      retries: 10
-      start_period: 20s
+      timeout: 8s
+      retries: 15
+      start_period: 30s
 
   mongo3:
     image: mongo:7
@@ -57,11 +57,11 @@ services:
     networks:
       - app
     healthcheck:
-      test: ["CMD", "mongosh", "--quiet", "--eval", "db.runCommand({ping:1}).ok"]
+      test: ["CMD-SHELL", "mongosh -u \"$$MONGO_INITDB_ROOT_USERNAME\" -p \"$$MONGO_INITDB_ROOT_PASSWORD\" --authenticationDatabase admin --eval 'db.adminCommand({ping:1}).ok' --quiet 2>/dev/null | grep -q 1"]
       interval: 10s
-      timeout: 5s
-      retries: 10
-      start_period: 20s
+      timeout: 8s
+      retries: 15
+      start_period: 30s
 
   # One-shot init container: configures the replica set then exits (restart: no).
   mongo-rs-init:
