@@ -1,4 +1,4 @@
-import CheckoutLeadModel from '../models/CheckoutLead.model.js';
+import CheckoutLeadModel from '../models/checkoutLead.model.js';
 import { sendAbandonedCartRecovery } from './whatsapp.js';
 import { getSettings } from './siteSettings.js';
 import { logger } from './logger.js';

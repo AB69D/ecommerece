@@ -1,5 +1,5 @@
-import OrderModel from '../models/Order.model.js';
-import { SiteSettings } from '../models/SiteSettings.model.js';
+import OrderModel from '../models/order.model.js';
+import { SiteSettings } from '../models/siteSettings.model.js';
 import { getSettings, invalidateSettingsCache } from '../lib/siteSettings.js';
 import {
     pathaoCreateOrder,
