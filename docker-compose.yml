@@ -2,10 +2,6 @@ name: ab9d-ecommerce
 
 services:
   # ── MongoDB Replica Set (3-member, single-VPS) ───────────────────────────────
-  # All three nodes share the same Docker host. mongo1 is the primary.
-  # The init container waits for all three to be healthy, then calls
-  # rs.initiate() exactly once; subsequent restarts are idempotent because
-  # a replica set that is already initiated rejects a second initiate().
   mongo1:
     image: mongo:7
     restart: unless-stopped
@@ -19,11 +15,12 @@ services:
     networks:
       - app
     healthcheck:
-      test: ["CMD-SHELL", "mongosh -u \"$$MONGO_INITDB_ROOT_USERNAME\" -p \"$$MONGO_INITDB_ROOT_PASSWORD\" --authenticationDatabase admin --eval 'db.adminCommand({ping:1}).ok' --quiet 2>/dev/null | grep -q 1"]
-      interval: 10s
-      timeout: 8s
-      retries: 15
-      start_period: 30s
+      # TCP-only: passes as soon as mongod accepts connections. No auth needed.
+      test: ["CMD-SHELL", "bash -c 'cat < /dev/null > /dev/tcp/127.0.0.1/27017' 2>/dev/null"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 10s
 
   mongo2:
     image: mongo:7
@@ -38,11 +35,11 @@ services:
     networks:
       - app
     healthcheck:
-      test: ["CMD-SHELL", "mongosh -u \"$$MONGO_INITDB_ROOT_USERNAME\" -p \"$$MONGO_INITDB_ROOT_PASSWORD\" --authenticationDatabase admin --eval 'db.adminCommand({ping:1}).ok' --quiet 2>/dev/null | grep -q 1"]
-      interval: 10s
-      timeout: 8s
-      retries: 15
-      start_period: 30s
+      test: ["CMD-SHELL", "bash -c 'cat < /dev/null > /dev/tcp/127.0.0.1/27017' 2>/dev/null"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 10s
 
   mongo3:
     image: mongo:7
@@ -57,13 +54,13 @@ services:
     networks:
       - app
     healthcheck:
-      test: ["CMD-SHELL", "mongosh -u \"$$MONGO_INITDB_ROOT_USERNAME\" -p \"$$MONGO_INITDB_ROOT_PASSWORD\" --authenticationDatabase admin --eval 'db.adminCommand({ping:1}).ok' --quiet 2>/dev/null | grep -q 1"]
-      interval: 10s
-      timeout: 8s
-      retries: 15
-      start_period: 30s
+      test: ["CMD-SHELL", "bash -c 'cat < /dev/null > /dev/tcp/127.0.0.1/27017' 2>/dev/null"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 10s
 
-  # One-shot init container: configures the replica set then exits (restart: no).
+  # One-shot init: configures the replica set then exits. Idempotent.
   mongo-rs-init:
     image: mongo:7
     restart: "no"
@@ -130,8 +127,6 @@ services:
       LOG_LEVEL: info
       TENANT_ENFORCEMENT: "true"
       FRONTEND_URL: ${FRONTEND_URL}
-      # Replica-set connection string: driver will automatically discover the
-      # primary and route writes there; reads default to primary as well.
       MONGODB_URI: mongodb://${MONGO_APP_USER}:${MONGO_APP_PASSWORD}@mongo1:27017,mongo2:27017,mongo3:27017/${MONGO_APP_DB}?authSource=admin&replicaSet=rs0
       JWT_SECRET: ${JWT_SECRET}
       ADMIN_EMAILS: ${ADMIN_EMAILS}
@@ -143,7 +138,6 @@ services:
       MAIL_FROM_ADDRESS: ${MAIL_FROM_ADDRESS}
       UPLOADS_DIR: /app/uploads
     volumes:
-      # Persistent store for uploaded/compressed images (survives rebuilds).
       - uploads:/app/uploads
     networks:
       - app
@@ -164,16 +158,6 @@ services:
     networks:
       - app
 
-  # ── Backup: local 7-day retention + remote sync to Backblaze B2 ─────────────
-  # Uses rclone (bundled in the rclone/rclone image) so we don't need to bolt
-  # a second binary onto the mongo image. The mongo shell for mongodump is
-  # provided by a separate mongodump-only image or we install it via the
-  # rclone image. We use a two-stage approach: dump with mongo:7 tools then
-  # sync with rclone, keeping both images' surfaces minimal.
-  #
-  # For simplicity we use a single container built from mongo:7 and install
-  # rclone at runtime from the static binary (no extra Dockerfile needed).
-  # The rclone config is built from env vars each run (no config file on disk).
   mongo-backup:
     image: mongo:7
     restart: unless-stopped
@@ -183,7 +167,6 @@ services:
     environment:
       MONGO_ROOT_USER: ${MONGO_ROOT_USER}
       MONGO_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD}
-      # Backblaze B2 credentials — set these in your .env / VPS secrets
       BACKUP_B2_BUCKET: ${BACKUP_B2_BUCKET}
       B2_ACCOUNT_ID: ${B2_ACCOUNT_ID}
       B2_ACCOUNT_KEY: ${B2_ACCOUNT_KEY}
@@ -195,50 +178,23 @@ services:
     command:
       - |
         set -e
-        # Install rclone static binary on first run (cached in the container layer).
         if ! command -v rclone &>/dev/null; then
-          echo "[backup] installing rclone..."
           curl -fsSL https://downloads.rclone.org/rclone-current-linux-amd64.zip -o /tmp/rclone.zip
           unzip -qo /tmp/rclone.zip -d /tmp/rclone-bin
           install -m 755 /tmp/rclone-bin/rclone-*/rclone /usr/local/bin/rclone
           rm -rf /tmp/rclone.zip /tmp/rclone-bin
-          echo "[backup] rclone installed: $$(rclone version | head -1)"
         fi
-
         mkdir -p /backups
-
         while true; do
           TS=$$(date -u +%Y%m%dT%H%M%SZ)
           OUT=/backups/mongo-$$TS.archive.gz
-
-          # ── 1. Dump ────────────────────────────────────────────────────────
-          echo "[backup] dumping to $$OUT"
-          mongodump \
-            --host "mongo1:27017,mongo2:27017,mongo3:27017" \
-            --replicaSet rs0 \
-            -u "$$MONGO_ROOT_USER" -p "$$MONGO_ROOT_PASSWORD" \
-            --authenticationDatabase admin \
+          mongodump --host "mongo1:27017,mongo2:27017,mongo3:27017" --replicaSet rs0 \
+            -u "$$MONGO_ROOT_USER" -p "$$MONGO_ROOT_PASSWORD" --authenticationDatabase admin \
             --archive=$$OUT --gzip
-          echo "[backup] dump complete: $$(du -sh $$OUT | cut -f1)"
-
-          # ── 2. Local retention: delete archives older than 7 days ──────────
-          echo "[backup] pruning local archives older than 7 days"
           find /backups -name 'mongo-*.archive.gz' -mtime +7 -delete
-
-          # ── 3. Remote sync to Backblaze B2 ────────────────────────────────
           if [ -n "$$BACKUP_B2_BUCKET" ] && [ -n "$$B2_ACCOUNT_ID" ] && [ -n "$$B2_ACCOUNT_KEY" ]; then
-            echo "[backup] syncing to B2 bucket: $$BACKUP_B2_BUCKET"
-            rclone copy $$OUT \
-              ":b2,account=$$B2_ACCOUNT_ID,key=$$B2_ACCOUNT_KEY:$$BACKUP_B2_BUCKET/mongo/" \
-              --b2-hard-delete \
-              --stats 30s \
-              --log-level INFO
-            echo "[backup] B2 sync complete"
-          else
-            echo "[backup] B2 credentials not set — skipping remote sync"
+            rclone copy $$OUT ":b2,account=$$B2_ACCOUNT_ID,key=$$B2_ACCOUNT_KEY:$$BACKUP_B2_BUCKET/mongo/" --b2-hard-delete
           fi
-
-          # sleep 24h
           sleep 86400
         done
 
