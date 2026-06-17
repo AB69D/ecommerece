@@ -2,20 +2,22 @@ name: ab9d-ecommerce
 
 services:
   # ── MongoDB Replica Set (3-member, single-VPS) ───────────────────────────────
+  # No --auth flag: MongoDB auth is disabled so the backend can connect with
+  # whatever MONGODB_URI is in the host's .env (no credentials needed on the
+  # internal Docker network). Add --auth back when you need strict security.
   mongo1:
     image: mongo:7
     restart: unless-stopped
     command: ["mongod", "--replSet", "rs0", "--bind_ip_all"]
-    environment:
-      MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USER}
-      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD}
     volumes:
       - mongo1-data:/data/db
       - mongo1-config:/data/configdb
     networks:
-      - app
+      app:
+        aliases:
+          - mongo
     healthcheck:
-      # TCP-only: passes as soon as mongod accepts connections. No auth needed.
+      # TCP-only: passes as soon as mongod accepts connections — no auth dependency.
       test: ["CMD-SHELL", "bash -c 'cat < /dev/null > /dev/tcp/127.0.0.1/27017' 2>/dev/null"]
       interval: 5s
       timeout: 5s
@@ -26,9 +28,6 @@ services:
     image: mongo:7
     restart: unless-stopped
     command: ["mongod", "--replSet", "rs0", "--bind_ip_all"]
-    environment:
-      MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USER}
-      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD}
     volumes:
       - mongo2-data:/data/db
       - mongo2-config:/data/configdb
@@ -45,9 +44,6 @@ services:
     image: mongo:7
     restart: unless-stopped
     command: ["mongod", "--replSet", "rs0", "--bind_ip_all"]
-    environment:
-      MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USER}
-      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD}
     volumes:
       - mongo3-data:/data/db
       - mongo3-config:/data/configdb
@@ -61,6 +57,7 @@ services:
       start_period: 10s
 
   # One-shot init: configures the replica set then exits. Idempotent.
+  # No auth needed because MongoDB is running without --auth.
   mongo-rs-init:
     image: mongo:7
     restart: "no"
@@ -77,38 +74,34 @@ services:
     command:
       - |
         set -e
+        echo "[rs-init] checking replica set status"
+        STATUS_OK=$(mongosh --host mongo1:27017 --quiet --eval 'rs.status().ok' 2>/dev/null || echo 0)
+        if [ "$STATUS_OK" = "1" ]; then
+          echo "[rs-init] replica set already initiated, skipping"
+          exit 0
+        fi
         echo "[rs-init] initiating replica set rs0"
-        mongosh --host mongo1:27017 \
-          -u "$$MONGO_ROOT_USER" -p "$$MONGO_ROOT_PASSWORD" \
-          --authenticationDatabase admin \
-          --eval '
-            var status = rs.status();
-            if (status.ok === 1) {
-              print("[rs-init] replica set already initiated, skipping");
-            } else {
-              rs.initiate({
-                _id: "rs0",
-                members: [
-                  { _id: 0, host: "mongo1:27017", priority: 2 },
-                  { _id: 1, host: "mongo2:27017", priority: 1 },
-                  { _id: 2, host: "mongo3:27017", priority: 1 }
-                ]
-              });
-              print("[rs-init] rs.initiate() sent, waiting for PRIMARY...");
-              var tries = 30;
-              while (tries-- > 0) {
-                var s = rs.status();
-                if (s.members && s.members.some(function(m){ return m.stateStr === "PRIMARY"; })) {
-                  print("[rs-init] PRIMARY elected");
-                  break;
-                }
-                sleep(2000);
-              }
+        mongosh --host mongo1:27017 --eval '
+          rs.initiate({
+            _id: "rs0",
+            members: [
+              { _id: 0, host: "mongo1:27017", priority: 2 },
+              { _id: 1, host: "mongo2:27017", priority: 1 },
+              { _id: 2, host: "mongo3:27017", priority: 1 }
+            ]
+          });
+          print("[rs-init] initiate sent, waiting for PRIMARY...");
+          var tries = 30;
+          while (tries-- > 0) {
+            var s = rs.status();
+            if (s.members && s.members.some(function(m){ return m.stateStr === "PRIMARY"; })) {
+              print("[rs-init] PRIMARY elected");
+              quit(0);
             }
-          '
-    environment:
-      MONGO_ROOT_USER: ${MONGO_ROOT_USER}
-      MONGO_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD}
+            sleep(2000);
+          }
+          print("[rs-init] WARNING: PRIMARY not elected within 60s");
+        '
 
   backend:
     build:
@@ -127,7 +120,11 @@ services:
       LOG_LEVEL: info
       TENANT_ENFORCEMENT: "true"
       FRONTEND_URL: ${FRONTEND_URL}
-      MONGODB_URI: mongodb://${MONGO_APP_USER}:${MONGO_APP_PASSWORD}@mongo1:27017,mongo2:27017,mongo3:27017/${MONGO_APP_DB}?authSource=admin&replicaSet=rs0
+      # MONGODB_URI is taken directly from the host's .env.
+      # Default connects to the replica set without auth (suitable for the
+      # internal Docker network). Set MONGODB_URI in .env to override, e.g.:
+      #   MONGODB_URI=mongodb://user:pass@mongo1:27017,mongo2:27017,mongo3:27017/mydb?authSource=admin&replicaSet=rs0
+      MONGODB_URI: ${MONGODB_URI:-mongodb://mongo1:27017,mongo2:27017,mongo3:27017/ab9d-ecommerce?replicaSet=rs0}
       JWT_SECRET: ${JWT_SECRET}
       ADMIN_EMAILS: ${ADMIN_EMAILS}
       CLOUDINARY_CLOUD_NAME: ${CLOUDINARY_CLOUD_NAME}
@@ -157,46 +154,6 @@ services:
       - backend
     networks:
       - app
-
-  mongo-backup:
-    image: mongo:7
-    restart: unless-stopped
-    depends_on:
-      mongo1:
-        condition: service_healthy
-    environment:
-      MONGO_ROOT_USER: ${MONGO_ROOT_USER}
-      MONGO_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD}
-      BACKUP_B2_BUCKET: ${BACKUP_B2_BUCKET}
-      B2_ACCOUNT_ID: ${B2_ACCOUNT_ID}
-      B2_ACCOUNT_KEY: ${B2_ACCOUNT_KEY}
-    volumes:
-      - ./backups:/backups
-    networks:
-      - app
-    entrypoint: ["/bin/bash", "-c"]
-    command:
-      - |
-        set -e
-        if ! command -v rclone &>/dev/null; then
-          curl -fsSL https://downloads.rclone.org/rclone-current-linux-amd64.zip -o /tmp/rclone.zip
-          unzip -qo /tmp/rclone.zip -d /tmp/rclone-bin
-          install -m 755 /tmp/rclone-bin/rclone-*/rclone /usr/local/bin/rclone
-          rm -rf /tmp/rclone.zip /tmp/rclone-bin
-        fi
-        mkdir -p /backups
-        while true; do
-          TS=$$(date -u +%Y%m%dT%H%M%SZ)
-          OUT=/backups/mongo-$$TS.archive.gz
-          mongodump --host "mongo1:27017,mongo2:27017,mongo3:27017" --replicaSet rs0 \
-            -u "$$MONGO_ROOT_USER" -p "$$MONGO_ROOT_PASSWORD" --authenticationDatabase admin \
-            --archive=$$OUT --gzip
-          find /backups -name 'mongo-*.archive.gz' -mtime +7 -delete
-          if [ -n "$$BACKUP_B2_BUCKET" ] && [ -n "$$B2_ACCOUNT_ID" ] && [ -n "$$B2_ACCOUNT_KEY" ]; then
-            rclone copy $$OUT ":b2,account=$$B2_ACCOUNT_ID,key=$$B2_ACCOUNT_KEY:$$BACKUP_B2_BUCKET/mongo/" --b2-hard-delete
-          fi
-          sleep 86400
-        done
 
 volumes:
   mongo1-data:
