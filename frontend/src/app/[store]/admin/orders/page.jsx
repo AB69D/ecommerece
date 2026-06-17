@@ -888,6 +888,12 @@ export default function AdminOrdersPage() {
                                             <span className="font-medium text-emerald-600">-{symbol}{selectedOrder.discount}</span>
                                         </div>
                                     )}
+                                    {selectedOrder.vatAmount > 0 && (
+                                        <div className="flex justify-between text-sm">
+                                            <span className="text-gray-500">VAT ({selectedOrder.vatRate}%)</span>
+                                            <span className="font-medium text-indigo-700">+{symbol}{selectedOrder.vatAmount}</span>
+                                        </div>
+                                    )}
                                     <div className="flex justify-between text-sm">
                                         <span className="text-gray-500">Payment Method</span>
                                         <span className="font-medium capitalize">
@@ -906,6 +912,36 @@ export default function AdminOrdersPage() {
                                         <span>Total Amount</span>
                                         <span className="text-emerald-700">{symbol}{selectedOrder.totalAmount}</span>
                                     </div>
+                                    {selectedOrder.vatInvoiceNo && (
+                                        <div className="flex items-center justify-between pt-3 border-t border-dashed border-indigo-200">
+                                            <div>
+                                                <p className="text-xs text-gray-400 mb-0.5">VAT Invoice</p>
+                                                <p className="text-sm font-mono font-semibold text-indigo-700">{selectedOrder.vatInvoiceNo}</p>
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={async () => {
+                                                    try {
+                                                        const res = await authFetch(
+                                                            `/api/admin/vat/invoices/${selectedOrder.vatInvoiceId}?format=html`
+                                                        );
+                                                        const data = await res.json();
+                                                        const html = data.data?.html || data.data;
+                                                        if (html && typeof html === 'string') {
+                                                            const win = window.open("", "_blank");
+                                                            win.document.write(html);
+                                                            win.document.close();
+                                                        }
+                                                    } catch {
+                                                        /* ignore */
+                                                    }
+                                                }}
+                                                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-lg hover:bg-indigo-100 transition-colors"
+                                            >
+                                                <FiEye className="w-3.5 h-3.5" /> View Invoice
+                                            </button>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
 

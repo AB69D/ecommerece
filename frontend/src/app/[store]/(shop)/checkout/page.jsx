@@ -459,7 +459,14 @@ export default function CheckoutPage() {
     const afterDiscount = subtotal - totalDiscount;
 
     const couponDiscount = Math.min(appliedCoupon?.discount || 0, afterDiscount);
-    const totalAmount = Math.max(0, afterDiscount - couponDiscount) + deliveryCharges[formData.deliveryArea];
+
+    // VAT — only shown when the site has vatEnabled + a positive rate.
+    const vatEnabled = Boolean(settings?.vat?.enabled && settings?.vat?.rate > 0);
+    const vatRate = vatEnabled ? (Number(settings?.vat?.rate) || 0) : 0;
+    const netAfterCoupon = Math.max(0, afterDiscount - couponDiscount);
+    const vatAmount = vatEnabled ? Math.round(netAfterCoupon * vatRate / 100 * 100) / 100 : 0;
+
+    const totalAmount = netAfterCoupon + deliveryCharges[formData.deliveryArea] + vatAmount;
 
     if (orderPlaced && orderData) {
         return (
@@ -495,6 +502,34 @@ export default function CheckoutPage() {
                         Continue Shopping
                     </button>
                 </div>
+                {orderData.vatInvoiceNo && (
+                    <button
+                        type="button"
+                        onClick={async () => {
+                            try {
+                                const res = await fetch(`/api/client/order/${orderData.orderId}/vat-invoice`, {
+                                    headers: { ...(store ? { 'X-Tenant': store } : {}) },
+                                });
+                                const data = await res.json();
+                                if (data.success && data.data?.html) {
+                                    const win = window.open("", "_blank");
+                                    win.document.write(data.data.html);
+                                    win.document.close();
+                                } else if (data.success && typeof data.data === 'string') {
+                                    const win = window.open("", "_blank");
+                                    win.document.write(data.data);
+                                    win.document.close();
+                                }
+                            } catch {
+                                /* ignore — user can try again */
+                            }
+                        }}
+                        className="mt-2 inline-flex items-center gap-2 px-5 py-2.5 rounded-lg border border-indigo-300 text-indigo-700 bg-indigo-50 hover:bg-indigo-100 text-sm font-medium transition-colors"
+                    >
+                        <span>Download VAT Invoice (Mushak 6.3)</span>
+                        <span className="text-xs font-mono text-indigo-500">{orderData.vatInvoiceNo}</span>
+                    </button>
+                )}
                 {wa.enabled && (
                     <a
                         href={wa.chatUrl(
@@ -1027,6 +1062,12 @@ export default function CheckoutPage() {
                                 <span>Shipping ({deliveryLabels[formData.deliveryArea]})</span>
                                 <span>{symbol}{deliveryCharges[formData.deliveryArea]}</span>
                             </div>
+                            {vatEnabled && vatAmount > 0 && (
+                                <div className="flex justify-between text-indigo-700">
+                                    <span>VAT ({vatRate}%)</span>
+                                    <span>+{symbol}{vatAmount.toFixed(2)}</span>
+                                </div>
+                            )}
                             <div className="flex justify-between font-bold text-gray-800 text-lg">
                                 <span>Total</span>
                                 <span>{symbol}{totalAmount}</span>

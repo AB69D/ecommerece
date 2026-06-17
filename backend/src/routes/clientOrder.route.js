@@ -11,10 +11,13 @@ import { evaluateCoupon } from '../lib/coupon.js';
 import { recordStockMovements } from '../lib/stockLedger.js';
 import { sendOrderConfirmationEmail } from '../lib/orderEmail.js';
 import { notifyAdminNewOrder, notifyCustomerOrderCreated } from '../lib/notify.js';
-import { isFeatureEnabled } from '../lib/siteSettings.js';
+import { isFeatureEnabled, getSettings, invalidateSettingsCache } from '../lib/siteSettings.js';
 import { sendWhatsAppTemplate } from '../lib/whatsapp.js';
 import { optionalCustomer, requireCustomer } from '../middlewares/clientAuth.middleware.js';
 import { clientReturnRequestController } from '../controllers/order.controller.js';
+import { calculateVat, generateMushakInvoiceNo, generateMushak63Html } from '../lib/vat.js';
+import VatInvoiceModel from '../models/VatInvoice.model.js';
+import { logger } from '../lib/logger.js';
 
 const clientOrderRouter = Router();
 
@@ -400,6 +403,83 @@ clientOrderRouter.post('/create', optionalCustomer, async (req, res) => {
             }
         }
 
+        // ── VAT Invoice generation ────────────────────────────────────────────
+        // Fire-and-forget: VAT invoice failure NEVER blocks the checkout response.
+        try {
+            const vatEnabled = await isFeatureEnabled('vatEnabled', false);
+            if (vatEnabled) {
+                const vatSettings = (await getSettings())?.vat;
+                if (vatSettings?.rate > 0 && vatSettings?.registrationNumber) {
+                    const { taxableAmount, vatAmount } = calculateVat(
+                        subtotal,
+                        discount || 0,
+                        vatSettings.rate,
+                    );
+                    // Atomically increment mushakCounter to get a unique sequential number
+                    const updatedSettings = await SiteSettings.findOneAndUpdate(
+                        { tenantId: req.tenantId },
+                        { $inc: { 'vat.mushakCounter': 1 } },
+                        { new: true },
+                    );
+                    const invoiceNo = generateMushakInvoiceNo(
+                        vatSettings.mushakPrefix || 'MSHK',
+                        updatedSettings.vat.mushakCounter,
+                    );
+                    const buyerAddress = [order.shippingAddress, order.city].filter(Boolean).join(', ');
+                    const vatInvoice = await VatInvoiceModel.create({
+                        tenantId: req.tenantId,
+                        invoiceNo,
+                        orderId: order._id,
+                        invoiceDate: new Date(),
+                        sellerBin: vatSettings.registrationNumber,
+                        sellerName: vatSettings.businessName || '',
+                        sellerAddress: vatSettings.businessAddress || '',
+                        buyerName: order.customerName || '',
+                        buyerPhone: order.customerPhone || '',
+                        buyerAddress,
+                        buyerBin: '',
+                        items: orderItems.map(item => {
+                            const lineSubtotal = (item.price || 0) * (item.quantity || 1);
+                            const lineVat = Math.round(lineSubtotal * vatSettings.rate / 100 * 100) / 100;
+                            return {
+                                name: item.productName || '',
+                                quantity: item.quantity || 1,
+                                unitPrice: item.price || 0,
+                                discountAmount: 0,
+                                taxableAmount: lineSubtotal,
+                                vatRate: vatSettings.rate,
+                                vatAmount: lineVat,
+                                total: lineSubtotal + lineVat,
+                            };
+                        }),
+                        subtotal,
+                        discountAmount: discount || 0,
+                        taxableAmount,
+                        vatRate: vatSettings.rate,
+                        vatAmount,
+                        deliveryCharge: deliveryCharge || 0,
+                        grandTotal: totalAmount + vatAmount,
+                        paymentMethod: order.paymentMethod || '',
+                    });
+                    await OrderModel.updateOne(
+                        { _id: order._id },
+                        {
+                            $set: {
+                                vatAmount,
+                                vatRate: vatSettings.rate,
+                                taxableAmount,
+                                vatInvoiceId: vatInvoice._id,
+                                vatInvoiceNo: invoiceNo,
+                            },
+                        },
+                    );
+                    await invalidateSettingsCache();
+                }
+            }
+        } catch (vatErr) {
+            logger.error({ err: vatErr }, 'VAT invoice generation failed for order ' + orderId);
+        }
+
         // Record the stock draw-down in the ledger (best-effort, feature-gated).
         // Customer-driven, so there is no actor.
         await recordStockMovements(
@@ -660,6 +740,56 @@ clientOrderRouter.post('/:orderId/resend-otp', async (req, res) => {
 // The customer must own the order (customerId match), it must be 'delivered',
 // and the returnAvailableUntil window must not have passed.
 clientOrderRouter.post('/:orderId/return-request', requireCustomer, clientReturnRequestController);
+
+// ── VAT invoice (customer-facing) ─────────────────────────────────────────────
+// Returns the Mushak 6.3 HTML invoice for a given order. The caller must
+// supply ?phone=<order-phone> as a basic capability check (no auth needed).
+// ?format=json returns JSON instead of HTML.
+clientOrderRouter.get('/:orderId/vat-invoice', async (req, res) => {
+    try {
+        const { orderId: orderParam } = req.params;
+        const { phone, format } = req.query;
+
+        let orderQuery = {};
+        if (orderParam.length === 24 && /^[0-9a-f]+$/i.test(orderParam)) {
+            // Could be a MongoDB ObjectId — try both
+            orderQuery = { orderId: orderParam };
+        } else {
+            orderQuery = { orderId: orderParam };
+        }
+
+        const order = await OrderModel.findOne(orderQuery).lean();
+        if (!order) {
+            return res.status(404).json({ message: 'Order not found', success: false, error: true });
+        }
+
+        // Phone check — require caller to know the phone number on the order
+        if (phone && order.customerPhone) {
+            if (String(phone).trim() !== String(order.customerPhone).trim()) {
+                return res.status(403).json({ message: 'Phone number does not match this order', success: false, error: true });
+            }
+        }
+
+        if (!order.vatInvoiceId) {
+            return res.status(404).json({ message: 'No VAT invoice has been generated for this order', success: false, error: true });
+        }
+
+        const invoice = await VatInvoiceModel.findById(order.vatInvoiceId).lean();
+        if (!invoice) {
+            return res.status(404).json({ message: 'VAT invoice record not found', success: false, error: true });
+        }
+
+        if (format === 'json') {
+            return res.json({ message: 'VAT invoice', data: invoice, success: true, error: false });
+        }
+
+        res.setHeader('Content-Type', 'text/html; charset=utf-8');
+        return res.send(generateMushak63Html(invoice));
+    } catch (err) {
+        logger.error({ err }, 'VAT invoice fetch error');
+        res.status(500).json({ message: err.message, success: false, error: true });
+    }
+});
 
 clientOrderRouter.get('/:orderId', async (req, res) => {
     try {

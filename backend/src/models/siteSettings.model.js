@@ -60,6 +60,8 @@ const siteSettingsSchema = new mongoose.Schema(
             flashSales: { type: Boolean, default: false },
             codPartialDeposit: { type: Boolean, default: false },
             abandonedCartRecovery: { type: Boolean, default: false },
+            multiWarehouse: { type: Boolean, default: false },
+            vatEnabled: { type: Boolean, default: false },
         },
 
         // ── Announcement bar ──────────────────────────────────────────────────
@@ -302,6 +304,34 @@ const siteSettingsSchema = new mongoose.Schema(
                 apiKey: { type: String, default: '' },
                 secretKey: { type: String, default: '' },
             },
+        },
+
+        // ── Multi-warehouse inventory settings ─────────────────────────────
+        // Only relevant when features.multiWarehouse is true. defaultLocationId
+        // is set by the stock migration script when the feature is first enabled.
+        inventory: {
+            defaultLocationId: { type: mongoose.Schema.Types.ObjectId, ref: 'Location', default: null },
+            lowStockThreshold: { type: Number, default: 5 }, // per-location low-stock alert threshold
+            autoRouteOrders: { type: Boolean, default: false }, // auto-select location with highest available stock
+        },
+
+        // ── VAT / Mushak configuration ─────────────────────────────────────────
+        // Populated once admin enables VAT for the tenant. mushakCounter is
+        // atomically incremented ($inc) at each invoice generation so numbers
+        // are sequential with no gaps across concurrent requests.
+        vat: {
+            registrationNumber: { type: String, default: '' },     // e-BIN (13 digits)
+            businessName: { type: String, default: '' },
+            businessAddress: { type: String, default: '' },
+            sectorType: {
+                type: String,
+                enum: ['retail', 'restaurant', 'pharmacy', 'digital', 'export', 'other'],
+                default: 'retail',
+            },
+            rate: { type: Number, default: 15 },                   // percentage, e.g. 15
+            registrationDate: { type: Date, default: null },
+            mushakPrefix: { type: String, default: 'MSHK' },       // invoice number prefix
+            mushakCounter: { type: Number, default: 0 },            // auto-incremented
         },
 
         maintenanceMode: { type: Boolean, default: false },

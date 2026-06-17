@@ -5,7 +5,7 @@ import {
     FiSettings, FiImage, FiUpload, FiTrash2, FiPlus, FiCheck, FiAlertCircle,
     FiType, FiPhone, FiShare2, FiSearch, FiLayout, FiSave, FiX,
     FiToggleRight, FiPrinter, FiTag, FiActivity, FiDroplet, FiRotateCcw, FiCreditCard,
-    FiTruck,
+    FiTruck, FiPercent,
 } from "react-icons/fi";
 import { getSiteSettings, updateSiteSettings, uploadSiteImage } from "@/services/siteSettings";
 import { getFooterSettings, updateFooterSettings } from "@/services/footer";
@@ -29,6 +29,7 @@ const TABS = [
     { id: "barcode", label: "Barcode & Labels", icon: <FiTag className="w-4 h-4" /> },
     { id: "integrations", label: "Analytics & WhatsApp", icon: <FiActivity className="w-4 h-4" /> },
     { id: "couriers", label: "Couriers", icon: <FiTruck className="w-4 h-4" /> },
+    { id: "vat", label: "VAT / মূসক", icon: <FiPercent className="w-4 h-4" /> },
     { id: "footer", label: "Footer", icon: <FiLayout className="w-4 h-4" /> },
 ];
 
@@ -50,6 +51,7 @@ const FEATURE_FLAGS = [
     ["codOtpVerification", "COD phone verification (OTP)", "Send a WhatsApp OTP after every Cash on Delivery order to confirm the customer's phone number and reduce fake orders."],
     ["codPartialDeposit", "COD partial deposit", "Ask COD customers to send a small advance via bKash/Nagad/Rocket to reduce fake orders. Admin verifies the transaction ID manually."],
     ["abandonedCartRecovery", "Abandoned cart recovery", "Automatically send a WhatsApp reminder to customers who started checkout but never completed their order. Requires WhatsApp to be enabled."],
+    ["multiWarehouse", "Multi-warehouse Inventory", "Track stock per warehouse or location. When enabled, a Default Warehouse is set up and all stock movements are recorded per location. Go to Locations to manage warehouses."],
 ];
 
 const DAYS_OF_WEEK = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
@@ -357,6 +359,7 @@ export default function SettingsPage() {
             [provider]: { ...(p.couriers?.[provider] || {}), ...patch },
         },
     }));
+    const setVat = (patch) => setSettings((p) => ({ ...p, vat: { ...(p.vat || {}), ...patch } }));
 
     const save = async () => {
         setSaving(true); setMsg({ type: "", text: "" }); setFieldErrors({});
@@ -495,6 +498,15 @@ export default function SettingsPage() {
                     })),
                 },
                 maintenanceMode: !!settings.maintenanceMode,
+                vat: {
+                    enabled: !!settings.vat?.enabled,
+                    registrationNumber: (settings.vat?.registrationNumber || "").slice(0, 13),
+                    businessName: settings.vat?.businessName || "",
+                    businessAddress: settings.vat?.businessAddress || "",
+                    sectorType: settings.vat?.sectorType || "retail",
+                    rate: Number(settings.vat?.rate) || 15,
+                    mushakPrefix: settings.vat?.mushakPrefix || "INV",
+                },
                 couriers: {
                     pathao: {
                         enabled: !!settings.couriers?.pathao?.enabled,
@@ -1435,6 +1447,136 @@ export default function SettingsPage() {
                         </div>
                     </div>
                 )}
+
+                {tab === "vat" && (() => {
+                    const SECTOR_RATES = {
+                        retail: 15, restaurant: 5, pharmacy: 0, digital: 5, export: 0, other: null,
+                    };
+                    const vatEnabled = !!settings.vat?.enabled;
+                    const vatRate = Number(settings.vat?.rate) || 15;
+                    return (
+                        <div className="space-y-5">
+                            <div className="bg-gray-50 border border-gray-100 rounded-xl p-4 space-y-3">
+                                <div className="flex items-center justify-between flex-wrap gap-3">
+                                    <h3 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                                        <FiPercent className="w-4 h-4" /> VAT / মূসক Settings
+                                    </h3>
+                                    {vatEnabled && (
+                                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700 border border-emerald-200">
+                                            <FiCheck className="w-3 h-3" /> VAT Active — {vatRate}%
+                                        </span>
+                                    )}
+                                </div>
+                                <Toggle
+                                    label="Enable VAT"
+                                    hint="When enabled, a VAT invoice (Mushak 6.3) is auto-generated for each order."
+                                    checked={vatEnabled}
+                                    onChange={(v) => setVat({ enabled: v })}
+                                />
+                            </div>
+
+                            <div className="bg-gray-50 border border-gray-100 rounded-xl p-4 space-y-3">
+                                <h3 className="text-sm font-semibold text-gray-700">Business & Tax Registration</h3>
+                                <Field label="e-BIN / Registration Number" hint="13-digit VAT registration number issued by NBR.">
+                                    <input
+                                        className={inputCls}
+                                        maxLength={13}
+                                        value={settings.vat?.registrationNumber || ""}
+                                        onChange={(e) => setVat({ registrationNumber: e.target.value.replace(/\D/g, "").slice(0, 13) })}
+                                        placeholder="0000000000000"
+                                        inputMode="numeric"
+                                        pattern="[0-9]{13}"
+                                    />
+                                    {(settings.vat?.registrationNumber || "").length > 0 && (settings.vat?.registrationNumber || "").length !== 13 && (
+                                        <span className="block text-xs text-amber-600 mt-1 flex items-center gap-1">
+                                            <FiAlertCircle className="w-3 h-3 shrink-0" /> Must be exactly 13 digits ({(settings.vat?.registrationNumber || "").length} entered)
+                                        </span>
+                                    )}
+                                </Field>
+                                <Field label="Business Name" hint="Printed as the seller name on Mushak 6.3 invoices.">
+                                    <input
+                                        className={inputCls}
+                                        value={settings.vat?.businessName || ""}
+                                        onChange={(e) => setVat({ businessName: e.target.value })}
+                                        placeholder="Your company name"
+                                    />
+                                </Field>
+                                <Field label="Business Address" hint="Printed as the seller address on invoices.">
+                                    <textarea
+                                        rows={2}
+                                        className={inputCls}
+                                        value={settings.vat?.businessAddress || ""}
+                                        onChange={(e) => setVat({ businessAddress: e.target.value })}
+                                        placeholder="123, Dhaka, Bangladesh"
+                                    />
+                                </Field>
+                            </div>
+
+                            <div className="bg-gray-50 border border-gray-100 rounded-xl p-4 space-y-3">
+                                <h3 className="text-sm font-semibold text-gray-700">VAT Rate</h3>
+                                <Field label="Sector Type" hint="Auto-fills the standard VAT rate for your business category.">
+                                    <select
+                                        className={inputCls}
+                                        value={settings.vat?.sectorType || "retail"}
+                                        onChange={(e) => {
+                                            const sector = e.target.value;
+                                            const autoRate = SECTOR_RATES[sector];
+                                            setVat({ sectorType: sector, ...(autoRate !== null ? { rate: autoRate } : {}) });
+                                        }}
+                                    >
+                                        <option value="retail">Retail — 15%</option>
+                                        <option value="restaurant">Restaurant — 5%</option>
+                                        <option value="pharmacy">Pharmacy — 0%</option>
+                                        <option value="digital">Digital Services — 5%</option>
+                                        <option value="export">Export — 0%</option>
+                                        <option value="other">Other / Custom</option>
+                                    </select>
+                                </Field>
+                                <Field label="VAT Rate %" hint="Applied to taxable amount. Change freely for custom rates.">
+                                    <input
+                                        type="number"
+                                        min="0"
+                                        max="100"
+                                        step="0.01"
+                                        className={inputCls}
+                                        value={settings.vat?.rate ?? 15}
+                                        onChange={(e) => setVat({ rate: Number(e.target.value) })}
+                                    />
+                                </Field>
+                                {vatEnabled && vatRate > 0 && (
+                                    <p className="text-xs text-gray-500">
+                                        Preview on a <span className="font-semibold">৳1,000</span> order:{" "}
+                                        <span className="font-semibold text-gray-700">
+                                            VAT = ৳{(1000 * vatRate / 100).toFixed(2)}, Total = ৳{(1000 + 1000 * vatRate / 100).toFixed(2)}
+                                        </span>
+                                    </p>
+                                )}
+                            </div>
+
+                            <div className="bg-gray-50 border border-gray-100 rounded-xl p-4 space-y-3">
+                                <h3 className="text-sm font-semibold text-gray-700">Invoice Numbering</h3>
+                                <Field label="Invoice Prefix" hint="Prepended to each Mushak invoice number, e.g. &quot;MSHK&quot; → MSHK-2026-000001.">
+                                    <input
+                                        className={`${inputCls} uppercase font-mono`}
+                                        maxLength={10}
+                                        value={settings.vat?.mushakPrefix || "INV"}
+                                        onChange={(e) => setVat({ mushakPrefix: e.target.value.toUpperCase().replace(/[^A-Z0-9-]/g, "") })}
+                                        placeholder="INV"
+                                    />
+                                </Field>
+                                <p className="text-xs text-gray-400">
+                                    Sample: <span className="font-mono font-semibold text-gray-600">
+                                        {(settings.vat?.mushakPrefix || "INV").toUpperCase()}-{new Date().getFullYear()}-000001
+                                    </span>
+                                </p>
+                                <p className="text-xs text-gray-400">
+                                    The counter increments automatically and is never reset.
+                                    View all invoices on the <a href="vat" className="text-indigo-600 hover:underline">VAT Invoices</a> page.
+                                </p>
+                            </div>
+                        </div>
+                    );
+                })()}
 
                 {tab === "footer" && (
                     <>

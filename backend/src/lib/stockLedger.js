@@ -1,3 +1,4 @@
+import mongoose from 'mongoose';
 import StockMovementModel from '../models/stockMovement.model.js';
 import ProductModel from '../models/product.model.js';
 import { isFeatureEnabled } from './siteSettings.js';
@@ -71,4 +72,55 @@ export const actorFromReq = (req) => {
     const a = req?.adminDoc;
     if (!a) return { id: null, username: null, fullName: null };
     return { id: String(a._id), username: a.username, fullName: a.fullName || a.username };
+};
+
+// Return total stock figures for a single product variant across all locations.
+//
+// When multiWarehouse is enabled the authoritative stock lives in LocationStock
+// documents, so we SUM across them. Otherwise we fall back to the flat
+// product.weights[weightIndex].stock field.
+//
+//   returns: { stock, reserved, available }
+export const getTotalStockForVariant = async (tenantId, productId, weightIndex) => {
+    try {
+        const mwEnabled = await isFeatureEnabled('multiWarehouse', false);
+
+        if (mwEnabled) {
+            // Lazy import to avoid circular-dependency risk at module load time
+            const { LocationStockModel } = await import('../models/LocationStock.model.js');
+            const result = await LocationStockModel.aggregate([
+                {
+                    $match: {
+                        tenantId: new mongoose.Types.ObjectId(tenantId),
+                        productId: new mongoose.Types.ObjectId(productId),
+                        weightIndex: Number(weightIndex),
+                    },
+                },
+                {
+                    $group: {
+                        _id: null,
+                        total: { $sum: '$stock' },
+                        reserved: { $sum: '$reservedQty' },
+                    },
+                },
+            ]);
+
+            if (result[0]) {
+                const { total, reserved } = result[0];
+                return { stock: total, reserved, available: Math.max(0, total - reserved) };
+            }
+            return { stock: 0, reserved: 0, available: 0 };
+        }
+
+        // Fallback: read from flat product.weights[weightIndex].stock
+        const product = await ProductModel.findOne(
+            { _id: new mongoose.Types.ObjectId(productId), tenantId: new mongoose.Types.ObjectId(tenantId) },
+        ).select('weights').lean();
+
+        const stock = product?.weights?.[Number(weightIndex)]?.stock ?? 0;
+        return { stock, reserved: 0, available: stock };
+    } catch (err) {
+        logger.error({ err }, 'getTotalStockForVariant failed');
+        return { stock: 0, reserved: 0, available: 0 };
+    }
 };

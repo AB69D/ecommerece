@@ -5,6 +5,7 @@ import Link from "@/components/StoreLink";
 import {
     FiDollarSign, FiShoppingCart, FiPackage, FiAlertTriangle, FiTrendingUp, FiTrendingDown,
     FiGrid, FiTruck, FiStar, FiArrowRight, FiShoppingBag, FiGlobe, FiUsers, FiCreditCard,
+    FiMapPin,
 } from "react-icons/fi";
 import { authFetch } from "@/services/api";
 import { getDashboardOverview } from "@/services/analytics";
@@ -53,6 +54,75 @@ function StatCard({ icon, label, value, accent, growth }) {
                     {Math.abs(growth)}% <span className="text-gray-400 font-normal">vs prev 7d</span>
                 </div>
             )}
+        </div>
+    );
+}
+
+// ── Stock by Location widget (multiWarehouse only) ─────────────────────────
+function StockByLocationWidget({ store, money }) {
+    const [locations, setLocations] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [enabled, setEnabled] = useState(false);
+
+    useEffect(() => {
+        (async () => {
+            try {
+                const res = await authFetch("/api/v1/admin/location");
+                const d = await res.json();
+                if (d?.success) {
+                    setLocations(d.data || []);
+                    setEnabled(true);
+                }
+            } catch {
+                setEnabled(false);
+            } finally {
+                setLoading(false);
+            }
+        })();
+    }, []);
+
+    if (loading || !enabled || locations.length === 0) return null;
+
+    return (
+        <div className="bg-white border border-gray-200 rounded-2xl p-4 sm:p-5">
+            <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                    <span className="w-9 h-9 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
+                        <FiMapPin className="w-5 h-5" />
+                    </span>
+                    <div>
+                        <h3 className="font-semibold text-gray-800">Stock by Location</h3>
+                        <p className="text-xs text-gray-400">Multi-warehouse inventory overview</p>
+                    </div>
+                </div>
+                <Link href="/admin/locations" className="text-sm text-indigo-600 hover:text-indigo-700 font-medium flex items-center gap-1">
+                    Manage <FiArrowRight className="w-4 h-4" />
+                </Link>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                {locations.map((loc) => (
+                    <div key={loc._id} className="bg-gray-50 rounded-xl p-3">
+                        <div className="flex items-center justify-between mb-1">
+                            <p className="text-sm font-semibold text-gray-800 truncate">{loc.name}</p>
+                            <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full capitalize ${
+                                loc.active !== false ? "bg-emerald-50 text-emerald-700" : "bg-gray-100 text-gray-500"
+                            }`}>{loc.type}</span>
+                        </div>
+                        <code className="text-[11px] text-gray-400">{loc.code}</code>
+                        {loc.isDefault && (
+                            <span className="ml-2 text-[10px] text-indigo-600 font-semibold">DEFAULT</span>
+                        )}
+                        <div className="mt-2">
+                            <Link
+                                href={`/${store}/admin/locations/${loc._id}/stock`}
+                                className="text-xs text-indigo-600 hover:text-indigo-700 font-medium"
+                            >
+                                View stock
+                            </Link>
+                        </div>
+                    </div>
+                ))}
+            </div>
         </div>
     );
 }
@@ -494,6 +564,9 @@ export default function DashboardPage() {
                             </div>
                         </div>
                     )}
+
+                    {/* Stock by Location widget — only shown when multiWarehouse feature is on */}
+                    <StockByLocationWidget store={store} money={money} />
 
                     {/* Quick actions */}
                     <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">

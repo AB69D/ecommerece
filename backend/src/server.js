@@ -59,6 +59,9 @@ import platformRouter from './routes/platform.route.js';
 import notificationRouter from './routes/notification.route.js';
 import flashSaleRouter from './routes/flashSale.route.js';
 import courierRouter from './routes/courier.route.js';
+import vatConfigRouter from './routes/vatConfig.route.js';
+import locationRouter from './routes/location.route.js';
+import stockTransferRouter from './routes/stockTransfer.route.js';
 import { recoverAbandonedCarts } from './lib/abandonedCart.js';
 
 const app = express();
@@ -346,6 +349,9 @@ const mountApiRoutes = (prefix) => {
     app.use(`${prefix}/admin/notifications`, requireAuth, notificationRouter);
     app.use(`${prefix}/admin/flash-sale`, requireAuth, flashSaleRouter.admin);
     app.use(`${prefix}/admin/courier`, requireAuth, courierRouter);
+    app.use(`${prefix}/admin/vat`, requireAuth, vatConfigRouter);
+    app.use(`${prefix}/admin/location`, requireAuth, locationRouter);
+    app.use(`${prefix}/admin/stock-transfer`, requireAuth, stockTransferRouter);
 
     // Public / client routes
     // NOTE: multer-based routes must use wrapMulter() from tenantContext.js so

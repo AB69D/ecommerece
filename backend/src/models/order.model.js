@@ -227,6 +227,22 @@ const orderSchema = new Schema({
     // Flipped by admin after receiving the courier's COD bank transfer.
     codRemitted: { type: Boolean, default: false },
     codRemittedAt: { type: Date, default: null },
+
+    // ── Multi-warehouse fulfillment ───────────────────────────────────────────
+    // The Location from which this order's stock was (or will be) deducted.
+    // Null for orders placed before multi-warehouse was enabled, and for
+    // ecommerce orders when the feature is off.
+    fulfillLocationId: { type: mongoose.Schema.Types.ObjectId, ref: 'Location', default: null },
+
+    // ── VAT / Mushak 6.3 ─────────────────────────────────────────────────────
+    // Populated when the tenant has VAT enabled and a Mushak 6.3 invoice is
+    // generated at order creation time. All default to 0/null so historical
+    // orders and VAT-disabled tenants remain unaffected.
+    vatAmount: { type: Number, default: 0 },
+    vatRate: { type: Number, default: 0 },
+    taxableAmount: { type: Number, default: 0 },
+    vatInvoiceId: { type: mongoose.Schema.Types.ObjectId, ref: 'VatInvoice', default: null },
+    vatInvoiceNo: { type: String, default: null },
 }, {
     timestamps: true
 });

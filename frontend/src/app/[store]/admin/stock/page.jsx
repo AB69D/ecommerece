@@ -1,7 +1,7 @@
 "use client";
 import { authFetch } from "@/services/api";
 import React, { useState, useEffect } from "react";
-import { FiSearch, FiPlus, FiMinus, FiAlertCircle, FiTrendingUp, FiPackage, FiAlertTriangle } from "react-icons/fi";
+import { FiSearch, FiPlus, FiMinus, FiAlertCircle, FiTrendingUp, FiPackage, FiAlertTriangle, FiMapPin } from "react-icons/fi";
 import { useAdminAuth } from "@/context/AdminAuthContext";
 import { useCurrency } from "@/context/CurrencyContext.jsx";
 
@@ -17,6 +17,44 @@ export default function StockManagementPage() {
     const [message, setMessage] = useState("");
     const [adjustModal, setAdjustModal] = useState({ show: false, product: null, weightIndex: null });
     const [adjustForm, setAdjustForm] = useState({ quantity: "", action: "add", reason: "" });
+
+    // Multi-warehouse: location filter
+    const [locations, setLocations] = useState([]);
+    const [selectedLocation, setSelectedLocation] = useState("");
+    const [locationStockData, setLocationStockData] = useState([]);
+    const [locationLoading, setLocationLoading] = useState(false);
+    const multiWarehouse = locations.length > 0;
+
+    useEffect(() => {
+        // Try to load locations — if multi-warehouse is enabled the API returns them
+        (async () => {
+            try {
+                const res = await authFetch("/api/v1/admin/location");
+                const d = await res.json();
+                if (d?.success && (d.data || []).length > 0) {
+                    setLocations(d.data.filter((l) => l.active !== false));
+                }
+            } catch {
+                /* multi-warehouse not enabled — ignore */
+            }
+        })();
+    }, []);
+
+    useEffect(() => {
+        if (!selectedLocation) return;
+        setLocationLoading(true);
+        (async () => {
+            try {
+                const res = await authFetch(`/api/v1/admin/location/${selectedLocation}/stock?limit=200`);
+                const d = await res.json();
+                if (d?.success) setLocationStockData(d.data?.items || []);
+            } catch {
+                setLocationStockData([]);
+            } finally {
+                setLocationLoading(false);
+            }
+        })();
+    }, [selectedLocation]);
 
     useEffect(() => {
         const fetchStockData = async () => {
@@ -161,6 +199,78 @@ export default function StockManagementPage() {
                 );
             })()}
 
+            {/* Location filter — only shown when multi-warehouse is enabled */}
+            {multiWarehouse && (
+                <div className="mb-4 flex items-center gap-3 flex-wrap">
+                    <div className="flex items-center gap-2 text-sm text-gray-600">
+                        <FiMapPin className="w-4 h-4 text-indigo-500" />
+                        <span className="font-medium">Location:</span>
+                    </div>
+                    <select
+                        value={selectedLocation}
+                        onChange={(e) => setSelectedLocation(e.target.value)}
+                        className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                    >
+                        <option value="">All locations (aggregate)</option>
+                        {locations.map((l) => (
+                            <option key={l._id} value={l._id}>
+                                {l.name} ({l.code})
+                            </option>
+                        ))}
+                    </select>
+                </div>
+            )}
+
+            {/* Location-specific stock view */}
+            {multiWarehouse && selectedLocation && (
+                <div className="mb-6">
+                    {locationLoading ? (
+                        <div className="py-8 flex justify-center">
+                            <div className="w-7 h-7 border-3 border-gray-200 border-t-indigo-600 rounded-full animate-spin" />
+                        </div>
+                    ) : locationStockData.length === 0 ? (
+                        <div className="border-2 border-dashed border-gray-200 rounded-xl py-10 text-center">
+                            <FiPackage className="w-6 h-6 text-gray-300 mx-auto mb-2" />
+                            <p className="text-sm text-gray-400">No stock at this location.</p>
+                        </div>
+                    ) : (
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-sm">
+                                <thead>
+                                    <tr className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wide border-b border-gray-100">
+                                        <th className="pb-3 pr-4">Product</th>
+                                        <th className="pb-3 pr-4">Variant</th>
+                                        <th className="pb-3 pr-4 text-right">Stock</th>
+                                        <th className="pb-3 pr-4 text-right">Reserved</th>
+                                        <th className="pb-3 text-right">Available</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-50">
+                                    {locationStockData
+                                        .filter((it) =>
+                                            !search || (it.productName || "").toLowerCase().includes(search.toLowerCase())
+                                        )
+                                        .map((item, idx) => {
+                                            const available = item.stock - (item.reservedQty || 0);
+                                            return (
+                                                <tr key={idx} className={`${available < 5 ? "bg-red-50" : "hover:bg-gray-50"}`}>
+                                                    <td className="py-2.5 pr-4 font-medium text-gray-800">{item.productName}</td>
+                                                    <td className="py-2.5 pr-4 text-gray-500">{item.weight || `Variant ${item.weightIndex}`}</td>
+                                                    <td className="py-2.5 pr-4 text-right font-mono text-gray-800">{item.stock}</td>
+                                                    <td className="py-2.5 pr-4 text-right font-mono text-gray-500">{item.reservedQty || 0}</td>
+                                                    <td className={`py-2.5 text-right font-mono font-semibold ${available < 5 ? "text-red-600" : "text-gray-800"}`}>
+                                                        {available}
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
+                </div>
+            )}
+
             <div className="mb-6">
                 <div className="relative">
                     <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
@@ -174,13 +284,13 @@ export default function StockManagementPage() {
                 </div>
             </div>
 
-            {loading ? (
+            {!selectedLocation && loading ? (
                 <div className="flex items-center justify-center py-20">
                     <div className="w-10 h-10 border-4 border-gray-300 border-t-emerald-600 rounded-full animate-spin" />
                 </div>
-            ) : filteredData.length === 0 ? (
+            ) : !selectedLocation && filteredData.length === 0 ? (
                 <div className="text-center py-20 text-gray-500">No stock data found</div>
-            ) : (
+            ) : !selectedLocation ? (
                 <div className="space-y-4">
                     {filteredData.map((product) => (
                         <div key={product._id} className="border border-gray-200 rounded-xl overflow-hidden">
