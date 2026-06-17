@@ -1,4 +1,4 @@
-name: VPS Diagnostics
+name: VPS Diagnostics + Bootstrap
 
 on:
   workflow_dispatch:
