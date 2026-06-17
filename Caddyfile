@@ -1,10 +1,21 @@
-# Caddy reverse proxy — backend-only (frontend is on Vercel).
-# Currently serves HTTP on port 80 by IP (no domain yet).
-# When you have a domain pointing at this VPS, replace `:80` block with
-# `api.yourdomain.com { reverse_proxy backend:8080 }` and Caddy will
-# auto-provision Let's Encrypt HTTPS.
+# Caddy reverse proxy.
+# /api/* and /healthz go straight to the Express backend.
+# Everything else (/, /app/admin/*, /platform, /login, …) goes to the Next.js
+# frontend.  Both services are on the internal Docker "app" network.
 
 :80 {
     encode zstd gzip
-    reverse_proxy backend:8080
+
+    # ── Backend ──────────────────────────────────────────────────────────────
+    handle /api/* {
+        reverse_proxy backend:8080
+    }
+    handle /healthz {
+        reverse_proxy backend:8080
+    }
+
+    # ── Frontend (Next.js) ───────────────────────────────────────────────────
+    handle {
+        reverse_proxy frontend:3000
+    }
 }

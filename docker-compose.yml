@@ -139,6 +139,25 @@ services:
     networks:
       - app
 
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        # Server-side Next.js code (storeContext, server components) calls this
+        # URL directly from inside the Docker network. Client-side code always
+        # uses relative /api/* paths, which Caddy routes straight to the backend
+        # without going through Next.js at all.
+        NEXT_PUBLIC_BACKEND_URL: http://backend:8080
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+      HOSTNAME: "0.0.0.0"
+    networks:
+      - app
+    depends_on:
+      - backend
+
   caddy:
     image: caddy:2-alpine
     restart: unless-stopped
@@ -152,6 +171,7 @@ services:
       - caddy-config:/config
     depends_on:
       - backend
+      - frontend
     networks:
       - app
 

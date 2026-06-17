@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - 'backend/**'
+      - 'frontend/**'
       - 'docker-compose.yml'
       - 'Caddyfile'
       - '.github/workflows/deploy-backend.yml'
@@ -18,7 +19,7 @@ concurrency:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 30
     env:
       VPS_HOST: ${{ secrets.VPS_HOST }}
       VPS_USER: ${{ secrets.VPS_USER || 'root' }}
@@ -124,22 +125,51 @@ jobs:
           # always restart caddy so it can bind port 80
           docker compose up -d --force-recreate caddy
 
-          # wait for health (caddy proxies / → backend:8080 → /healthz JSON)
+          # wait for backend health (/healthz → backend:8080)
+          BACKEND_OK=0
           for i in $(seq 1 60); do
             STATUS=$(curl -s -o /tmp/healthz_resp.txt -w "%{http_code}" -m 5 http://127.0.0.1/healthz 2>/dev/null || echo "000")
             BODY=$(cat /tmp/healthz_resp.txt 2>/dev/null || echo "")
             if echo "$BODY" | grep -q '"status"'; then
               echo "Backend healthy after $i attempts (HTTP $STATUS)"
-              exit 0
+              BACKEND_OK=1
+              break
             fi
             echo "Attempt $i/60: HTTP $STATUS — $BODY"
             sleep 2
           done
-          echo "=== BACKEND DID NOT BECOME HEALTHY ==="
-          docker compose logs --tail=100 backend
+          if [ "$BACKEND_OK" -eq 0 ]; then
+            echo "=== BACKEND DID NOT BECOME HEALTHY ==="
+            docker compose logs --tail=100 backend
+            docker compose logs --tail=20 caddy
+            docker compose ps
+            echo "=== Direct port 8080 check ==="
+            curl -fsS -m 5 http://127.0.0.1:8080/healthz 2>&1 || echo "Port 8080 unreachable"
+            exit 1
+          fi
+
+          echo "=== Build + start frontend (Next.js) ==="
+          docker compose up -d --build frontend 2>&1
+          echo "=== Frontend container status ==="
+          docker compose ps frontend
+          docker compose logs --tail=20 frontend
+
+          # Restart caddy so it can resolve the now-running frontend container
+          docker compose up -d --force-recreate caddy
+
+          echo "=== Waiting for frontend to respond (up to 2 min) ==="
+          for i in $(seq 1 24); do
+            FE_STATUS=$(curl -s -o /dev/null -w "%{http_code}" -m 10 http://127.0.0.1/ 2>/dev/null || echo "000")
+            echo "Attempt $i/24: frontend HTTP $FE_STATUS"
+            if [ "$FE_STATUS" = "200" ] || [ "$FE_STATUS" = "307" ] || [ "$FE_STATUS" = "308" ]; then
+              echo "Frontend healthy after $i attempts (HTTP $FE_STATUS)"
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "=== FRONTEND DID NOT BECOME HEALTHY ==="
+          docker compose logs --tail=50 frontend
           docker compose logs --tail=20 caddy
           docker compose ps
-          echo "=== Direct port 8080 check ==="
-          curl -fsS -m 5 http://127.0.0.1:8080/healthz 2>&1 || echo "Port 8080 unreachable"
           exit 1
           EOF
