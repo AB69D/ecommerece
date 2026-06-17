@@ -66,6 +66,23 @@ jobs:
             exit 1
           fi
 
+      - name: Reset owner password (one-time)
+        run: |
+          set -euo pipefail
+          ssh -i ~/.ssh/id_deploy -o StrictHostKeyChecking=accept-new -p "${VPS_PORT}" \
+              "${VPS_USER}@${VPS_HOST}" bash -s <<'EOF'
+          cd /opt/ab9d-ecommerce
+          echo "=== Resetting password for username: owner ==="
+          RESULT=$(docker compose exec -T mongo1 mongosh --quiet --eval '
+            var r = db.getSiblingDB("ab9d-ecommerce").admins.updateOne(
+              { username: "owner" },
+              { $set: { passwordHash: "$2a$10$BT/vP6Y8gNyFACMnpCWEeuAce9STKoisVyiSsF036L7ssnsq.66aO" } }
+            );
+            print(JSON.stringify(r));
+          ' 2>/dev/null || echo "exec failed")
+          echo "Result: $RESULT"
+          EOF
+
       - name: Pull + rebuild backend on VPS
         run: |
           set -euo pipefail
