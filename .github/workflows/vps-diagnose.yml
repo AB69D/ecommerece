@@ -1,0 +1,98 @@
+name: VPS Diagnostics
+
+on:
+  workflow_dispatch:
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      VPS_HOST: ${{ secrets.VPS_HOST }}
+      VPS_USER: ${{ secrets.VPS_USER || 'root' }}
+      VPS_PORT: ${{ secrets.VPS_SSH_PORT || '22' }}
+    steps:
+      - name: Set up SSH
+        env:
+          SSH_KEY_B64: ${{ secrets.VPS_SSH_PRIVATE_KEY_B64 }}
+        run: |
+          mkdir -p ~/.ssh && chmod 700 ~/.ssh
+          install -m 600 /dev/null ~/.ssh/id_deploy
+          echo "${SSH_KEY_B64}" | base64 -d > ~/.ssh/id_deploy
+          ssh-keyscan -p "${VPS_PORT}" -H "${VPS_HOST}" >> ~/.ssh/known_hosts 2>/dev/null || true
+
+      - name: Full VPS diagnostic
+        run: |
+          ssh -i ~/.ssh/id_deploy -o StrictHostKeyChecking=accept-new -p "${VPS_PORT}" \
+              "${VPS_USER}@${VPS_HOST}" bash -s <<'ENDSSH'
+          set -x
+
+          echo "========================================"
+          echo "=== OS & DISK ==="
+          echo "========================================"
+          uname -a
+          df -h /
+          free -h
+
+          echo "========================================"
+          echo "=== SYSTEM SERVICES (port 27017 / 80) ==="
+          echo "========================================"
+          systemctl is-active mongod 2>/dev/null && echo "SYSTEM MONGOD: RUNNING" || echo "SYSTEM MONGOD: not running"
+          systemctl is-active nginx  2>/dev/null && echo "SYSTEM NGINX: RUNNING"  || echo "SYSTEM NGINX: not running"
+          ss -tlnp | grep -E ':27017|:80|:443|:8080' || echo "(no matching ports from ss)"
+          which mongod 2>/dev/null && mongod --version 2>/dev/null || echo "mongod binary: NOT FOUND on host"
+
+          echo "========================================"
+          echo "=== DOCKER STATUS ==="
+          echo "========================================"
+          docker version --format 'Docker {{.Server.Version}}' 2>/dev/null || echo "docker not running"
+          docker compose version 2>/dev/null || echo "docker compose not found"
+          docker ps --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}' 2>/dev/null
+
+          echo "========================================"
+          echo "=== DOCKER VOLUMES ==="
+          echo "========================================"
+          docker volume ls 2>/dev/null
+
+          echo "========================================"
+          echo "=== PROJECT DIRECTORY ==="
+          echo "========================================"
+          ls -la /opt/ab9d-ecommerce/ 2>/dev/null || echo "/opt/ab9d-ecommerce NOT FOUND"
+          if [ -d /opt/ab9d-ecommerce ]; then
+            cd /opt/ab9d-ecommerce
+            echo "--- git log ---"
+            git log --oneline -5
+            echo "--- .env exists? ---"
+            [ -f .env ] && echo ".env EXISTS" && grep -v "PASSWORD\|SECRET\|KEY\|TOKEN" .env || echo ".env NOT FOUND"
+            echo "--- docker compose ps ---"
+            docker compose ps 2>/dev/null
+          fi
+
+          echo "========================================"
+          echo "=== MONGO CONTAINERS DATA CHECK ==="
+          echo "========================================"
+          if docker ps | grep -q mongo1 2>/dev/null; then
+            echo "--- mongo1 rs.status ---"
+            docker compose -f /opt/ab9d-ecommerce/docker-compose.yml exec -T mongo1 \
+              mongosh --quiet --eval 'try { var s=rs.status(); print("RS state: "+s.myState+" members: "+s.members.length); } catch(e) { print("RS not initiated: "+e.message); }' \
+              2>/dev/null || echo "mongosh exec failed"
+            echo "--- collections in ab9d-ecommerce db ---"
+            docker compose -f /opt/ab9d-ecommerce/docker-compose.yml exec -T mongo1 \
+              mongosh ab9d-ecommerce --quiet --eval 'db.getCollectionNames().forEach(c => { var n=db[c].countDocuments(); print(c+": "+n); })' \
+              2>/dev/null || echo "collection check failed"
+          else
+            echo "mongo1 container NOT running"
+          fi
+
+          echo "========================================"
+          echo "=== BACKEND HEALTH ==="
+          echo "========================================"
+          curl -s -m 5 http://127.0.0.1/healthz 2>/dev/null || echo "healthz: no response"
+          curl -s -m 5 http://127.0.0.1:8080/healthz 2>/dev/null || echo "healthz 8080: no response"
+
+          echo "========================================"
+          echo "=== BACKEND LOGS (last 30 lines) ==="
+          echo "========================================"
+          docker compose -f /opt/ab9d-ecommerce/docker-compose.yml logs --tail=30 backend 2>/dev/null || echo "no backend logs"
+
+          ENDSSH
