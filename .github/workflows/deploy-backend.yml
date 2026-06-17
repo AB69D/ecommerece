@@ -87,19 +87,43 @@ jobs:
           git reset --hard origin/main
           echo "Current commit (after):  $(git rev-parse --short HEAD)"
 
-          docker compose up -d --build backend
+          echo "=== Docker disk usage ==="
+          docker system df 2>/dev/null || true
+
+          echo "=== Building backend ==="
+          docker compose up -d --build backend 2>&1
+          echo "=== Build complete. Container status ==="
+          docker compose ps backend
+
+          echo "=== Early backend logs (first 30s) ==="
+          sleep 5
+          docker compose logs --tail=30 backend
+
           # always restart caddy so it can bind port 80 now that nginx is gone
           docker compose up -d --force-recreate caddy
+          echo "=== Caddy status ==="
+          docker compose ps caddy
+
           # wait for health (caddy proxies / → backend:8080 → /healthz JSON)
-          for i in $(seq 1 30); do
-            if curl -fsS -m 3 http://127.0.0.1/healthz 2>/dev/null | grep -q '"status"'; then
-              echo "Backend healthy after $i attempts"
+          # 60 iterations × 2s = 120s max wait
+          for i in $(seq 1 60); do
+            STATUS=$(curl -s -o /tmp/healthz_resp.txt -w "%{http_code}" -m 5 http://127.0.0.1/healthz 2>/dev/null || echo "000")
+            BODY=$(cat /tmp/healthz_resp.txt 2>/dev/null || echo "")
+            if echo "$BODY" | grep -q '"status"'; then
+              echo "Backend healthy after $i attempts (HTTP $STATUS): $BODY"
               exit 0
             fi
+            echo "Attempt $i/$((60)): HTTP $STATUS — $BODY"
             sleep 2
           done
-          echo "Backend did not become healthy"
-          docker compose logs --tail=50 backend
-          docker compose logs --tail=20 caddy
+          echo "=== BACKEND DID NOT BECOME HEALTHY ==="
+          echo "=== Backend logs (last 100 lines) ==="
+          docker compose logs --tail=100 backend
+          echo "=== Caddy logs ==="
+          docker compose logs --tail=30 caddy
+          echo "=== Container status ==="
+          docker compose ps
+          echo "=== Direct backend port check (bypass Caddy) ==="
+          curl -fsS -m 5 http://127.0.0.1:8080/healthz 2>&1 || echo "Direct port 8080 unreachable"
           exit 1
           EOF
